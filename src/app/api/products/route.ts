@@ -2,15 +2,20 @@ import { NextResponse } from 'next/server';
 
 /**
  * SERVER-SIDE PROXY: Al-Ragheb API
- * Updated to use the correct /client/api/products endpoint and api-token header.
+ * Handles both general product listings and specific category content.
  */
 const AL_RAGHEB_BASE_URL = "https://api.alragheb-store.com";
 const AL_RAGHEB_AUTH_TOKEN = "64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    // Official endpoint from documentation: /client/api/products
-    const endpoint = `${AL_RAGHEB_BASE_URL}/client/api/products`;
+    const { searchParams } = new URL(request.url);
+    const categoryId = searchParams.get('categoryId');
+    
+    // Determine endpoint based on whether a specific Category ID was requested
+    const endpoint = categoryId 
+      ? `${AL_RAGHEB_BASE_URL}/client/api/content/${categoryId}`
+      : `${AL_RAGHEB_BASE_URL}/client/api/products`;
     
     const response = await fetch(endpoint, {
       method: 'GET',

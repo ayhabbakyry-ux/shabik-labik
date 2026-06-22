@@ -43,7 +43,13 @@ export function ProductSheet({
     
     setFetching(true);
     try {
-      const response = await fetch('/api/products');
+      // If serviceId is a number (Category ID), pass it to the proxy
+      const isNumericId = !isNaN(Number(serviceId));
+      const url = isNumericId 
+        ? `/api/products?categoryId=${serviceId}`
+        : `/api/products`;
+
+      const response = await fetch(url);
 
       if (!response.ok) {
         const errData = await response.json();
@@ -53,22 +59,21 @@ export function ProductSheet({
       const data = await response.json();
       
       // Al-Ragheb API returns products in a "data" property or as a root array
-      const allProducts = Array.isArray(data) ? data : (data.data || []);
+      let allProducts = Array.isArray(data) ? data : (data.data || []);
       
-      // Filter logic: Match serviceId to names or categories
-      const filtered = allProducts.filter((p: any) => {
-        const productName = String(p.name || '').toLowerCase();
-        const categoryName = String(p.category_name || '').toLowerCase();
-        const target = serviceId.toLowerCase();
-        
-        // Extract the base key (e.g., 'syriatel' from 'syriatel-units')
-        const baseKey = target.split('-')[0];
-        
-        // Match if product name or its category contains our key
-        return productName.includes(baseKey) || categoryName.includes(baseKey);
-      });
+      // If we used a specific categoryId, the server likely already filtered them.
+      // If not, we perform local keyword filtering for safety.
+      if (!isNumericId) {
+        allProducts = allProducts.filter((p: any) => {
+          const productName = String(p.name || '').toLowerCase();
+          const categoryName = String(p.category_name || '').toLowerCase();
+          const target = serviceId.toLowerCase();
+          const baseKey = target.split('-')[0];
+          return productName.includes(baseKey) || categoryName.includes(baseKey);
+        });
+      }
 
-      setProducts(filtered);
+      setProducts(allProducts);
     } catch (error: any) {
       console.error("Client fetch error:", error);
       toast({
@@ -130,7 +135,7 @@ export function ProductSheet({
               {serviceName}
             </SheetTitle>
             <SheetDescription className="flex items-center gap-2">
-              Live from Al-Ragheb API
+              Live Category Sync
               <span className="inline-flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
             </SheetDescription>
           </SheetHeader>
@@ -143,14 +148,14 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm font-medium">Bypassing CORS & Connecting...</p>
+              <p className="text-sm font-medium">Fetching specific category goods...</p>
             </div>
           ) : products.length === 0 ? (
             <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <PackageX className="h-8 w-8" />
               <p className="text-sm font-medium text-center">
                 No items found for <br/>
-                <span className="text-primary font-bold">"{serviceId}"</span>
+                <span className="text-primary font-bold">"{serviceName}"</span>
               </p>
             </div>
           ) : (
@@ -182,11 +187,11 @@ export function ProductSheet({
         
         <div className="p-6 bg-muted/30 border-t flex items-center justify-between">
           <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-            Secure Backend Bridge
+            Category ID: {serviceId}
           </p>
           <div className="flex items-center gap-1 text-[10px] text-primary font-bold">
             <ExternalLink className="h-3 w-3" />
-            Verified Provider
+            Direct API Response
           </div>
         </div>
       </SheetContent>
