@@ -16,12 +16,26 @@ import { Label } from "@/components/ui/label";
 import { useUser } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 import { AdminPanel } from "@/components/admin/AdminPanel";
-import { Loader2, PackageX, RefreshCw, Key, AlertCircle, Terminal } from "lucide-react";
+import { Loader2, PackageX, RefreshCw, Key, AlertCircle, Terminal, Info } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type Product = {
   id: string | number;
   name: string;
   price: number;
+};
+
+type ServerCategory = {
+  id: number;
+  الاسم?: string;
+  name?: string;
 };
 
 const AL_RAGHEB_ERRORS: Record<number | string, string> = {
@@ -48,7 +62,7 @@ export function ProductSheet({
   children, 
   serviceName, 
   serviceId,
-  categoryId, // New: Direct ID support
+  categoryId, 
 }: { 
   children: React.ReactNode; 
   serviceName: string;
@@ -56,6 +70,7 @@ export function ProductSheet({
   categoryId?: number;
 }) {
   const [products, setProducts] = useState<Product[]>([]);
+  const [serverCategories, setServerCategories] = useState<ServerCategory[]>([]);
   const [fetching, setFetching] = useState(false);
   const [ordering, setOrdering] = useState<string | number | null>(null);
   const [playerId, setPlayerId] = useState("");
@@ -66,23 +81,22 @@ export function ProductSheet({
     if (serviceId === 'admin') return;
     
     setFetching(true);
-    console.log(`%c [DEBUG] Fetch triggered for: ${serviceName}`, 'background: #222; color: #bada55; font-size: 14px');
+    setServerCategories([]);
 
     try {
-      // DEBUG: ALWAYS LOG ALL CATEGORIES TO CONSOLE
+      // Step 1: Always fetch the root categories to show the user the IDs on screen
       const rootRes = await fetch('/api/products?categoryId=0');
       const rootData = await rootRes.json();
-      console.log("%c [SERVER CATEGORY LIST] 👇", 'color: #ff00ff; font-weight: bold; font-size: 16px');
-      console.table(Array.isArray(rootData) ? rootData : rootData.data || []);
+      const rawCategories = Array.isArray(rootData) ? rootData : (rootData.data || []);
+      setServerCategories(rawCategories);
 
       if (!categoryId) {
-        console.warn(`[DEBUG] No categoryId provided for "${serviceName}". Please check the table above and provide the ID in ServiceGrid.tsx.`);
         setProducts([]);
         setFetching(false);
         return;
       }
 
-      console.log(`[DEBUG] Fetching products for confirmed ID: ${categoryId}`);
+      // Step 2: Fetch products for the specific mapped ID
       const contentRes = await fetch(`/api/products?categoryId=${categoryId}`);
       const contentData = await contentRes.json();
 
@@ -99,7 +113,6 @@ export function ProductSheet({
 
       setProducts(mappedProducts);
     } catch (error: any) {
-      console.error("[DEBUG] Fetch failed:", error);
       toast({
         title: "Fetch Error",
         description: error.message,
@@ -140,63 +153,93 @@ export function ProductSheet({
           </Button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {!categoryId && (
-            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex gap-3 text-yellow-800 text-sm">
-              <Terminal className="h-5 w-5 shrink-0" />
-              <div>
-                <p className="font-bold">Developer Note:</p>
-                <p>Check the browser console to see the list of IDs from the server. Once you have the ID for this service, map it in ServiceGrid.tsx.</p>
+        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          {/* Debug Display for Mobile Users */}
+          {!categoryId && !fetching && serverCategories.length > 0 && (
+            <div className="space-y-4">
+              <div className="p-4 bg-primary/10 border border-primary/20 rounded-xl flex gap-3 text-primary text-sm">
+                <Info className="h-5 w-5 shrink-0" />
+                <div>
+                  <p className="font-bold">Server Category List (Discovery):</p>
+                  <p>Please find the ID for <strong>{serviceName}</strong> in the list below and let me know.</p>
+                </div>
+              </div>
+              
+              <div className="border rounded-lg overflow-hidden bg-white">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="font-bold">Category Name</TableHead>
+                      <TableHead className="text-right font-bold">ID</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {serverCategories.map((cat) => (
+                      <TableRow key={cat.id}>
+                        <TableCell className="font-medium">{cat.الاسم || cat.name}</TableCell>
+                        <TableCell className="text-right font-mono text-primary font-bold">
+                          {cat.id}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             </div>
           )}
 
-          <div className="space-y-2 p-4 bg-accent/50 rounded-xl border border-accent">
-            <Label htmlFor="playerId" className="text-xs font-bold uppercase flex items-center gap-2">
-              <Key className="h-3 w-3" /> Account ID / Phone
-            </Label>
-            <Input 
-              id="playerId" 
-              placeholder="e.g. 09xxxxxxxx" 
-              value={playerId}
-              onChange={(e) => setPlayerId(e.target.value)}
-              className="bg-white"
-            />
-          </div>
+          {fetching && (
+            <div className="h-60 flex flex-col items-center justify-center text-muted-foreground gap-3">
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+              <p className="text-sm font-medium animate-pulse">Communicating with Al-Ragheb...</p>
+            </div>
+          )}
 
-          {fetching ? (
-            <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm font-medium animate-pulse">Syncing with Al-Ragheb...</p>
-            </div>
-          ) : products.length === 0 ? (
-            <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
-              <PackageX className="h-8 w-8 opacity-20" />
-              <p className="text-sm font-medium text-center">
-                {categoryId ? "No products found for this ID." : "Waiting for ID assignment."}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {products.map((product) => (
-                <div 
-                  key={product.id}
-                  className="flex items-center justify-between p-4 rounded-xl border bg-card hover:bg-accent/10 transition-colors shadow-sm"
-                >
-                  <div className="space-y-1">
-                    <p className="font-bold text-sm leading-tight">{product.name}</p>
-                    <p className="text-sm font-bold text-secondary">{product.price.toLocaleString()} SYP</p>
-                  </div>
-                  <Button size="sm" className="h-9 px-6">Order</Button>
+          {!fetching && categoryId && (
+            <>
+              <div className="space-y-2 p-4 bg-accent/50 rounded-xl border border-accent">
+                <Label htmlFor="playerId" className="text-xs font-bold uppercase flex items-center gap-2">
+                  <Key className="h-3 w-3" /> Account ID / Phone
+                </Label>
+                <Input 
+                  id="playerId" 
+                  placeholder="e.g. 09xxxxxxxx" 
+                  value={playerId}
+                  onChange={(e) => setPlayerId(e.target.value)}
+                  className="bg-white"
+                />
+              </div>
+
+              {products.length === 0 ? (
+                <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
+                  <PackageX className="h-8 w-8 opacity-20" />
+                  <p className="text-sm font-medium text-center">
+                    No products found for ID #{categoryId}.
+                  </p>
                 </div>
-              ))}
-            </div>
+              ) : (
+                <div className="space-y-3">
+                  {products.map((product) => (
+                    <div 
+                      key={product.id}
+                      className="flex items-center justify-between p-4 rounded-xl border bg-card hover:bg-accent/10 transition-colors shadow-sm"
+                    >
+                      <div className="space-y-1">
+                        <p className="font-bold text-sm leading-tight">{product.name}</p>
+                        <p className="text-sm font-bold text-secondary">{product.price.toLocaleString()} SYP</p>
+                      </div>
+                      <Button size="sm" className="h-9 px-6">Order</Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
         
         <div className="p-4 bg-muted/30 border-t flex items-center justify-between">
           <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">
-            DIRECT_ID_MAPPING_ENABLED
+            MOBILE_DEBUG_ACTIVE
           </p>
           <div className="flex items-center gap-2 text-[9px] text-primary font-bold">
             <AlertCircle className="h-3 w-3" />
