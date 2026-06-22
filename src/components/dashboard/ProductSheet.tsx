@@ -17,17 +17,16 @@ import { AdminPanel } from "@/components/admin/AdminPanel";
 import { Loader2, PackageX, ExternalLink } from "lucide-react";
 
 /**
- * CONFIGURATION: Paste your Al-Ragheb API details here
+ * PRODUCTION CONFIGURATION: Al-Ragheb API
  */
-const AL_RAGHEB_API_URL = "https://your-api-endpoint.com/api/products"; // Replace with your URL
-const AL_RAGHEB_AUTH_TOKEN = "YOUR_BEARER_TOKEN_HERE"; // Replace with your Token
+const AL_RAGHEB_API_URL = "https://api.alragheb-store.com/api/products"; 
+const AL_RAGHEB_AUTH_TOKEN = "64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0";
 
 type Product = {
   id: string | number;
   name: string;
   price: number;
   category: string;
-  // Add other fields as per your actual API response
 };
 
 export function ProductSheet({ 
@@ -52,35 +51,34 @@ export function ProductSheet({
     const fetchProducts = async () => {
       setFetching(true);
       try {
-        // Construct the URL. If your API supports category filtering via query params:
-        // const url = `${AL_RAGHEB_API_URL}?category=${serviceId}`;
-        const url = AL_RAGHEB_API_URL;
-
-        const response = await fetch(url, {
+        const response = await fetch(AL_RAGHEB_API_URL, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${AL_RAGHEB_AUTH_TOKEN}`,
             'Content-Type': 'application/json',
+            'Accept': 'application/json'
           },
         });
 
         if (!response.ok) {
-          throw new Error(`API Error: ${response.statusText}`);
+          throw new Error(`API Error: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
         
-        /**
-         * NOTE: Adjust 'data' mapping based on your API structure.
-         * If the API returns { products: [...] }, use data.products.
-         * We filter by serviceId (Category) locally if the API returns all products.
-         */
-        const allProducts = Array.isArray(data) ? data : (data.products || []);
+        // Al-Ragheb API typically returns products in a 'data' array or root array
+        const allProducts = Array.isArray(data) ? data : (data.data || data.products || []);
         
         // Filter products that match the current category (serviceId)
-        const filtered = allProducts.filter((p: any) => 
-          String(p.category).toLowerCase() === serviceId.toLowerCase()
-        );
+        // We normalize both strings to ensure reliable matching
+        const filtered = allProducts.filter((p: any) => {
+          const productCategory = String(p.category || '').toLowerCase();
+          const targetCategory = serviceId.toLowerCase();
+          
+          // Match by exact ID or if the category string contains our service name key
+          return productCategory === targetCategory || 
+                 productCategory.includes(targetCategory.split('-')[0]);
+        });
 
         setProducts(filtered);
       } catch (error: any) {
@@ -110,10 +108,7 @@ export function ProductSheet({
     
     setOrdering(product.id);
     
-    /**
-     * TRANSACTION LOGIC: 
-     * In a production app, you would send a POST request to your backend here.
-     */
+    // Simulate order processing for the MVP
     setTimeout(() => {
       setOrdering(null);
       addBalance(-product.price);
