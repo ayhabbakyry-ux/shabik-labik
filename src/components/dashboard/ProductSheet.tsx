@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -43,7 +44,6 @@ export function ProductSheet({
     
     setFetching(true);
     try {
-      // If serviceId is a number (Category ID), pass it to the proxy
       const isNumericId = !isNaN(Number(serviceId));
       const url = isNumericId 
         ? `/api/products?categoryId=${serviceId}`
@@ -58,18 +58,38 @@ export function ProductSheet({
 
       const data = await response.json();
       
-      // Al-Ragheb API returns products in a "data" property or as a root array
       let allProducts = Array.isArray(data) ? data : (data.data || []);
       
-      // If we used a specific categoryId, the server likely already filtered them.
-      // If not, we perform local keyword filtering for safety.
+      // Advanced Filtering Logic for Arabic Categories
       if (!isNumericId) {
         allProducts = allProducts.filter((p: any) => {
-          const productName = String(p.name || '').toLowerCase();
-          const categoryName = String(p.category_name || '').toLowerCase();
+          const productName = String(p.name || '');
+          const categoryName = String(p.category_name || '');
+          
+          if (serviceId === 'line-recharge') {
+            // "قسم شحن الخطوط" should show both Syriatel and MTN units
+            return (
+              categoryName === "قسم شحن الخطوط" || 
+              productName.includes("وحدات سيريتل") || 
+              productName.includes("وحدات الام تي ان")
+            );
+          }
+          
+          if (serviceId === 'syriatel-units') {
+            return productName.includes("وحدات سيريتل") || categoryName.includes("سيريتل");
+          }
+          
+          if (serviceId === 'mtn-units') {
+            return productName.includes("وحدات الام تي ان") || categoryName.includes("MTN") || categoryName.includes("ام تي ان");
+          }
+
+          if (serviceId === 'alragheb') {
+             return true; // Show all for generic Al-Ragheb button
+          }
+
+          // Default fallback keyword search
           const target = serviceId.toLowerCase();
-          const baseKey = target.split('-')[0];
-          return productName.includes(baseKey) || categoryName.includes(baseKey);
+          return productName.toLowerCase().includes(target) || categoryName.toLowerCase().includes(target);
         });
       }
 
@@ -187,7 +207,7 @@ export function ProductSheet({
         
         <div className="p-6 bg-muted/30 border-t flex items-center justify-between">
           <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-            Category ID: {serviceId}
+            Filter: {serviceId}
           </p>
           <div className="flex items-center gap-1 text-[10px] text-primary font-bold">
             <ExternalLink className="h-3 w-3" />

@@ -1,21 +1,23 @@
+
 "use client";
 
-import { Smartphone, Zap, Gamepad2, CreditCard, MessageCircle, ShieldCheck } from "lucide-react";
+import { Smartphone, Zap, Gamepad2, CreditCard, MessageCircle, ShieldCheck, Layers } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ProductSheet } from "./ProductSheet";
 
 /**
  * Service Grid Configuration
- * Note: IDs '1' and '2' are placeholders for Syriatel and MTN Category IDs.
- * Please replace them with the actual IDs from your Al-Ragheb API response.
+ * Updated with Arabic category names as requested.
+ * 'line-recharge' acts as a filter for the 'قسم شحن الخطوط' logic.
  */
 const services = [
-  { id: 'alragheb', name: "Al-Ragheb Digital Goods", icon: Zap, color: "text-amber-500", bg: "bg-amber-50" },
-  { id: '1', name: "Syriatel Units", icon: Smartphone, color: "text-red-500", bg: "bg-red-50" },
-  { id: '2', name: "MTN Units", icon: Smartphone, color: "text-yellow-600", bg: "bg-yellow-50" },
-  { id: 'syriatel-cash', name: "Syr Cash Topup", icon: CreditCard, color: "text-red-600", bg: "bg-red-50" },
-  { id: 'gaming', name: "Gaming & Chat Apps", icon: Gamepad2, color: "text-blue-500", bg: "bg-blue-50" },
-  { id: 'admin', name: "Admin (Maalam Console)", icon: ShieldCheck, color: "text-primary", bg: "bg-primary/10", isAdmin: true },
+  { id: 'alragheb', name: "بضاعة ومنتجات الراغب", icon: Zap, color: "text-amber-500", bg: "bg-amber-50" },
+  { id: 'line-recharge', name: "قسم شحن الخطوط", icon: Layers, color: "text-emerald-500", bg: "bg-emerald-50" },
+  { id: 'syriatel-units', name: "وحدات سيريتل", icon: Smartphone, color: "text-red-500", bg: "bg-red-50" },
+  { id: 'mtn-units', name: "وحدات الام تي ان", icon: Smartphone, color: "text-yellow-600", bg: "bg-yellow-50" },
+  { id: 'syriatel-cash', name: "سيريتل كاش", icon: CreditCard, color: "text-red-600", bg: "bg-red-50" },
+  { id: 'gaming', name: "العاب وتطبيقات دردشة", icon: Gamepad2, color: "text-blue-500", bg: "bg-blue-50" },
+  { id: 'admin', name: "لوحة التحكم (المعلم)", icon: ShieldCheck, color: "text-primary", bg: "bg-primary/10", isAdmin: true },
 ];
 
 export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
