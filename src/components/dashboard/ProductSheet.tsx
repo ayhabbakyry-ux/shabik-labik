@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -11,10 +10,12 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useUser } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 import { AdminPanel } from "@/components/admin/AdminPanel";
-import { Loader2, PackageX, ExternalLink, RefreshCw } from "lucide-react";
+import { Loader2, PackageX, ExternalLink, RefreshCw, Key } from "lucide-react";
 
 type Product = {
   id: string | number;
@@ -36,19 +37,17 @@ export function ProductSheet({
   const [products, setProducts] = useState<Product[]>([]);
   const [fetching, setFetching] = useState(false);
   const [ordering, setOrdering] = useState<string | number | null>(null);
+  const [playerId, setPlayerId] = useState("");
   const { userBalance, addBalance } = useUser();
   const { toast } = useToast();
 
   /**
    * Exact API Mapping
-   * We map our internal service IDs to the EXACT Arabic strings 
-   * returned by the Al-Ragheb API.
    */
   const targetMap: Record<string, string> = useMemo(() => ({
     'syriatel-units': 'وحدات سيريتل',
     'mtn-units': 'وحدات الام تي ان',
     'line-recharge': 'قسم شحن الخطوط',
-    'alragheb': 'بضاعة ومنتجات الراغب',
     'syriatel-cash': 'سيريتل كاش',
     'gaming': 'العاب'
   }), []);
@@ -61,49 +60,37 @@ export function ProductSheet({
       const targetName = targetMap[serviceId];
       if (!targetName) throw new Error("Invalid service mapping");
 
-      // 1. DYNAMIC ID DISCOVERY: Fetch category list (Root 0)
+      // 1. DYNAMIC DISCOVERY: Fetch root categories (0)
       const discoveryRes = await fetch(`/api/products?categoryId=0`);
       if (!discoveryRes.ok) throw new Error("Failed to reach discovery endpoint");
       
       const discoveryData = await discoveryRes.json();
       const allDiscoveryItems = Array.isArray(discoveryData) ? discoveryData : (discoveryData.data || []);
 
-      // 2. RESOLVE NUMERIC ID: Search for the exact Arabic match
+      // 2. RESOLVE ID: Match exact Arabic string from Part 4 docs
       const matchedCategory = allDiscoveryItems.find((item: any) => {
         const itemName = String(item.name || "").trim();
-        const itemCatName = String(item.category_name || "").trim();
-        return itemName.includes(targetName) || itemCatName.includes(targetName);
+        return itemName === targetName;
       });
 
-      const resolvedId = matchedCategory ? (matchedCategory.id || matchedCategory.category_id) : 0;
+      if (!matchedCategory) throw new Error(`Category "${targetName}" not found on server`);
+
+      const resolvedId = matchedCategory.id;
       
-      // 3. TARGETED FETCH: Call specific content endpoint using the resolved ID
+      // 3. TARGETED FETCH: GET /client/api/content/[resolvedId]
       const response = await fetch(`/api/products?categoryId=${resolvedId}`);
       if (!response.ok) throw new Error("Server responded with an error");
 
       const rawData = await response.json();
+      // Documentation Part 2 says it returns products directly or in a 'data' key
       const allFetchedProducts = Array.isArray(rawData) ? rawData : (rawData.data || []);
 
-      // 4. FINAL PRECISION FILTER: Ensure the list ONLY contains relevant items
-      const strictlyFiltered = allFetchedProducts.filter((product: Product) => {
-        const pName = String(product.name).toLowerCase();
-        const pCatName = String(product.category_name || "").toLowerCase();
-        
-        // Special logic for "Line Recharge" to include all units
-        if (serviceId === 'line-recharge') {
-          return pName.includes('وحدات') || pCatName.includes('شحن');
-        }
-
-        // Exact string matching for standard categories
-        return pName.includes(targetName) || pCatName.includes(targetName);
-      });
-      
-      setProducts(strictlyFiltered);
+      setProducts(allFetchedProducts);
     } catch (error: any) {
-      console.error("Fetch/Filter error:", error);
+      console.error("Fetch error:", error);
       toast({
         title: "Connection Error",
-        description: error.message || "Could not resolve category filtering.",
+        description: error.message || "Failed to sync with Al-Ragheb.",
         variant: "destructive",
       });
     } finally {
@@ -117,7 +104,7 @@ export function ProductSheet({
     }
   }, [serviceId]);
 
-  const handleOrder = (product: Product) => {
+  const handleOrder = async (product: Product) => {
     if (userBalance < product.price) {
       toast({
         title: "Insufficient Balance",
@@ -126,17 +113,47 @@ export function ProductSheet({
       });
       return;
     }
+
+    if (!playerId && (serviceId === 'gaming' || serviceId.includes('units'))) {
+      toast({
+        title: "Player ID Required",
+        description: "Please enter the account ID for this service.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setOrdering(product.id);
     
-    setTimeout(() => {
-      setOrdering(null);
-      addBalance(-product.price);
+    try {
+      // Part 2 & 3: Mandatory order_uuid (UUIDv4)
+      const orderUuid = crypto.randomUUID();
+      
+      const res = await fetch(
+        `/api/products?type=order&productId=${product.id}&playerId=${encodeURIComponent(playerId)}&orderUuid=${orderUuid}`
+      );
+      
+      const result = await res.json();
+
+      if (result.الحالة === "موافق") {
+        addBalance(-product.price);
+        toast({
+          title: "Order Successful",
+          description: `Order ID: ${result.بيانات?.order_id || 'Success'}`,
+        });
+        setPlayerId("");
+      } else {
+        throw new Error(result.error || result.الحالة || "Order failed");
+      }
+    } catch (error: any) {
       toast({
-        title: "Success",
-        description: `Purchased: ${product.name}`,
+        title: "Transaction Failed",
+        description: error.message,
+        variant: "destructive",
       });
-    }, 1200);
+    } finally {
+      setOrdering(null);
+    }
   };
 
   if (serviceId === 'admin') {
@@ -160,7 +177,7 @@ export function ProductSheet({
               {serviceName}
             </SheetTitle>
             <SheetDescription className="flex items-center gap-2">
-              Verified Server ID Discovery
+              Documentation-Verified Sync
               <span className="inline-flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
             </SheetDescription>
           </SheetHeader>
@@ -169,19 +186,32 @@ export function ProductSheet({
           </Button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {(serviceId === 'gaming' || serviceId.includes('units')) && (
+            <div className="space-y-2 p-4 bg-accent rounded-xl">
+              <Label htmlFor="playerId" className="text-xs font-bold uppercase">Account / Player ID</Label>
+              <div className="relative">
+                <Key className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  id="playerId" 
+                  placeholder="Enter ID here..." 
+                  value={playerId}
+                  onChange={(e) => setPlayerId(e.target.value)}
+                  className="pl-10 bg-white"
+                />
+              </div>
+            </div>
+          )}
+
           {fetching ? (
             <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm font-medium">Resolving Server ID...</p>
+              <p className="text-sm font-medium">Fetching Category Content...</p>
             </div>
           ) : products.length === 0 ? (
             <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <PackageX className="h-8 w-8" />
-              <p className="text-sm font-medium text-center">
-                No items matching <br/>
-                <span className="text-primary font-bold">"{serviceName}"</span>
-              </p>
+              <p className="text-sm font-medium text-center">No active products in this category.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -192,7 +222,6 @@ export function ProductSheet({
                 >
                   <div className="space-y-1 pr-4">
                     <p className="font-bold text-sm leading-tight">{product.name}</p>
-                    <p className="text-xs text-muted-foreground opacity-70">Category: {product.category_name || "General"}</p>
                     <p className="text-sm font-bold text-secondary">
                       {product.price.toLocaleString()} <span className="text-[10px] font-normal">SYP</span>
                     </p>
@@ -213,11 +242,11 @@ export function ProductSheet({
         
         <div className="p-4 bg-muted/30 border-t flex items-center justify-between">
           <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">
-            Live Category Sync
+            Idempotency Key Active
           </p>
           <div className="flex items-center gap-1 text-[9px] text-primary font-bold">
             <ExternalLink className="h-3 w-3" />
-            100% Accuracy Mode
+            V4 UUID Enforcement
           </div>
         </div>
       </SheetContent>
