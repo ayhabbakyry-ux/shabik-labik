@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -20,7 +19,8 @@ type Product = {
   id: string | number;
   name: string;
   price: number;
-  category?: string;
+  category_id?: string | number;
+  category_name?: string;
 };
 
 export function ProductSheet({ 
@@ -43,7 +43,6 @@ export function ProductSheet({
     
     setFetching(true);
     try {
-      // Fetching from our local API proxy to avoid CORS and secure the token
       const response = await fetch('/api/products');
 
       if (!response.ok) {
@@ -53,22 +52,20 @@ export function ProductSheet({
 
       const data = await response.json();
       
-      // Standardize data extraction (API might return { data: [...] } or root array)
-      const allProducts = Array.isArray(data) ? data : (data.data || data.products || []);
+      // Al-Ragheb API often returns data in a "data" property or as a root array
+      const allProducts = Array.isArray(data) ? data : (data.data || []);
       
-      // Filter logic: Map serviceId to potential category keywords
+      // Filter logic: Match serviceId to category names or IDs returned by the API
       const filtered = allProducts.filter((p: any) => {
-        const productCategory = String(p.category || '').toLowerCase();
         const productName = String(p.name || '').toLowerCase();
+        const categoryName = String(p.category_name || '').toLowerCase();
         const target = serviceId.toLowerCase();
         
-        // Match if the category or name contains the service ID key
-        // e.g. 'syriatel-units' -> matches 'syriatel'
+        // Extract the base key (e.g., 'syriatel' from 'syriatel-units')
         const baseKey = target.split('-')[0];
         
-        return productCategory.includes(baseKey) || 
-               productName.includes(baseKey) ||
-               productCategory === target;
+        // Match if product name or its category contains our key
+        return productName.includes(baseKey) || categoryName.includes(baseKey);
       });
 
       setProducts(filtered);
@@ -100,7 +97,6 @@ export function ProductSheet({
     
     setOrdering(product.id);
     
-    // Simulate order placement
     setTimeout(() => {
       setOrdering(null);
       addBalance(-product.price);
@@ -132,7 +128,7 @@ export function ProductSheet({
               {serviceName}
             </SheetTitle>
             <SheetDescription className="flex items-center gap-2">
-              Syncing with Al-Ragheb API
+              Live from Al-Ragheb API
               <span className="inline-flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
             </SheetDescription>
           </SheetHeader>
@@ -162,7 +158,7 @@ export function ProductSheet({
                   key={product.id}
                   className="flex items-center justify-between p-4 rounded-xl border bg-card hover:border-primary/50 transition-colors shadow-sm"
                 >
-                  <div className="space-y-1">
+                  <div className="space-y-1 pr-4">
                     <p className="font-bold text-sm leading-tight">{product.name}</p>
                     <p className="text-sm font-bold text-secondary">
                       {product.price.toLocaleString()} <span className="text-[10px] font-normal">SYP</span>
@@ -172,7 +168,7 @@ export function ProductSheet({
                     size="sm" 
                     onClick={() => handleOrder(product)}
                     disabled={ordering !== null}
-                    className="h-9 px-4"
+                    className="h-9 px-4 shrink-0"
                   >
                     {ordering === product.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Order"}
                   </Button>
