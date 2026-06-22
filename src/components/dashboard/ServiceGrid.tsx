@@ -1,17 +1,17 @@
 "use client";
 
-import { Smartphone, Zap, Gamepad2, CreditCard, ShieldCheck, Layers } from "lucide-react";
+import { Smartphone, Gamepad2, CreditCard, ShieldCheck } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ProductSheet } from "./ProductSheet";
 
 /**
  * Service Grid Configuration
- * Using EXACT Arabic strings from Part 4 Documentation for 100% accuracy matching.
+ * Flattened UI to avoid Code 109 errors.
+ * Using EXACT Arabic strings for direct dynamic resolution from Al-Ragheb API.
  */
 const services = [
-  { id: 'mtn-units', name: "وحدات الام تي ان", icon: Smartphone, color: "text-yellow-600", bg: "bg-yellow-50" },
-  { id: 'syriatel-units', name: "وحدات سيريتل", icon: Smartphone, color: "text-red-500", bg: "bg-red-50" },
-  { id: 'line-recharge', name: "قسم شحن الخطوط", icon: Layers, color: "text-emerald-500", bg: "bg-emerald-50" },
+  { id: 'mtn-units', name: "إم تي ان وحدات", icon: Smartphone, color: "text-yellow-600", bg: "bg-yellow-50" },
+  { id: 'syriatel-units', name: "سيريتل وحدات", icon: Smartphone, color: "text-red-500", bg: "bg-red-50" },
   { id: 'syriatel-cash', name: "سيريتل كاش", icon: CreditCard, color: "text-red-600", bg: "bg-red-50" },
   { id: 'gaming', name: "العاب", icon: Gamepad2, color: "text-blue-500", bg: "bg-blue-50" },
   { id: 'admin', name: "لوحة التحكم (المعلم)", icon: ShieldCheck, color: "text-primary", bg: "bg-primary/10", isAdmin: true },

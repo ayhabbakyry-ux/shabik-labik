@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { useUser } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 import { AdminPanel } from "@/components/admin/AdminPanel";
-import { Loader2, PackageX, ExternalLink, RefreshCw, Key, AlertCircle } from "lucide-react";
+import { Loader2, PackageX, RefreshCw, Key, AlertCircle } from "lucide-react";
 
 type Product = {
   id: string | number;
@@ -63,12 +63,11 @@ export function ProductSheet({
   const { toast } = useToast();
 
   /**
-   * Documentation Part 4: Arabic String Mapping
+   * Mapping service keys to exact Arabic category names for dynamic discovery
    */
   const targetMap: Record<string, string> = useMemo(() => ({
-    'mtn-units': 'وحدات الام تي ان',
-    'syriatel-units': 'وحدات سيريتل',
-    'line-recharge': 'قسم شحن الخطوط',
+    'mtn-units': 'إم تي ان وحدات',
+    'syriatel-units': 'سيريتل وحدات',
     'syriatel-cash': 'سيريتل كاش',
     'gaming': 'العاب'
   }), []);
@@ -81,7 +80,7 @@ export function ProductSheet({
       const targetName = targetMap[serviceId];
       if (!targetName) throw new Error("Invalid service mapping");
 
-      // 1. DYNAMIC DISCOVERY: GET /client/api/content/0 (Documentation Part 2)
+      // 1. DYNAMIC DISCOVERY: GET /client/api/content/0
       const discoveryRes = await fetch(`/api/products?categoryId=0`);
       const discoveryData = await discoveryRes.json();
       
@@ -92,18 +91,13 @@ export function ProductSheet({
 
       const allDiscoveryItems = Array.isArray(discoveryData) ? discoveryData : (discoveryData.data || []);
 
-      // 2. RESOLVE ID: Match exact Arabic string
+      // 2. RESOLVE ID: Match exact Arabic string from discovery
       const matchedCategory = allDiscoveryItems.find((item: any) => {
         const itemName = String(item.name || "").trim();
         return itemName === targetName;
       });
 
       if (!matchedCategory) {
-        // Fallback for sub-filtering if it's an aggregate section like "قسم شحن الخطوط"
-        if (serviceId === 'line-recharge') {
-          // If the main section isn't found as a direct child, we might need a different crawl, 
-          // but usually it's a top-level category in the documented store.
-        }
         throw new Error(`Category "${targetName}" not found on server (Code 109)`);
       }
 
@@ -127,6 +121,7 @@ export function ProductSheet({
         description: error.message,
         variant: "destructive",
       });
+      setProducts([]); // Clear products on error
     } finally {
       setFetching(false);
     }
@@ -148,10 +143,10 @@ export function ProductSheet({
       return;
     }
 
-    if (!playerId && (serviceId === 'gaming' || serviceId.includes('units') || serviceId === 'line-recharge')) {
+    if (!playerId && (serviceId === 'gaming' || serviceId.includes('units'))) {
       toast({
         title: "Input Required",
-        description: "Please enter the Account ID.",
+        description: "Please enter the Account / Phone ID.",
         variant: "destructive",
       });
       return;
@@ -160,7 +155,7 @@ export function ProductSheet({
     setOrdering(product.id);
     
     try {
-      // Documentation Part 2 & 3: Mandatory order_uuid (UUIDv4)
+      // Mandatory order_uuid (UUIDv4)
       const orderUuid = crypto.randomUUID();
       
       const res = await fetch(
@@ -177,7 +172,6 @@ export function ProductSheet({
         });
         setPlayerId("");
       } else {
-        // Documentation Part 5: Mapping returned error code
         const errorCode = result.code || result.الحالة;
         const mappedError = AL_RAGHEB_ERRORS[errorCode] || result.error || "Order Refused";
         throw new Error(mappedError);
@@ -226,11 +220,11 @@ export function ProductSheet({
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           <div className="space-y-2 p-4 bg-accent/50 rounded-xl border border-accent">
             <Label htmlFor="playerId" className="text-xs font-bold uppercase flex items-center gap-2">
-              <Key className="h-3 w-3" /> Account / Player ID
+              <Key className="h-3 w-3" /> Account / Phone ID
             </Label>
             <Input 
               id="playerId" 
-              placeholder="e.g. 12345678" 
+              placeholder="e.g. 09xxxxxxxx or ID" 
               value={playerId}
               onChange={(e) => setPlayerId(e.target.value)}
               className="bg-white"
