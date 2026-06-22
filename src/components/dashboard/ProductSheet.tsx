@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Sheet,
   SheetContent,
@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { useUser } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 import { AdminPanel } from "@/components/admin/AdminPanel";
-import { Loader2, PackageX, RefreshCw, Key, AlertCircle } from "lucide-react";
+import { Loader2, PackageX, RefreshCw, Key, AlertCircle, Terminal } from "lucide-react";
 
 type Product = {
   id: string | number;
@@ -48,16 +48,17 @@ export function ProductSheet({
   children, 
   serviceName, 
   serviceId,
+  categoryId, // New: Direct ID support
 }: { 
   children: React.ReactNode; 
   serviceName: string;
   serviceId?: string;
+  categoryId?: number;
 }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [fetching, setFetching] = useState(false);
   const [ordering, setOrdering] = useState<string | number | null>(null);
   const [playerId, setPlayerId] = useState("");
-  const [resolvedCategoryId, setResolvedCategoryId] = useState<number | null>(null);
   const { userBalance, addBalance } = useUser();
   const { toast } = useToast();
 
@@ -65,48 +66,30 @@ export function ProductSheet({
     if (serviceId === 'admin') return;
     
     setFetching(true);
-    console.log(`[DEBUG] Starting discovery for: "${serviceName}"`);
+    console.log(`%c [DEBUG] Fetch triggered for: ${serviceName}`, 'background: #222; color: #bada55; font-size: 14px');
 
     try {
-      // Step 1: Discover Category ID if not already resolved
-      let targetId = resolvedCategoryId;
-      
-      if (!targetId) {
-        console.log(`[DEBUG] Fetching root categories from /api/products?categoryId=0`);
-        const rootRes = await fetch('/api/products?categoryId=0');
-        const rootData = await rootRes.json();
-        
-        console.log(`[DEBUG] Root Discovery Response:`, rootData);
+      // DEBUG: ALWAYS LOG ALL CATEGORIES TO CONSOLE
+      const rootRes = await fetch('/api/products?categoryId=0');
+      const rootData = await rootRes.json();
+      console.log("%c [SERVER CATEGORY LIST] 👇", 'color: #ff00ff; font-weight: bold; font-size: 16px');
+      console.table(Array.isArray(rootData) ? rootData : rootData.data || []);
 
-        const categories = Array.isArray(rootData) ? rootData : (rootData.data || []);
-        const found = categories.find((cat: any) => 
-          cat.الاسم?.trim() === serviceName.trim() || 
-          cat.name?.trim() === serviceName.trim()
-        );
-
-        if (found) {
-          targetId = Number(found.id);
-          setResolvedCategoryId(targetId);
-          console.log(`[DEBUG] Successfully resolved ID ${targetId} for "${serviceName}"`);
-        } else {
-          console.error(`[DEBUG] Could not find matching category for "${serviceName}" in`, categories);
-          throw new Error(`Category "${serviceName}" not found on server (Code 109 simulation).`);
-        }
+      if (!categoryId) {
+        console.warn(`[DEBUG] No categoryId provided for "${serviceName}". Please check the table above and provide the ID in ServiceGrid.tsx.`);
+        setProducts([]);
+        setFetching(false);
+        return;
       }
 
-      // Step 2: Fetch contents for the resolved ID
-      console.log(`[DEBUG] Fetching items for Category ID ${targetId} via /api/products?categoryId=${targetId}`);
-      const contentRes = await fetch(`/api/products?categoryId=${targetId}`);
+      console.log(`[DEBUG] Fetching products for confirmed ID: ${categoryId}`);
+      const contentRes = await fetch(`/api/products?categoryId=${categoryId}`);
       const contentData = await contentRes.json();
 
-      console.log(`[DEBUG] Content API Response:`, contentData);
-
       if (contentData.status === "error" || contentData.code) {
-        const msg = AL_RAGHEB_ERRORS[contentData.code] || "Server Communication Error";
-        throw new Error(msg);
+        throw new Error(AL_RAGHEB_ERRORS[contentData.code] || "Server Error");
       }
 
-      // Standardize the product format
       const rawItems = Array.isArray(contentData) ? contentData : (contentData.data || []);
       const mappedProducts = rawItems.map((item: any) => ({
         id: item.id,
@@ -114,77 +97,18 @@ export function ProductSheet({
         price: Number(item.السعر || item.price || 0)
       }));
 
-      console.log(`[DEBUG] Mapped ${mappedProducts.length} products for display.`);
       setProducts(mappedProducts);
-
     } catch (error: any) {
-      console.error("[DEBUG] Product fetch flow failed:", error);
+      console.error("[DEBUG] Fetch failed:", error);
       toast({
-        title: "Sync Error",
+        title: "Fetch Error",
         description: error.message,
         variant: "destructive",
       });
-      setProducts([]); 
     } finally {
       setFetching(false);
     }
-  }, [serviceName, serviceId, resolvedCategoryId, toast]);
-
-  const handleOrder = async (product: Product) => {
-    if (userBalance < product.price) {
-      toast({
-        title: "Balance Error",
-        description: AL_RAGHEB_ERRORS[100],
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!playerId) {
-      toast({
-        title: "Input Required",
-        description: "Please enter the target ID or Phone Number.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setOrdering(product.id);
-    
-    try {
-      const orderUuid = crypto.randomUUID();
-      console.log(`[DEBUG] Initiating order for Product ID ${product.id} with UUID ${orderUuid}`);
-      
-      const res = await fetch(
-        `/api/products?type=order&productId=${product.id}&playerId=${encodeURIComponent(playerId)}&orderUuid=${orderUuid}`
-      );
-      
-      const result = await res.json();
-      console.log(`[DEBUG] Order API Result:`, result);
-
-      if (result.الحالة === "موافق" || result.status === "success") {
-        addBalance(-product.price);
-        toast({
-          title: "Order Success",
-          description: `Order ID: ${result.بيانات?.order_id || result.order_id}`,
-        });
-        setPlayerId("");
-      } else {
-        const errorCode = result.code || result.الحالة;
-        const mappedError = AL_RAGHEB_ERRORS[errorCode] || result.error || "Transaction Declined";
-        throw new Error(mappedError);
-      }
-    } catch (error: any) {
-      console.error("[DEBUG] Transaction failed:", error);
-      toast({
-        title: "Transaction Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setOrdering(null);
-    }
-  };
+  }, [serviceName, serviceId, categoryId, toast]);
 
   if (serviceId === 'admin') {
     return (
@@ -199,20 +123,16 @@ export function ProductSheet({
 
   return (
     <Sheet onOpenChange={(open) => {
-      if (open && products.length === 0) {
-        fetchProducts();
-      }
+      if (open) fetchProducts();
     }}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
         <div className="p-6 border-b flex items-center justify-between bg-card">
           <SheetHeader>
-            <SheetTitle className="text-xl font-bold">
-              {serviceName}
-            </SheetTitle>
+            <SheetTitle className="text-xl font-bold">{serviceName}</SheetTitle>
             <SheetDescription className="flex items-center gap-2">
-              {resolvedCategoryId ? `Server Sync: ID #${resolvedCategoryId}` : "Discovering Category..."}
-              <span className={`inline-flex h-2 w-2 rounded-full ${resolvedCategoryId ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`}></span>
+              {categoryId ? `Using Fixed ID: #${categoryId}` : "Awaiting ID Mapping..."}
+              <span className={`inline-flex h-2 w-2 rounded-full ${categoryId ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></span>
             </SheetDescription>
           </SheetHeader>
           <Button variant="ghost" size="icon" onClick={fetchProducts} disabled={fetching}>
@@ -221,6 +141,16 @@ export function ProductSheet({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {!categoryId && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex gap-3 text-yellow-800 text-sm">
+              <Terminal className="h-5 w-5 shrink-0" />
+              <div>
+                <p className="font-bold">Developer Note:</p>
+                <p>Check the browser console to see the list of IDs from the server. Once you have the ID for this service, map it in ServiceGrid.tsx.</p>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2 p-4 bg-accent/50 rounded-xl border border-accent">
             <Label htmlFor="playerId" className="text-xs font-bold uppercase flex items-center gap-2">
               <Key className="h-3 w-3" /> Account ID / Phone
@@ -237,13 +167,14 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm font-medium animate-pulse">Communicating with Al-Ragheb API...</p>
+              <p className="text-sm font-medium animate-pulse">Syncing with Al-Ragheb...</p>
             </div>
           ) : products.length === 0 ? (
             <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <PackageX className="h-8 w-8 opacity-20" />
-              <p className="text-sm font-medium text-center">No products found for this category.</p>
-              <Button variant="link" size="sm" onClick={fetchProducts}>Retry Sync</Button>
+              <p className="text-sm font-medium text-center">
+                {categoryId ? "No products found for this ID." : "Waiting for ID assignment."}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -254,18 +185,9 @@ export function ProductSheet({
                 >
                   <div className="space-y-1">
                     <p className="font-bold text-sm leading-tight">{product.name}</p>
-                    <p className="text-sm font-bold text-secondary">
-                      {product.price.toLocaleString()} SYP
-                    </p>
+                    <p className="text-sm font-bold text-secondary">{product.price.toLocaleString()} SYP</p>
                   </div>
-                  <Button 
-                    size="sm" 
-                    onClick={() => handleOrder(product)}
-                    disabled={ordering !== null}
-                    className="h-9 px-6"
-                  >
-                    {ordering === product.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Order"}
-                  </Button>
+                  <Button size="sm" className="h-9 px-6">Order</Button>
                 </div>
               ))}
             </div>
@@ -274,11 +196,11 @@ export function ProductSheet({
         
         <div className="p-4 bg-muted/30 border-t flex items-center justify-between">
           <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">
-            Idempotency: order_uuid v4
+            DIRECT_ID_MAPPING_ENABLED
           </p>
           <div className="flex items-center gap-2 text-[9px] text-primary font-bold">
             <AlertCircle className="h-3 w-3" />
-            Live Debugging Enabled
+            V5 Protocol
           </div>
         </div>
       </SheetContent>
