@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Smartphone, FileText, Globe, SmartphoneNfc, ShieldCheck, Phone } from "lucide-react";
+import { Smartphone, FileText, Globe, SmartphoneNfc, ShieldCheck, Phone, Gamepad2, CreditCard, ShoppingBag, Tv, Hash, Zap } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ProductSheet } from "./ProductSheet";
 
@@ -11,21 +11,84 @@ type ServiceItem = {
   icon: any;
   color: string;
   bg: string;
-  categoryId?: number; // Added: Direct ID from Al-Ragheb
+  categoryId: number; 
+};
+
+type Section = {
+  title: string;
+  icon: any;
+  items: ServiceItem[];
+  colorClass: string;
 };
 
 export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
-  // Static UI structure matching screenshot 1000197511.jpg
-  // Once the user checks the console, we will fill in the 'categoryId' values here.
-  const lineChargingServices: ServiceItem[] = [
-    { id: "mtn_units", name: "إم تي إن وحدات", icon: Smartphone, color: "text-yellow-600", bg: "bg-yellow-50", categoryId: undefined },
-    { id: "syr_units", name: "سيريتل وحدات", icon: Smartphone, color: "text-red-600", bg: "bg-red-50", categoryId: undefined },
-    { id: "mtn_bill", name: "إم تي إن فاتورة", icon: FileText, color: "text-yellow-700", bg: "bg-yellow-100", categoryId: undefined },
-    { id: "syr_bill", name: "سيريتل فاتورة", icon: FileText, color: "text-red-700", bg: "bg-red-100", categoryId: undefined },
-    { id: "elux", name: "ELUX", icon: SmartphoneNfc, color: "text-blue-600", bg: "bg-blue-50", categoryId: undefined },
-    { id: "syr_old", name: "سيريتل - الليرة القديمة", icon: Smartphone, color: "text-rose-600", bg: "bg-rose-50", categoryId: undefined },
-    { id: "asiacell", name: "ASIACELL", icon: Globe, color: "text-purple-600", bg: "bg-purple-50", categoryId: undefined },
-    { id: "sentence", name: "SENTENCE", icon: Smartphone, color: "text-indigo-600", bg: "bg-indigo-50", categoryId: undefined },
+  // Hardcoded mapping based on user documentation parts 1-5 and official IDs
+  const sections: Section[] = [
+    {
+      title: "قسم شحن الخطوط",
+      icon: Phone,
+      colorClass: "text-primary",
+      items: [
+        { id: "mtn_units", name: "إم تي إن وحدات", icon: Smartphone, color: "text-yellow-600", bg: "bg-yellow-50", categoryId: 6 },
+        { id: "syr_units", name: "سيريتل وحدات", icon: Smartphone, color: "text-red-600", bg: "bg-red-50", categoryId: 6 },
+        { id: "mtn_bill", name: "إم تي إن فاتورة", icon: FileText, color: "text-yellow-700", bg: "bg-yellow-100", categoryId: 6 },
+        { id: "syr_bill", name: "سيريتل فاتورة", icon: FileText, color: "text-red-700", bg: "bg-red-100", categoryId: 6 },
+        { id: "elux", name: "ELUX", icon: SmartphoneNfc, color: "text-blue-600", bg: "bg-blue-50", categoryId: 6 },
+        { id: "syr_old", name: "سيريتل - الليرة القديمة", icon: Smartphone, color: "text-rose-600", bg: "bg-rose-50", categoryId: 6 },
+        { id: "asiacell", name: "ASIACELL", icon: Globe, color: "text-purple-600", bg: "bg-purple-50", categoryId: 6 },
+        { id: "sentence", name: "SENTENCE", icon: Smartphone, color: "text-indigo-600", bg: "bg-indigo-50", categoryId: 6 },
+      ]
+    },
+    {
+      title: "قسم الألعاب",
+      icon: Gamepad2,
+      colorClass: "text-green-600",
+      items: [
+        { id: "pubg", name: "ببجي موبايل", icon: Gamepad2, color: "text-green-600", bg: "bg-green-50", categoryId: 2 },
+        { id: "freefire", name: "فري فاير", icon: Zap, color: "text-orange-600", bg: "bg-orange-50", categoryId: 2 },
+      ]
+    },
+    {
+      title: "تطبيقات الشحن",
+      icon: SmartphoneNfc,
+      colorClass: "text-blue-600",
+      items: [
+        { id: "tiktok", name: "تيك توك", icon: SmartphoneNfc, color: "text-pink-600", bg: "bg-pink-50", categoryId: 1 },
+        { id: "likee", name: "لايكي", icon: SmartphoneNfc, color: "text-purple-600", bg: "bg-purple-50", categoryId: 1 },
+      ]
+    },
+    {
+      title: "الدفع الإلكتروني",
+      icon: CreditCard,
+      colorClass: "text-indigo-600",
+      items: [
+        { id: "epayment", name: "بطاقات دفع", icon: CreditCard, color: "text-indigo-600", bg: "bg-indigo-50", categoryId: 4 },
+      ]
+    },
+    {
+      title: "المتاجر الرقمية",
+      icon: ShoppingBag,
+      colorClass: "text-amber-600",
+      items: [
+        { id: "google_play", name: "جوجل بلاي", icon: ShoppingBag, color: "text-amber-600", bg: "bg-amber-50", categoryId: 5 },
+      ]
+    },
+    {
+      title: "تطبيقات المشاهدة",
+      icon: Tv,
+      colorClass: "text-rose-600",
+      items: [
+        { id: "netflix", name: "نتفليكس", icon: Tv, color: "text-rose-600", bg: "bg-rose-50", categoryId: 7 },
+      ]
+    },
+    {
+      title: "قسم تفعيل الأرقام",
+      icon: Hash,
+      colorClass: "text-cyan-600",
+      items: [
+        { id: "numbers", name: "تفعيل أرقام", icon: Hash, color: "text-cyan-600", bg: "bg-cyan-50", categoryId: 19 },
+      ]
+    }
   ];
 
   const renderServiceCard = (service: ServiceItem) => {
@@ -51,17 +114,18 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
   };
 
   return (
-    <div className="space-y-8">
-      {/* Line Charging Section (قسم شحن الخطوط) */}
-      <div className="space-y-4">
-        <h3 className="font-bold text-lg border-r-4 border-primary pr-3 flex items-center gap-2">
-          <Phone className="h-5 w-5 text-primary" />
-          قسم شحن الخطوط
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {lineChargingServices.map(renderServiceCard)}
+    <div className="space-y-12">
+      {sections.map((section, idx) => (
+        <div key={idx} className="space-y-4">
+          <h3 className={`font-bold text-lg border-r-4 border-current pr-3 flex items-center gap-2 ${section.colorClass}`}>
+            <section.icon className="h-5 w-5" />
+            {section.title}
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {section.items.map(renderServiceCard)}
+          </div>
         </div>
-      </div>
+      ))}
 
       {isAdmin && (
         <div className="space-y-4">
