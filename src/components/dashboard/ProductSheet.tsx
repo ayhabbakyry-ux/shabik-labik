@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   Sheet,
   SheetContent,
@@ -48,40 +48,79 @@ export function ProductSheet({
   children, 
   serviceName, 
   serviceId,
-  apiCategoryId
 }: { 
   children: React.ReactNode; 
   serviceName: string;
   serviceId?: string;
-  apiCategoryId?: number;
 }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [fetching, setFetching] = useState(false);
   const [ordering, setOrdering] = useState<string | number | null>(null);
   const [playerId, setPlayerId] = useState("");
+  const [resolvedCategoryId, setResolvedCategoryId] = useState<number | null>(null);
   const { userBalance, addBalance } = useUser();
   const { toast } = useToast();
 
-  const fetchProducts = async () => {
-    if (serviceId === 'admin' || !apiCategoryId) return;
+  const fetchProducts = useCallback(async () => {
+    if (serviceId === 'admin') return;
     
     setFetching(true);
-    try {
-      // Direct ID-based fetch, no more name-string discovery
-      const response = await fetch(`/api/products?categoryId=${apiCategoryId}`);
-      const rawData = await response.json();
+    console.log(`[DEBUG] Starting discovery for: "${serviceName}"`);
 
-      if (rawData.status === "error" || rawData.code) {
-        const msg = AL_RAGHEB_ERRORS[rawData.code] || "Server Communication Error";
+    try {
+      // Step 1: Discover Category ID if not already resolved
+      let targetId = resolvedCategoryId;
+      
+      if (!targetId) {
+        console.log(`[DEBUG] Fetching root categories from /api/products?categoryId=0`);
+        const rootRes = await fetch('/api/products?categoryId=0');
+        const rootData = await rootRes.json();
+        
+        console.log(`[DEBUG] Root Discovery Response:`, rootData);
+
+        const categories = Array.isArray(rootData) ? rootData : (rootData.data || []);
+        const found = categories.find((cat: any) => 
+          cat.الاسم?.trim() === serviceName.trim() || 
+          cat.name?.trim() === serviceName.trim()
+        );
+
+        if (found) {
+          targetId = Number(found.id);
+          setResolvedCategoryId(targetId);
+          console.log(`[DEBUG] Successfully resolved ID ${targetId} for "${serviceName}"`);
+        } else {
+          console.error(`[DEBUG] Could not find matching category for "${serviceName}" in`, categories);
+          throw new Error(`Category "${serviceName}" not found on server (Code 109 simulation).`);
+        }
+      }
+
+      // Step 2: Fetch contents for the resolved ID
+      console.log(`[DEBUG] Fetching items for Category ID ${targetId} via /api/products?categoryId=${targetId}`);
+      const contentRes = await fetch(`/api/products?categoryId=${targetId}`);
+      const contentData = await contentRes.json();
+
+      console.log(`[DEBUG] Content API Response:`, contentData);
+
+      if (contentData.status === "error" || contentData.code) {
+        const msg = AL_RAGHEB_ERRORS[contentData.code] || "Server Communication Error";
         throw new Error(msg);
       }
 
-      const allFetchedProducts = Array.isArray(rawData) ? rawData : (rawData.data || []);
-      setProducts(allFetchedProducts);
+      // Standardize the product format
+      const rawItems = Array.isArray(contentData) ? contentData : (contentData.data || []);
+      const mappedProducts = rawItems.map((item: any) => ({
+        id: item.id,
+        name: item.الاسم || item.name,
+        price: Number(item.السعر || item.price || 0)
+      }));
+
+      console.log(`[DEBUG] Mapped ${mappedProducts.length} products for display.`);
+      setProducts(mappedProducts);
+
     } catch (error: any) {
-      console.error("Product fetch error:", error);
+      console.error("[DEBUG] Product fetch flow failed:", error);
       toast({
-        title: "Category Error",
+        title: "Sync Error",
         description: error.message,
         variant: "destructive",
       });
@@ -89,7 +128,7 @@ export function ProductSheet({
     } finally {
       setFetching(false);
     }
-  };
+  }, [serviceName, serviceId, resolvedCategoryId, toast]);
 
   const handleOrder = async (product: Product) => {
     if (userBalance < product.price) {
@@ -114,11 +153,14 @@ export function ProductSheet({
     
     try {
       const orderUuid = crypto.randomUUID();
+      console.log(`[DEBUG] Initiating order for Product ID ${product.id} with UUID ${orderUuid}`);
+      
       const res = await fetch(
         `/api/products?type=order&productId=${product.id}&playerId=${encodeURIComponent(playerId)}&orderUuid=${orderUuid}`
       );
       
       const result = await res.json();
+      console.log(`[DEBUG] Order API Result:`, result);
 
       if (result.الحالة === "موافق" || result.status === "success") {
         addBalance(-product.price);
@@ -133,6 +175,7 @@ export function ProductSheet({
         throw new Error(mappedError);
       }
     } catch (error: any) {
+      console.error("[DEBUG] Transaction failed:", error);
       toast({
         title: "Transaction Failed",
         description: error.message,
@@ -156,7 +199,7 @@ export function ProductSheet({
 
   return (
     <Sheet onOpenChange={(open) => {
-      if (open && apiCategoryId && products.length === 0) {
+      if (open && products.length === 0) {
         fetchProducts();
       }
     }}>
@@ -168,8 +211,8 @@ export function ProductSheet({
               {serviceName}
             </SheetTitle>
             <SheetDescription className="flex items-center gap-2">
-              Sync: ID #{apiCategoryId}
-              <span className="inline-flex h-2 w-2 rounded-full bg-green-500"></span>
+              {resolvedCategoryId ? `Server Sync: ID #${resolvedCategoryId}` : "Discovering Category..."}
+              <span className={`inline-flex h-2 w-2 rounded-full ${resolvedCategoryId ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`}></span>
             </SheetDescription>
           </SheetHeader>
           <Button variant="ghost" size="icon" onClick={fetchProducts} disabled={fetching}>
@@ -194,13 +237,13 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm font-medium animate-pulse">Fetching from Al-Ragheb API...</p>
+              <p className="text-sm font-medium animate-pulse">Communicating with Al-Ragheb API...</p>
             </div>
           ) : products.length === 0 ? (
             <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <PackageX className="h-8 w-8 opacity-20" />
               <p className="text-sm font-medium text-center">No products found for this category.</p>
-              <Button variant="link" size="sm" onClick={fetchProducts}>Retry Fetch</Button>
+              <Button variant="link" size="sm" onClick={fetchProducts}>Retry Sync</Button>
             </div>
           ) : (
             <div className="space-y-3">
@@ -235,7 +278,7 @@ export function ProductSheet({
           </p>
           <div className="flex items-center gap-2 text-[9px] text-primary font-bold">
             <AlertCircle className="h-3 w-3" />
-            Code 109 Resolved (Dynamic)
+            Live Debugging Enabled
           </div>
         </div>
       </SheetContent>

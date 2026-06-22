@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 
 /**
@@ -22,25 +23,25 @@ export async function GET(request: Request) {
 
     if (type === 'order' && productId && orderUuid) {
       // Create Order Endpoint: GET /client/api/newOrder/{product_id}/params
-      // Documentation Part 3: Mandatory qty, playerId, order_uuid
       endpoint = `${AL_RAGHEB_BASE_URL}/client/api/newOrder/${productId}/params?qty=${qty}&order_uuid=${orderUuid}`;
       if (playerId) endpoint += `&playerId=${encodeURIComponent(playerId)}`;
     } else if (type === 'check' && (orderId || orderUuid)) {
-      // Order Check Endpoint: Documentation Part 4
+      // Order Check Endpoint
       if (orderUuid) {
         endpoint = `${AL_RAGHEB_BASE_URL}/client/api/check?orders=${orderUuid}&uuid=1`;
       } else {
         endpoint = `${AL_RAGHEB_BASE_URL}/client/api/check?orders=${orderId}`;
       }
-    } else if (categoryId) {
+    } else if (categoryId !== null) {
       // Content/Discovery Endpoint: GET /client/api/content/[id]
       // Documentation Part 2: root is 0
       endpoint = `${AL_RAGHEB_BASE_URL}/client/api/content/${categoryId}`;
     } else {
       // Default to Product List: GET /client/api/products
-      // Documentation Part 1 & 2
       endpoint = `${AL_RAGHEB_BASE_URL}/client/api/products`;
     }
+
+    console.log(`[PROXY] Fetching: ${endpoint}`);
 
     const response = await fetch(endpoint, {
       method: 'GET',
@@ -53,12 +54,9 @@ export async function GET(request: Request) {
     });
 
     const data = await response.json();
-
-    // Documentation Part 5: Error handling integration
-    // Many API responses might return 200 with an error status in the body
     return NextResponse.json(data);
   } catch (error: any) {
-    console.error("Al-Ragheb Proxy Error:", error);
+    console.error("[PROXY ERROR]:", error);
     return NextResponse.json(
       { error: "Failed to connect to Al-Ragheb server.", code: 500 },
       { status: 500 }
