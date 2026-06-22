@@ -14,44 +14,21 @@ import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 import { AdminPanel } from "@/components/admin/AdminPanel";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, PackageX } from "lucide-react";
+import { Loader2, PackageX, ExternalLink } from "lucide-react";
+
+/**
+ * CONFIGURATION: Paste your Al-Ragheb API details here
+ */
+const AL_RAGHEB_API_URL = "https://your-api-endpoint.com/api/products"; // Replace with your URL
+const AL_RAGHEB_AUTH_TOKEN = "YOUR_BEARER_TOKEN_HERE"; // Replace with your Token
 
 type Product = {
-  id: string;
+  id: string | number;
   name: string;
   price: number;
   category: string;
+  // Add other fields as per your actual API response
 };
-
-/**
- * Simulated Al-Ragheb Central Database
- * In a real scenario, this would be an API endpoint that accepts a categoryId.
- */
-const AL_RAGHEB_CENTRAL_DB: Product[] = [
-  // Syriatel Units
-  { id: "s1", name: "Syriatel 1000 Units", price: 2500, category: "syriatel-units" },
-  { id: "s2", name: "Syriatel 5000 Units", price: 12000, category: "syriatel-units" },
-  { id: "s3", name: "Syriatel 10000 Units", price: 23500, category: "syriatel-units" },
-  // Syriatel Cash
-  { id: "sc1", name: "SyrCash Transfer 10,000", price: 10500, category: "syriatel-cash" },
-  { id: "sc2", name: "SyrCash Transfer 50,000", price: 52000, category: "syriatel-cash" },
-  { id: "sc3", name: "SyrCash Transfer 100,000", price: 103000, category: "syriatel-cash" },
-  // MTN Cash
-  { id: "m1", name: "MTN Cash 10,000", price: 10500, category: "mtn-cash" },
-  { id: "m2", name: "MTN Cash 50,000", price: 52000, category: "mtn-cash" },
-  { id: "m3", name: "MTN Cash 100,000", price: 103000, category: "mtn-cash" },
-  // Gaming
-  { id: "g1", name: "PUBG Mobile 60 UC", price: 15000, category: "gaming" },
-  { id: "g2", name: "PUBG Mobile 325 UC", price: 75000, category: "gaming" },
-  { id: "g3", name: "Free Fire 100 Diamonds", price: 12000, category: "gaming" },
-  { id: "g4", name: "PlayStation $10 Card", price: 185000, category: "gaming" },
-  { id: "g5", name: "Roblox 800 Robux", price: 145000, category: "gaming" },
-  // Al-Ragheb General / Others
-  { id: "a1", name: "Telegram Premium (1 Month)", price: 45000, category: "alragheb" },
-  { id: "a2", name: "TikTok 1000 Coins", price: 92000, category: "alragheb" },
-  { id: "a3", name: "Google Play $5 Card", price: 115000, category: "alragheb" },
-];
 
 export function ProductSheet({ 
   children, 
@@ -64,27 +41,62 @@ export function ProductSheet({
 }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [fetching, setFetching] = useState(false);
-  const [ordering, setOrdering] = useState<string | null>(null);
+  const [ordering, setOrdering] = useState<string | number | null>(null);
   const { userBalance, addBalance } = useUser();
   const { toast } = useToast();
 
   useEffect(() => {
+    // Skip fetching if this is the admin console toggle
     if (serviceId === 'admin') return;
     
-    // Simulate Al-Ragheb API category-filtered fetch
-    setFetching(true);
     const fetchProducts = async () => {
-      // Simulate network latency
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Filter the central database using serviceId as the Category Identifier
-      const filtered = AL_RAGHEB_CENTRAL_DB.filter(p => p.category === serviceId);
-      setProducts(filtered);
-      setFetching(false);
+      setFetching(true);
+      try {
+        // Construct the URL. If your API supports category filtering via query params:
+        // const url = `${AL_RAGHEB_API_URL}?category=${serviceId}`;
+        const url = AL_RAGHEB_API_URL;
+
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${AL_RAGHEB_AUTH_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        /**
+         * NOTE: Adjust 'data' mapping based on your API structure.
+         * If the API returns { products: [...] }, use data.products.
+         * We filter by serviceId (Category) locally if the API returns all products.
+         */
+        const allProducts = Array.isArray(data) ? data : (data.products || []);
+        
+        // Filter products that match the current category (serviceId)
+        const filtered = allProducts.filter((p: any) => 
+          String(p.category).toLowerCase() === serviceId.toLowerCase()
+        );
+
+        setProducts(filtered);
+      } catch (error: any) {
+        console.error("Failed to fetch from Al-Ragheb API:", error);
+        toast({
+          title: "Connection Error",
+          description: "Could not reach Al-Ragheb server. Check your API configuration.",
+          variant: "destructive",
+        });
+      } finally {
+        setFetching(false);
+      }
     };
 
     fetchProducts();
-  }, [serviceId]);
+  }, [serviceId, toast]);
 
   const handleOrder = (product: Product) => {
     if (userBalance < product.price) {
@@ -97,7 +109,11 @@ export function ProductSheet({
     }
     
     setOrdering(product.id);
-    // Simulate transaction delay
+    
+    /**
+     * TRANSACTION LOGIC: 
+     * In a production app, you would send a POST request to your backend here.
+     */
     setTimeout(() => {
       setOrdering(null);
       addBalance(-product.price);
@@ -105,7 +121,7 @@ export function ProductSheet({
         title: "Order Placed Successfully",
         description: `Purchased: ${product.name} for ${product.price.toLocaleString()} SYP`,
       });
-    }, 1200);
+    }, 1500);
   };
 
   if (serviceId === 'admin') {
@@ -128,8 +144,9 @@ export function ProductSheet({
             <SheetTitle className="text-2xl font-bold flex items-center gap-2">
               {serviceName}
             </SheetTitle>
-            <SheetDescription>
-              Real-time sync active. Filtering by Category ID: <span className="font-mono text-primary font-bold">{serviceId}</span>
+            <SheetDescription className="flex items-center gap-2">
+              Syncing with Al-Ragheb Server 
+              <span className="inline-flex h-2 w-2 rounded-full bg-green-500"></span>
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -138,12 +155,16 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm font-medium">Fetching available products...</p>
+              <p className="text-sm font-medium">Connecting to provider...</p>
             </div>
           ) : products.length === 0 ? (
             <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <PackageX className="h-8 w-8" />
-              <p className="text-sm font-medium">No products found for this category.</p>
+              <p className="text-sm font-medium text-center">
+                No active items found for <br/>
+                <span className="text-primary font-bold">"{serviceId}"</span>
+              </p>
+              <p className="text-[10px] text-muted-foreground">Verify category mapping in API</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -174,10 +195,14 @@ export function ProductSheet({
           )}
         </div>
         
-        <div className="p-6 bg-muted/30 border-t text-center">
+        <div className="p-6 bg-muted/30 border-t flex items-center justify-between">
           <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-            Al-Ragheb API Bridge Status: <span className="text-green-600">Connected</span>
+            Live API Bridge
           </p>
+          <div className="flex items-center gap-1 text-[10px] text-primary font-bold">
+            <ExternalLink className="h-3 w-3" />
+            Verified Provider
+          </div>
         </div>
       </SheetContent>
     </Sheet>
