@@ -52,10 +52,10 @@ export function ProductSheet({
 
       const data = await response.json();
       
-      // Al-Ragheb API often returns data in a "data" property or as a root array
+      // Al-Ragheb API returns products in a "data" property or as a root array
       const allProducts = Array.isArray(data) ? data : (data.data || []);
       
-      // Filter logic: Match serviceId to category names or IDs returned by the API
+      // Filter logic: Match serviceId to names or categories
       const filtered = allProducts.filter((p: any) => {
         const productName = String(p.name || '').toLowerCase();
         const categoryName = String(p.category_name || '').toLowerCase();
@@ -82,7 +82,9 @@ export function ProductSheet({
   };
 
   useEffect(() => {
-    fetchProducts();
+    if (serviceId !== 'admin') {
+      fetchProducts();
+    }
   }, [serviceId]);
 
   const handleOrder = (product: Product) => {
