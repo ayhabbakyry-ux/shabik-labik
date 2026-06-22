@@ -1,0 +1,29 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "pubg-mobile",
+      "description": "PUBG Mobile character",
+      "imageUrl": "https://picsum.photos/seed/pubg/400/300",
+      "imageHint": "action game"
+    },
+    {
+      "id": "free-fire",
+      "description": "Free Fire character",
+      "imageUrl": "https://picsum.photos/seed/freefire/400/300",
+      "imageHint": "battle royale"
+    },
+    {
+      "id": "syriatel",
+      "description": "Syriatel logo abstract",
+      "imageUrl": "https://picsum.photos/seed/telecom1/400/300",
+      "imageHint": "technology abstract"
+    },
+    {
+      "id": "mtn",
+      "description": "MTN logo abstract",
+      "imageUrl": "https://picsum.photos/seed/telecom2/400/300",
+      "imageHint": "network abstract"
+    }
+  ]
+}
