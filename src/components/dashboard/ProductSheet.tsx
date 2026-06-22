@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Sheet,
   SheetContent,
@@ -39,69 +39,71 @@ export function ProductSheet({
   const { userBalance, addBalance } = useUser();
   const { toast } = useToast();
 
+  // Mapping slugs to the Arabic names found in the API for Discovery & Post-Filter
+  const targetMap: Record<string, string> = useMemo(() => ({
+    'syriatel-units': 'وحدات سيريتل',
+    'mtn-units': 'وحدات الام تي ان',
+    'line-recharge': 'قسم شحن الخطوط',
+    'alragheb': 'بضاعة ومنتجات الراغب',
+    'syriatel-cash': 'سيريتل كاش',
+    'gaming': 'العاب'
+  }), []);
+
   const fetchProducts = async () => {
     if (serviceId === 'admin') return;
     
     setFetching(true);
     try {
-      let finalCategoryId: string | number = serviceId;
+      const targetName = targetMap[serviceId];
+      if (!targetName) throw new Error("Invalid service mapping");
 
-      // 1. DYNAMIC ID DISCOVERY: If the ID is a slug (string), we find the real ID from the server
-      if (isNaN(Number(serviceId))) {
-        // Fetch categories/root products to find IDs
-        const discoveryRes = await fetch(`/api/products?categoryId=0`);
-        if (!discoveryRes.ok) throw new Error("Failed to reach discovery endpoint");
-        
-        const discoveryData = await discoveryRes.json();
-        const allItems = Array.isArray(discoveryData) ? discoveryData : (discoveryData.data || []);
+      // 1. DYNAMIC ID DISCOVERY: Fetch root (0) to find the correct numeric category ID
+      const discoveryRes = await fetch(`/api/products?categoryId=0`);
+      if (!discoveryRes.ok) throw new Error("Failed to reach discovery endpoint");
+      
+      const discoveryData = await discoveryRes.json();
+      const allDiscoveryItems = Array.isArray(discoveryData) ? discoveryData : (discoveryData.data || []);
 
-        // Mapping slugs to the Arabic names found in the API
-        const targetMap: Record<string, string> = {
-          'syriatel-units': 'وحدات سيريتل',
-          'mtn-units': 'وحدات الام تي ان',
-          'line-recharge': 'قسم شحن الخطوط',
-          'alragheb': 'بضاعة ومنتجات الراغب',
-          'syriatel-cash': 'سيريتل كاش',
-          'gaming': 'العاب'
-        };
+      // Search for the numeric ID by Arabic name matching
+      const matchedCategory = allDiscoveryItems.find((item: any) => 
+        String(item.name).includes(targetName) || 
+        String(item.category_name).includes(targetName)
+      );
 
-        const targetName = targetMap[serviceId];
-        
-        // Find the numeric ID by searching the name in the API response
-        const matchedCategory = allItems.find((item: any) => 
-          String(item.name).includes(targetName) || 
-          String(item.category_name).includes(targetName)
-        );
-
-        if (matchedCategory) {
-          finalCategoryId = matchedCategory.id || matchedCategory.category_id;
-        } else {
-          // If not found in discovery, we'll try to use the global list filtered
-          setProducts(allItems.filter((p: any) => 
-            String(p.name).includes(targetName) || String(p.category_name).includes(targetName)
-          ));
-          setFetching(false);
-          return;
-        }
-      }
-
-      // 2. FINAL FETCH: Use the discovered numeric ID to get specific content
-      const response = await fetch(`/api/products?categoryId=${finalCategoryId}`);
+      // 2. FETCH DATA: Use discovered ID or fallback to global list
+      const fetchId = matchedCategory ? (matchedCategory.id || matchedCategory.category_id) : 0;
+      const response = await fetch(`/api/products?categoryId=${fetchId}`);
 
       if (!response.ok) {
         const errData = await response.json();
         throw new Error(errData.error || "Server responded with an error");
       }
 
-      const data = await response.json();
-      const allProducts = Array.isArray(data) ? data : (data.data || []);
+      const rawData = await response.json();
+      const allFetchedProducts = Array.isArray(rawData) ? rawData : (rawData.data || []);
+
+      // 3. STRICT FILTERING LOGIC: Ensure the list is cleaned before display
+      // This prevents "dumping the full list" and respects the category logic
+      const strictlyFiltered = allFetchedProducts.filter((product: Product) => {
+        const pName = String(product.name).toLowerCase();
+        const pCatName = String(product.category_name || "").toLowerCase();
+        const searchKey = targetName.toLowerCase();
+
+        // Special logic for "Line Recharge" section which should show all units
+        if (serviceId === 'line-recharge') {
+          return pName.includes('وحدات') || pCatName.includes('شحن');
+        }
+
+        // Standard strict filter for specific categories
+        return pName.includes(searchKey) || pCatName.includes(searchKey);
+      });
       
-      setProducts(allProducts);
+      setProducts(strictlyFiltered);
     } catch (error: any) {
-      console.error("Discovery/Fetch error:", error);
+      console.error("Fetch/Filter error:", error);
       toast({
-        title: "Sync Error",
-        description: error.message || "Could not sync with digital provider.",
+        title: "Connection Error",
+        description: error.message || "Could not resolve category filtering.",
         variant: "destructive",
       });
     } finally {
@@ -158,7 +160,7 @@ export function ProductSheet({
               {serviceName}
             </SheetTitle>
             <SheetDescription className="flex items-center gap-2">
-              Real-time ID Sync (Live)
+              Strict Server Filtering (Live)
               <span className="inline-flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
             </SheetDescription>
           </SheetHeader>
@@ -171,13 +173,13 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm font-medium">Discovering IDs & Fetching...</p>
+              <p className="text-sm font-medium">Applying strict filters...</p>
             </div>
           ) : products.length === 0 ? (
             <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <PackageX className="h-8 w-8" />
               <p className="text-sm font-medium text-center">
-                No items found for <br/>
+                No items matching <br/>
                 <span className="text-primary font-bold">"{serviceName}"</span>
               </p>
             </div>
@@ -190,6 +192,7 @@ export function ProductSheet({
                 >
                   <div className="space-y-1 pr-4">
                     <p className="font-bold text-sm leading-tight">{product.name}</p>
+                    <p className="text-xs text-muted-foreground opacity-70">Category: {product.category_name || "General"}</p>
                     <p className="text-sm font-bold text-secondary">
                       {product.price.toLocaleString()} <span className="text-[10px] font-normal">SYP</span>
                     </p>
@@ -210,11 +213,11 @@ export function ProductSheet({
         
         <div className="p-6 bg-muted/30 border-t flex items-center justify-between">
           <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-            Resolved: {serviceId}
+            Filter: {serviceId}
           </p>
           <div className="flex items-center gap-1 text-[10px] text-primary font-bold">
             <ExternalLink className="h-3 w-3" />
-            Verified Dynamic ID
+            Verified Dynamic Sync
           </div>
         </div>
       </SheetContent>

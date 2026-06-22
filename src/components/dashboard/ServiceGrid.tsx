@@ -7,8 +7,7 @@ import { ProductSheet } from "./ProductSheet";
 
 /**
  * Service Grid Configuration
- * Using descriptive slugs that ProductSheet will resolve to numeric IDs 
- * by searching the live API /client/api/content/0 response.
+ * Each service has a unique ID used for dynamic ID resolution and filtering.
  */
 const services = [
   { id: 'alragheb', name: "بضاعة ومنتجات الراغب", icon: Zap, color: "text-amber-500", bg: "bg-amber-50" },
