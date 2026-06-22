@@ -14,19 +14,13 @@ import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 import { AdminPanel } from "@/components/admin/AdminPanel";
-import { Loader2, PackageX, ExternalLink } from "lucide-react";
-
-/**
- * PRODUCTION CONFIGURATION: Al-Ragheb API
- */
-const AL_RAGHEB_API_URL = "https://api.alragheb-store.com/api/products"; 
-const AL_RAGHEB_AUTH_TOKEN = "64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0";
+import { Loader2, PackageX, ExternalLink, RefreshCw } from "lucide-react";
 
 type Product = {
   id: string | number;
   name: string;
   price: number;
-  category: string;
+  category?: string;
 };
 
 export function ProductSheet({ 
@@ -44,57 +38,55 @@ export function ProductSheet({
   const { userBalance, addBalance } = useUser();
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Skip fetching if this is the admin console toggle
+  const fetchProducts = async () => {
     if (serviceId === 'admin') return;
     
-    const fetchProducts = async () => {
-      setFetching(true);
-      try {
-        const response = await fetch(AL_RAGHEB_API_URL, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${AL_RAGHEB_AUTH_TOKEN}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-        });
+    setFetching(true);
+    try {
+      // Fetching from our local API proxy to avoid CORS and secure the token
+      const response = await fetch('/api/products');
 
-        if (!response.ok) {
-          throw new Error(`API Error: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        
-        // Al-Ragheb API typically returns products in a 'data' array or root array
-        const allProducts = Array.isArray(data) ? data : (data.data || data.products || []);
-        
-        // Filter products that match the current category (serviceId)
-        // We normalize both strings to ensure reliable matching
-        const filtered = allProducts.filter((p: any) => {
-          const productCategory = String(p.category || '').toLowerCase();
-          const targetCategory = serviceId.toLowerCase();
-          
-          // Match by exact ID or if the category string contains our service name key
-          return productCategory === targetCategory || 
-                 productCategory.includes(targetCategory.split('-')[0]);
-        });
-
-        setProducts(filtered);
-      } catch (error: any) {
-        console.error("Failed to fetch from Al-Ragheb API:", error);
-        toast({
-          title: "Connection Error",
-          description: "Could not reach Al-Ragheb server. Check your API configuration.",
-          variant: "destructive",
-        });
-      } finally {
-        setFetching(false);
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || "Server responded with an error");
       }
-    };
 
+      const data = await response.json();
+      
+      // Standardize data extraction (API might return { data: [...] } or root array)
+      const allProducts = Array.isArray(data) ? data : (data.data || data.products || []);
+      
+      // Filter logic: Map serviceId to potential category keywords
+      const filtered = allProducts.filter((p: any) => {
+        const productCategory = String(p.category || '').toLowerCase();
+        const productName = String(p.name || '').toLowerCase();
+        const target = serviceId.toLowerCase();
+        
+        // Match if the category or name contains the service ID key
+        // e.g. 'syriatel-units' -> matches 'syriatel'
+        const baseKey = target.split('-')[0];
+        
+        return productCategory.includes(baseKey) || 
+               productName.includes(baseKey) ||
+               productCategory === target;
+      });
+
+      setProducts(filtered);
+    } catch (error: any) {
+      console.error("Client fetch error:", error);
+      toast({
+        title: "Sync Error",
+        description: error.message || "Could not sync with digital provider.",
+        variant: "destructive",
+      });
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  useEffect(() => {
     fetchProducts();
-  }, [serviceId, toast]);
+  }, [serviceId]);
 
   const handleOrder = (product: Product) => {
     if (userBalance < product.price) {
@@ -108,15 +100,15 @@ export function ProductSheet({
     
     setOrdering(product.id);
     
-    // Simulate order processing for the MVP
+    // Simulate order placement
     setTimeout(() => {
       setOrdering(null);
       addBalance(-product.price);
       toast({
-        title: "Order Placed Successfully",
-        description: `Purchased: ${product.name} for ${product.price.toLocaleString()} SYP`,
+        title: "Success",
+        description: `Purchased: ${product.name}`,
       });
-    }, 1500);
+    }, 1200);
   };
 
   if (serviceId === 'admin') {
@@ -134,47 +126,47 @@ export function ProductSheet({
     <Sheet>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
-        <div className="p-6 border-b">
+        <div className="p-6 border-b flex items-center justify-between">
           <SheetHeader>
-            <SheetTitle className="text-2xl font-bold flex items-center gap-2">
+            <SheetTitle className="text-xl font-bold">
               {serviceName}
             </SheetTitle>
             <SheetDescription className="flex items-center gap-2">
-              Syncing with Al-Ragheb Server 
-              <span className="inline-flex h-2 w-2 rounded-full bg-green-500"></span>
+              Syncing with Al-Ragheb API
+              <span className="inline-flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
             </SheetDescription>
           </SheetHeader>
+          <Button variant="ghost" size="icon" onClick={fetchProducts} disabled={fetching}>
+            <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
           {fetching ? (
             <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm font-medium">Connecting to provider...</p>
+              <p className="text-sm font-medium">Bypassing CORS & Connecting...</p>
             </div>
           ) : products.length === 0 ? (
             <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <PackageX className="h-8 w-8" />
               <p className="text-sm font-medium text-center">
-                No active items found for <br/>
+                No items found for <br/>
                 <span className="text-primary font-bold">"{serviceId}"</span>
               </p>
-              <p className="text-[10px] text-muted-foreground">Verify category mapping in API</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {products.map((product) => (
                 <div 
                   key={product.id}
                   className="flex items-center justify-between p-4 rounded-xl border bg-card hover:border-primary/50 transition-colors shadow-sm"
                 >
                   <div className="space-y-1">
-                    <p className="font-bold text-sm">{product.name}</p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-bold text-secondary">
-                        {product.price.toLocaleString()} <span className="text-[10px] font-normal">SYP</span>
-                      </p>
-                    </div>
+                    <p className="font-bold text-sm leading-tight">{product.name}</p>
+                    <p className="text-sm font-bold text-secondary">
+                      {product.price.toLocaleString()} <span className="text-[10px] font-normal">SYP</span>
+                    </p>
                   </div>
                   <Button 
                     size="sm" 
@@ -182,7 +174,7 @@ export function ProductSheet({
                     disabled={ordering !== null}
                     className="h-9 px-4"
                   >
-                    {ordering === product.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Order Now"}
+                    {ordering === product.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Order"}
                   </Button>
                 </div>
               ))}
@@ -192,7 +184,7 @@ export function ProductSheet({
         
         <div className="p-6 bg-muted/30 border-t flex items-center justify-between">
           <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-            Live API Bridge
+            Secure Backend Bridge
           </p>
           <div className="flex items-center gap-1 text-[10px] text-primary font-bold">
             <ExternalLink className="h-3 w-3" />
