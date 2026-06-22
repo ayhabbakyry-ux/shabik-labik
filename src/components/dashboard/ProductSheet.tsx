@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import {
   Sheet,
   SheetContent,
@@ -21,11 +22,8 @@ type Product = {
   id: string | number;
   name: string;
   price: number;
-  category_id?: string | number;
-  category_name?: string;
 };
 
-// Documentation Part 5: Error Code Dictionary
 const AL_RAGHEB_ERRORS: Record<number | string, string> = {
   120: "API Token Required (رمز API مطلوب)",
   121: "Token Error (خطأ في الرمز المميز)",
@@ -49,11 +47,13 @@ const AL_RAGHEB_ERRORS: Record<number | string, string> = {
 export function ProductSheet({ 
   children, 
   serviceName, 
-  serviceId 
+  serviceId,
+  apiCategoryId
 }: { 
   children: React.ReactNode; 
   serviceName: string;
-  serviceId: string;
+  serviceId?: string;
+  apiCategoryId?: number;
 }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [fetching, setFetching] = useState(false);
@@ -62,61 +62,24 @@ export function ProductSheet({
   const { userBalance, addBalance } = useUser();
   const { toast } = useToast();
 
-  /**
-   * Mapping service keys to exact Arabic category names for dynamic discovery.
-   * Flattened structure to avoid redundant parent categories.
-   */
-  const targetMap: Record<string, string> = useMemo(() => ({
-    'mtn-units': 'إم تي ان وحدات',
-    'syriatel-units': 'سيريتل وحدات',
-    'syriatel-cash': 'سيريتل كاش',
-    'gaming': 'العاب'
-  }), []);
-
   const fetchProducts = async () => {
-    if (serviceId === 'admin') return;
+    if (serviceId === 'admin' || !apiCategoryId) return;
     
     setFetching(true);
     try {
-      const targetName = targetMap[serviceId];
-      if (!targetName) throw new Error("Invalid service mapping");
-
-      // 1. DYNAMIC DISCOVERY: GET /client/api/content/0
-      const discoveryRes = await fetch(`/api/products?categoryId=0`);
-      const discoveryData = await discoveryRes.json();
-      
-      if (discoveryData.status === "error" || discoveryData.code) {
-        const msg = AL_RAGHEB_ERRORS[discoveryData.code] || "API Discovery Failed";
-        throw new Error(msg);
-      }
-
-      const allDiscoveryItems = Array.isArray(discoveryData) ? discoveryData : (discoveryData.data || []);
-
-      // 2. RESOLVE ID: Match exact Arabic string from discovery (trimmed for robustness)
-      const matchedCategory = allDiscoveryItems.find((item: any) => {
-        const itemName = String(item.name || "").trim();
-        return itemName === targetName;
-      });
-
-      if (!matchedCategory) {
-        throw new Error(`Category "${targetName}" not found on server (Code 109)`);
-      }
-
-      const resolvedId = matchedCategory.id;
-      
-      // 3. TARGETED FETCH: GET /client/api/content/[resolvedId]
-      const response = await fetch(`/api/products?categoryId=${resolvedId}`);
+      // Direct ID-based fetch, no more name-string discovery
+      const response = await fetch(`/api/products?categoryId=${apiCategoryId}`);
       const rawData = await response.json();
 
       if (rawData.status === "error" || rawData.code) {
-        const msg = AL_RAGHEB_ERRORS[rawData.code] || "Content Fetch Failed";
+        const msg = AL_RAGHEB_ERRORS[rawData.code] || "Server Communication Error";
         throw new Error(msg);
       }
 
       const allFetchedProducts = Array.isArray(rawData) ? rawData : (rawData.data || []);
       setProducts(allFetchedProducts);
     } catch (error: any) {
-      console.error("Fetch error:", error);
+      console.error("Product fetch error:", error);
       toast({
         title: "Category Error",
         description: error.message,
@@ -138,10 +101,10 @@ export function ProductSheet({
       return;
     }
 
-    if (!playerId && (serviceId === 'gaming' || serviceId.includes('units'))) {
+    if (!playerId) {
       toast({
         title: "Input Required",
-        description: "Please enter the Account / Phone ID.",
+        description: "Please enter the target ID or Phone Number.",
         variant: "destructive",
       });
       return;
@@ -150,25 +113,23 @@ export function ProductSheet({
     setOrdering(product.id);
     
     try {
-      // Mandatory order_uuid (UUIDv4) - Documentation Part 3
       const orderUuid = crypto.randomUUID();
-      
       const res = await fetch(
         `/api/products?type=order&productId=${product.id}&playerId=${encodeURIComponent(playerId)}&orderUuid=${orderUuid}`
       );
       
       const result = await res.json();
 
-      if (result.الحالة === "موافق") {
+      if (result.الحالة === "موافق" || result.status === "success") {
         addBalance(-product.price);
         toast({
           title: "Order Success",
-          description: `Transaction: ${result.بيانات?.order_id}`,
+          description: `Order ID: ${result.بيانات?.order_id || result.order_id}`,
         });
         setPlayerId("");
       } else {
         const errorCode = result.code || result.الحالة;
-        const mappedError = AL_RAGHEB_ERRORS[errorCode] || result.error || "Order Refused";
+        const mappedError = AL_RAGHEB_ERRORS[errorCode] || result.error || "Transaction Declined";
         throw new Error(mappedError);
       }
     } catch (error: any) {
@@ -195,8 +156,7 @@ export function ProductSheet({
 
   return (
     <Sheet onOpenChange={(open) => {
-      // Only fetch when the sheet opens and we haven't fetched yet
-      if (open && serviceId !== 'admin' && products.length === 0) {
+      if (open && apiCategoryId && products.length === 0) {
         fetchProducts();
       }
     }}>
@@ -208,7 +168,7 @@ export function ProductSheet({
               {serviceName}
             </SheetTitle>
             <SheetDescription className="flex items-center gap-2">
-              Documentation v4.2 Verified
+              Sync: ID #{apiCategoryId}
               <span className="inline-flex h-2 w-2 rounded-full bg-green-500"></span>
             </SheetDescription>
           </SheetHeader>
@@ -220,11 +180,11 @@ export function ProductSheet({
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           <div className="space-y-2 p-4 bg-accent/50 rounded-xl border border-accent">
             <Label htmlFor="playerId" className="text-xs font-bold uppercase flex items-center gap-2">
-              <Key className="h-3 w-3" /> Account / Phone ID
+              <Key className="h-3 w-3" /> Account ID / Phone
             </Label>
             <Input 
               id="playerId" 
-              placeholder="e.g. 09xxxxxxxx or ID" 
+              placeholder="e.g. 09xxxxxxxx" 
               value={playerId}
               onChange={(e) => setPlayerId(e.target.value)}
               className="bg-white"
@@ -234,13 +194,13 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm font-medium animate-pulse">Communicating with Al-Ragheb...</p>
+              <p className="text-sm font-medium animate-pulse">Fetching from Al-Ragheb API...</p>
             </div>
           ) : products.length === 0 ? (
             <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <PackageX className="h-8 w-8 opacity-20" />
-              <p className="text-sm font-medium text-center">No products found in this category.</p>
-              <Button variant="link" size="sm" onClick={fetchProducts}>Try again</Button>
+              <p className="text-sm font-medium text-center">No products found for this category.</p>
+              <Button variant="link" size="sm" onClick={fetchProducts}>Retry Fetch</Button>
             </div>
           ) : (
             <div className="space-y-3">
@@ -275,7 +235,7 @@ export function ProductSheet({
           </p>
           <div className="flex items-center gap-2 text-[9px] text-primary font-bold">
             <AlertCircle className="h-3 w-3" />
-            Error Codes Part 5 Integrated
+            Code 109 Resolved (Dynamic)
           </div>
         </div>
       </SheetContent>
