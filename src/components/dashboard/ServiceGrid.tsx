@@ -1,14 +1,14 @@
 
 "use client";
 
-import { Smartphone, Zap, Gamepad2, CreditCard, MessageCircle, ShieldCheck, Layers } from "lucide-react";
+import { Smartphone, Zap, Gamepad2, CreditCard, ShieldCheck, Layers } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ProductSheet } from "./ProductSheet";
 
 /**
  * Service Grid Configuration
- * Updated with Arabic category names as requested.
- * 'line-recharge' acts as a filter for the 'قسم شحن الخطوط' logic.
+ * Using descriptive slugs that ProductSheet will resolve to numeric IDs 
+ * by searching the live API /client/api/content/0 response.
  */
 const services = [
   { id: 'alragheb', name: "بضاعة ومنتجات الراغب", icon: Zap, color: "text-amber-500", bg: "bg-amber-50" },

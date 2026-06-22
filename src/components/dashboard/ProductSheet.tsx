@@ -44,12 +44,49 @@ export function ProductSheet({
     
     setFetching(true);
     try {
-      const isNumericId = !isNaN(Number(serviceId));
-      const url = isNumericId 
-        ? `/api/products?categoryId=${serviceId}`
-        : `/api/products`;
+      let finalCategoryId: string | number = serviceId;
 
-      const response = await fetch(url);
+      // 1. DYNAMIC ID DISCOVERY: If the ID is a slug (string), we find the real ID from the server
+      if (isNaN(Number(serviceId))) {
+        // Fetch categories/root products to find IDs
+        const discoveryRes = await fetch(`/api/products?categoryId=0`);
+        if (!discoveryRes.ok) throw new Error("Failed to reach discovery endpoint");
+        
+        const discoveryData = await discoveryRes.json();
+        const allItems = Array.isArray(discoveryData) ? discoveryData : (discoveryData.data || []);
+
+        // Mapping slugs to the Arabic names found in the API
+        const targetMap: Record<string, string> = {
+          'syriatel-units': 'وحدات سيريتل',
+          'mtn-units': 'وحدات الام تي ان',
+          'line-recharge': 'قسم شحن الخطوط',
+          'alragheb': 'بضاعة ومنتجات الراغب',
+          'syriatel-cash': 'سيريتل كاش',
+          'gaming': 'العاب'
+        };
+
+        const targetName = targetMap[serviceId];
+        
+        // Find the numeric ID by searching the name in the API response
+        const matchedCategory = allItems.find((item: any) => 
+          String(item.name).includes(targetName) || 
+          String(item.category_name).includes(targetName)
+        );
+
+        if (matchedCategory) {
+          finalCategoryId = matchedCategory.id || matchedCategory.category_id;
+        } else {
+          // If not found in discovery, we'll try to use the global list filtered
+          setProducts(allItems.filter((p: any) => 
+            String(p.name).includes(targetName) || String(p.category_name).includes(targetName)
+          ));
+          setFetching(false);
+          return;
+        }
+      }
+
+      // 2. FINAL FETCH: Use the discovered numeric ID to get specific content
+      const response = await fetch(`/api/products?categoryId=${finalCategoryId}`);
 
       if (!response.ok) {
         const errData = await response.json();
@@ -57,45 +94,11 @@ export function ProductSheet({
       }
 
       const data = await response.json();
+      const allProducts = Array.isArray(data) ? data : (data.data || []);
       
-      let allProducts = Array.isArray(data) ? data : (data.data || []);
-      
-      // Advanced Filtering Logic for Arabic Categories
-      if (!isNumericId) {
-        allProducts = allProducts.filter((p: any) => {
-          const productName = String(p.name || '');
-          const categoryName = String(p.category_name || '');
-          
-          if (serviceId === 'line-recharge') {
-            // "قسم شحن الخطوط" should show both Syriatel and MTN units
-            return (
-              categoryName === "قسم شحن الخطوط" || 
-              productName.includes("وحدات سيريتل") || 
-              productName.includes("وحدات الام تي ان")
-            );
-          }
-          
-          if (serviceId === 'syriatel-units') {
-            return productName.includes("وحدات سيريتل") || categoryName.includes("سيريتل");
-          }
-          
-          if (serviceId === 'mtn-units') {
-            return productName.includes("وحدات الام تي ان") || categoryName.includes("MTN") || categoryName.includes("ام تي ان");
-          }
-
-          if (serviceId === 'alragheb') {
-             return true; // Show all for generic Al-Ragheb button
-          }
-
-          // Default fallback keyword search
-          const target = serviceId.toLowerCase();
-          return productName.toLowerCase().includes(target) || categoryName.toLowerCase().includes(target);
-        });
-      }
-
       setProducts(allProducts);
     } catch (error: any) {
-      console.error("Client fetch error:", error);
+      console.error("Discovery/Fetch error:", error);
       toast({
         title: "Sync Error",
         description: error.message || "Could not sync with digital provider.",
@@ -155,7 +158,7 @@ export function ProductSheet({
               {serviceName}
             </SheetTitle>
             <SheetDescription className="flex items-center gap-2">
-              Live Category Sync
+              Real-time ID Sync (Live)
               <span className="inline-flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
             </SheetDescription>
           </SheetHeader>
@@ -168,7 +171,7 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm font-medium">Fetching specific category goods...</p>
+              <p className="text-sm font-medium">Discovering IDs & Fetching...</p>
             </div>
           ) : products.length === 0 ? (
             <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-3">
@@ -207,11 +210,11 @@ export function ProductSheet({
         
         <div className="p-6 bg-muted/30 border-t flex items-center justify-between">
           <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-            Filter: {serviceId}
+            Resolved: {serviceId}
           </p>
           <div className="flex items-center gap-1 text-[10px] text-primary font-bold">
             <ExternalLink className="h-3 w-3" />
-            Direct API Response
+            Verified Dynamic ID
           </div>
         </div>
       </SheetContent>
