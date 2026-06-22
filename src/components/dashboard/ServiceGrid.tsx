@@ -10,12 +10,12 @@ import { ProductSheet } from "./ProductSheet";
  * Each service has a unique ID used for dynamic ID resolution and filtering.
  */
 const services = [
-  { id: 'alragheb', name: "بضاعة ومنتجات الراغب", icon: Zap, color: "text-amber-500", bg: "bg-amber-50" },
-  { id: 'line-recharge', name: "قسم شحن الخطوط", icon: Layers, color: "text-emerald-500", bg: "bg-emerald-50" },
+  { id: 'mtn-units', name: "وحدات ام تي ان", icon: Smartphone, color: "text-yellow-600", bg: "bg-yellow-50" },
   { id: 'syriatel-units', name: "وحدات سيريتل", icon: Smartphone, color: "text-red-500", bg: "bg-red-50" },
-  { id: 'mtn-units', name: "وحدات الام تي ان", icon: Smartphone, color: "text-yellow-600", bg: "bg-yellow-50" },
+  { id: 'line-recharge', name: "قسم شحن الخطوط", icon: Layers, color: "text-emerald-500", bg: "bg-emerald-50" },
   { id: 'syriatel-cash', name: "سيريتل كاش", icon: CreditCard, color: "text-red-600", bg: "bg-red-50" },
   { id: 'gaming', name: "العاب وتطبيقات دردشة", icon: Gamepad2, color: "text-blue-500", bg: "bg-blue-50" },
+  { id: 'alragheb', name: "منتجات الراغب الآلية", icon: Zap, color: "text-amber-500", bg: "bg-amber-50" },
   { id: 'admin', name: "لوحة التحكم (المعلم)", icon: ShieldCheck, color: "text-primary", bg: "bg-primary/10", isAdmin: true },
 ];
 
