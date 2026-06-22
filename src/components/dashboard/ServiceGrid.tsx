@@ -1,118 +1,80 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
-import { Smartphone, Gamepad2, CreditCard, ShieldCheck, Loader2, AlertCircle } from "lucide-react";
+import { Smartphone, Gamepad2, CreditCard, ShieldCheck, Phone, FileText, Globe, SmartphoneNfc } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ProductSheet } from "./ProductSheet";
-import { useToast } from "@/hooks/use-toast";
 
-type ApiCategory = {
-  id: number;
+type ServiceItem = {
+  id: string;
   name: string;
+  icon: any;
+  color: string;
+  bg: string;
 };
 
 export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
-  const [categories, setCategories] = useState<ApiCategory[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
+  // Hardcoded UI structure as per screenshot 1000197511.jpg
+  const lineChargingServices: ServiceItem[] = [
+    { id: "mtn_units", name: "إم تي إن وحدات", icon: Smartphone, color: "text-yellow-600", bg: "bg-yellow-50" },
+    { id: "syr_units", name: "سيريتل وحدات", icon: Smartphone, color: "text-red-600", bg: "bg-red-50" },
+    { id: "mtn_bill", name: "إم تي إن فاتورة", icon: FileText, color: "text-yellow-700", bg: "bg-yellow-100" },
+    { id: "syr_bill", name: "سيريتل فاتورة", icon: FileText, color: "text-red-700", bg: "bg-red-100" },
+    { id: "elux", name: "ELUX", icon: SmartphoneNfc, color: "text-blue-600", bg: "bg-blue-50" },
+    { id: "syr_old", name: "سيريتل - الليرة القديمة", icon: Smartphone, color: "text-rose-600", bg: "bg-rose-50" },
+    { id: "asiacell", name: "ASIACELL", icon: Globe, color: "text-purple-600", bg: "bg-purple-50" },
+    { id: "sentence", name: "SENTENCE", icon: Smartphone, color: "text-indigo-600", bg: "bg-indigo-50" },
+  ];
 
-  useEffect(() => {
-    async function fetchCategories() {
-      try {
-        const res = await fetch('/api/products?categoryId=0');
-        const data = await res.json();
-        
-        // Ensure we get an array from the data property or the root
-        const items = Array.isArray(data) ? data : (data.data || []);
-        
-        // Log the response exactly as requested by the user to identify correct names
-        console.log("Al-Ragheb Root Categories:", items);
-        
-        setCategories(items);
-      } catch (error) {
-        console.error("Failed to fetch categories:", error);
-        toast({
-          title: "Connection Error",
-          description: "Could not load categories from Al-Ragheb.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchCategories();
-  }, [toast]);
-
-  // Helper to assign icons based on server-provided names
-  const getIconForCategory = (name: string) => {
-    const n = name.toLowerCase();
-    if (n.includes('سيريتل') || n.includes('mtn') || n.includes('وحدات')) return Smartphone;
-    if (n.includes('العاب') || n.includes('game') || n.includes('ببجي')) return Gamepad2;
-    if (n.includes('كاش') || n.includes('رصيد')) return CreditCard;
-    return Smartphone;
-  };
-
-  const getColorsForCategory = (name: string) => {
-    if (name.includes('سيريتل')) return { color: "text-red-600", bg: "bg-red-50" };
-    if (name.includes('mtn')) return { color: "text-yellow-600", bg: "bg-yellow-50" };
-    if (name.includes('العاب')) return { color: "text-blue-500", bg: "bg-blue-50" };
-    return { color: "text-primary", bg: "bg-primary/5" };
-  };
-
-  if (loading) {
+  const renderServiceCard = (service: ServiceItem) => {
+    const Icon = service.icon;
     return (
-      <div className="flex flex-col items-center justify-center py-12 space-y-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground font-medium">Syncing with Al-Ragheb Server...</p>
-      </div>
+      <ProductSheet key={service.id} serviceName={service.name}>
+        <Card className="hover:shadow-md transition-all cursor-pointer group active:scale-95 border-none bg-white overflow-hidden">
+          <CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-3">
+            <div className={`w-20 h-20 rounded-full ${service.bg} flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner`}>
+              <Icon className={`h-10 w-10 ${service.color}`} />
+            </div>
+            <p className="text-[13px] font-bold leading-tight text-foreground group-hover:text-primary transition-colors">
+              {service.name}
+            </p>
+          </CardContent>
+        </Card>
+      </ProductSheet>
     );
-  }
+  };
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-      {/* Dynamic API Categories */}
-      {categories.map((cat) => {
-        const Icon = getIconForCategory(cat.name);
-        const { color, bg } = getColorsForCategory(cat.name);
-        
-        return (
-          <ProductSheet key={cat.id} serviceName={cat.name} apiCategoryId={cat.id}>
-            <Card className="hover:shadow-md transition-all cursor-pointer group active:scale-95 border-none bg-white">
-              <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-3">
-                <div className={`p-3 rounded-2xl ${bg} group-hover:scale-110 transition-transform`}>
-                  <Icon className={`h-6 w-6 ${color}`} />
-                </div>
-                <p className="text-xs font-bold leading-tight uppercase tracking-wide text-muted-foreground group-hover:text-primary transition-colors">
-                  {cat.name}
-                </p>
-              </CardContent>
-            </Card>
-          </ProductSheet>
-        );
-      })}
+    <div className="space-y-8">
+      {/* Line Charging Section */}
+      <div className="space-y-4">
+        <h3 className="font-bold text-lg border-r-4 border-primary pr-3 flex items-center gap-2">
+          <Phone className="h-5 w-5 text-primary" />
+          قسم شحن الخطوط
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {lineChargingServices.map(renderServiceCard)}
+        </div>
+      </div>
 
-      {/* Admin Panel (Maalam Console) */}
+      {/* Admin Panel (Maalam Console) - Preserved logic */}
       {isAdmin && (
-        <ProductSheet serviceName="لوحة التحكم (المعلم)" serviceId="admin">
-          <Card className="hover:shadow-md transition-all cursor-pointer group active:scale-95 border-none bg-white">
-            <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-3">
-              <div className="p-3 rounded-2xl bg-primary/10 group-hover:scale-110 transition-transform">
-                <ShieldCheck className="h-6 w-6 text-primary" />
-              </div>
-              <p className="text-xs font-bold leading-tight uppercase tracking-wide text-muted-foreground group-hover:text-primary transition-colors">
-                لوحة التحكم
-              </p>
-            </CardContent>
-          </Card>
-        </ProductSheet>
-      )}
-
-      {categories.length === 0 && !loading && (
-        <div className="col-span-full p-8 text-center bg-muted/20 rounded-2xl border border-dashed">
-          <AlertCircle className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
-          <p className="text-sm font-medium text-muted-foreground">No categories returned from server.</p>
+        <div className="space-y-4">
+          <h3 className="font-bold text-lg border-r-4 border-destructive pr-3">الإدارة</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <ProductSheet serviceName="لوحة التحكم (المعلم)" serviceId="admin">
+              <Card className="hover:shadow-md transition-all cursor-pointer group active:scale-95 border-none bg-white">
+                <CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-3">
+                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <ShieldCheck className="h-10 w-10 text-primary" />
+                  </div>
+                  <p className="text-[13px] font-bold leading-tight text-muted-foreground group-hover:text-primary transition-colors">
+                    لوحة التحكم
+                  </p>
+                </CardContent>
+              </Card>
+            </ProductSheet>
+          </div>
         </div>
       )}
     </div>
