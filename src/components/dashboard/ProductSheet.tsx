@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   Sheet,
   SheetContent,
@@ -63,7 +63,8 @@ export function ProductSheet({
   const { toast } = useToast();
 
   /**
-   * Mapping service keys to exact Arabic category names for dynamic discovery
+   * Mapping service keys to exact Arabic category names for dynamic discovery.
+   * Flattened structure to avoid redundant parent categories.
    */
   const targetMap: Record<string, string> = useMemo(() => ({
     'mtn-units': 'إم تي ان وحدات',
@@ -91,7 +92,7 @@ export function ProductSheet({
 
       const allDiscoveryItems = Array.isArray(discoveryData) ? discoveryData : (discoveryData.data || []);
 
-      // 2. RESOLVE ID: Match exact Arabic string from discovery
+      // 2. RESOLVE ID: Match exact Arabic string from discovery (trimmed for robustness)
       const matchedCategory = allDiscoveryItems.find((item: any) => {
         const itemName = String(item.name || "").trim();
         return itemName === targetName;
@@ -121,17 +122,11 @@ export function ProductSheet({
         description: error.message,
         variant: "destructive",
       });
-      setProducts([]); // Clear products on error
+      setProducts([]); 
     } finally {
       setFetching(false);
     }
   };
-
-  useEffect(() => {
-    if (serviceId !== 'admin') {
-      fetchProducts();
-    }
-  }, [serviceId]);
 
   const handleOrder = async (product: Product) => {
     if (userBalance < product.price) {
@@ -155,7 +150,7 @@ export function ProductSheet({
     setOrdering(product.id);
     
     try {
-      // Mandatory order_uuid (UUIDv4)
+      // Mandatory order_uuid (UUIDv4) - Documentation Part 3
       const orderUuid = crypto.randomUUID();
       
       const res = await fetch(
@@ -199,7 +194,12 @@ export function ProductSheet({
   }
 
   return (
-    <Sheet>
+    <Sheet onOpenChange={(open) => {
+      // Only fetch when the sheet opens and we haven't fetched yet
+      if (open && serviceId !== 'admin' && products.length === 0) {
+        fetchProducts();
+      }
+    }}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
         <div className="p-6 border-b flex items-center justify-between bg-card">

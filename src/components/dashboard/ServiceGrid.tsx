@@ -7,7 +7,7 @@ import { ProductSheet } from "./ProductSheet";
 /**
  * Service Grid Configuration
  * Flattened UI to avoid Code 109 errors.
- * Using EXACT Arabic strings for direct dynamic resolution from Al-Ragheb API.
+ * No redundant parent category ('قسم شحن الخطوط') to prevent unneeded API calls.
  */
 const services = [
   { id: 'mtn-units', name: "إم تي ان وحدات", icon: Smartphone, color: "text-yellow-600", bg: "bg-yellow-50" },
