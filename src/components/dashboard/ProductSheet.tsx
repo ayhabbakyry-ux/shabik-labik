@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
@@ -25,10 +24,11 @@ import {
 } from "@/components/ui/select";
 
 /**
- * PRODUCTION-GRADE PRODUCT SHEET (STABLE & CRASH-PROOF)
- * 1. Robust Filtering: parent_id + Brand Keyword Isolation.
- * 2. Hidden 4% Margin: Automated markup applied in render.
- * 3. Crash Prevention: Optional chaining and fallbacks everywhere.
+ * PRODUCTION-GRADE PRODUCT SHEET (COMPLETE & STABLE)
+ * 1. Full Data Sync: Pulls all variations and products.
+ * 2. 4% Margin: Automated hidden markup on all customer prices.
+ * 3. Crash-Proof Extraction: Safe regex for Delivered Balance.
+ * 4. Strict Isolation: Keeps MTN and Syriatel brand-separated.
  */
 export function ProductSheet({ 
   children, 
@@ -49,14 +49,18 @@ export function ProductSheet({
   const sectionTitle = serviceName;
 
   /**
-   * ROBUST FILTERING LOGIC
-   * Strictly isolates brands and filters by category ID.
+   * ROBUST FILTERING & MAPPING LOGIC
+   * 1. Filters by Parent ID.
+   * 2. Isolates by Keyword (MTN/Syriatel).
+   * 3. Injects 4% Margin and Extracts Amount.
    */
   const filteredProducts = useMemo(() => {
     if (!allProducts || !Array.isArray(allProducts) || allProducts.length === 0) return [];
     
+    // 1. Get base products matching the current category
     let baseFilter = allProducts.filter(item => item && Number(item.parent_id) === Number(activeCategoryId));
 
+    // 2. Strict Grouping & Isolation for Telecom (Parent ID 6)
     if (Number(activeCategoryId) === 6 && sectionTitle) {
       const title = sectionTitle.toLowerCase();
       if (title.includes("إم تي إن") || title.includes("mtn")) {
@@ -68,7 +72,22 @@ export function ProductSheet({
       }
     }
     
-    return baseFilter;
+    // 3. Map over results to inject 4% profit margin and extract exact dynamic amount
+    return baseFilter.map(item => {
+      // Hidden 4% Margin math
+      const basePrice = Number(item.price || 0);
+      const finalCustomerPrice = (basePrice * 1.04).toFixed(2);
+      
+      // Dynamic Regex to strip and extract only numbers/dots from item name safely
+      const nameNumbers = item.name?.match(/[\d.]+/);
+      const amountDelivered = item.amount || item.denomination || (nameNumbers ? nameNumbers[0] : "محدد");
+
+      return {
+        ...item,
+        displayPrice: finalCustomerPrice, // ONLY this price will be shown
+        displayAmount: amountDelivered     // Extracted volume/balance
+      };
+    });
   }, [allProducts, activeCategoryId, sectionTitle]);
 
   const fetchProducts = useCallback(async () => {
@@ -102,7 +121,7 @@ export function ProductSheet({
     return (
       <Sheet>
         <SheetTrigger asChild>{children}</SheetTrigger>
-        <SheetContent side="bottom" className="h-[80vh] sm:h-screen sm:max-w-full">
+        <SheetContent side="bottom" className="h-[80vh] sm:h-screen sm:max-w-full overflow-y-auto">
           <AdminPanel />
         </SheetContent>
       </Sheet>
@@ -149,9 +168,10 @@ export function ProductSheet({
                     const selectedVarId = selectedVariations[product.id];
                     const currentVariation = variations.find((v: any) => v && String(v.id) === selectedVarId);
                     
-                    // CRASH-PROOF EXPRESSIONS
-                    const priceToDisplay = (Number(currentVariation?.price || product.price || 0) * 1.04).toFixed(2);
-                    const amountToDisplay = product.amount || product.denomination || product.name?.match(/[\d.]+/)?.[0] || "محدد";
+                    // Final Customer Pricing (Always Hidden 4% markup)
+                    const displayPrice = currentVariation 
+                      ? (Number(currentVariation.price || 0) * 1.04).toFixed(2)
+                      : product.displayPrice;
 
                     return (
                       <Card key={product.id} className="border-none shadow-sm bg-white overflow-hidden">
@@ -163,7 +183,7 @@ export function ProductSheet({
                             <div className="text-right">
                               <h4 className="font-bold text-base text-foreground leading-tight">{product.name}</h4>
                               <p className="text-[11px] text-primary font-bold mt-1">
-                                الرصيد الواصل: {amountToDisplay}
+                                الرصيد الواصل: {product.displayAmount}
                               </p>
                             </div>
                           </div>
@@ -181,9 +201,11 @@ export function ProductSheet({
                                   {variations.map((v: any) => {
                                     if (!v) return null;
                                     const markedUp = (Number(v.price || 0) * 1.04).toFixed(2);
+                                    const vMatch = v.name?.match(/[\d.]+/);
+                                    const vAmount = v.amount || v.value || (vMatch ? vMatch[0] : v.name || "محدد");
                                     return (
                                       <SelectItem key={v.id} value={String(v.id)}>
-                                        الرصيد الواصل: {v.name || v.value} - السعر: {markedUp} ل.س
+                                        الرصيد الواصل: {vAmount} - السعر: {markedUp} ل.س
                                       </SelectItem>
                                     );
                                   })}
@@ -196,7 +218,7 @@ export function ProductSheet({
                             <div className="text-right">
                               <p className="text-xs text-muted-foreground mb-1">السعر النهائي</p>
                               <p className="text-primary font-bold text-xl leading-none">
-                                {priceToDisplay} <span className="text-xs opacity-70">ل.س</span>
+                                {displayPrice} <span className="text-xs opacity-70">ل.س</span>
                               </p>
                             </div>
                             <Button 
