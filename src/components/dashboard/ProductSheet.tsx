@@ -40,19 +40,28 @@ export function ProductSheet({
   const [selectedVariations, setSelectedVariations] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
+  /**
+   * STRICT FILTERING & ISOLATION LOGIC
+   * 1. Filters by parent_id (provided as categoryId)
+   * 2. For category 6 (Telecom), applies strict keyword matching for brand isolation
+   */
   const filteredProducts = useMemo(() => {
     if (!allProducts || allProducts.length === 0) return [];
     
-    const activeCategoryId = Number(categoryId);
-    let baseFilter = allProducts.filter(item => Number(item.parent_id) === activeCategoryId);
+    const activeParentId = Number(categoryId);
+    let baseFilter = allProducts.filter(item => Number(item.parent_id) === activeParentId);
 
-    if (activeCategoryId === 6 && serviceName) {
+    // Deep isolation for shared Parent ID 6 (MTN/Syriatel)
+    if (activeParentId === 6 && serviceName) {
       const title = serviceName.toLowerCase();
-      if (title.includes("إم تي إن") || title.includes("mtn")) {
-        return baseFilter.filter(p => p.name.includes("إم تي إن") || p.name.toLowerCase().includes("mtn"));
+      const mtnKeywords = ["إم تي إن", "mtn"];
+      const syrKeywords = ["سيريتل", "syr", "syriatel", "سيرياتيل", "ليرة"];
+
+      if (mtnKeywords.some(k => title.includes(k))) {
+        return baseFilter.filter(p => mtnKeywords.some(k => p.name.toLowerCase().includes(k)));
       } 
-      if (title.includes("سيريتل") || title.includes("syr") || title.includes("syriatel")) {
-        return baseFilter.filter(p => p.name.includes("سيريتل") || p.name.toLowerCase().includes("syr") || p.name.includes("سيرياتيل"));
+      if (syrKeywords.some(k => title.includes(k))) {
+        return baseFilter.filter(p => syrKeywords.some(k => p.name.toLowerCase().includes(k)));
       }
     }
 
@@ -64,14 +73,15 @@ export function ProductSheet({
     
     setFetching(true);
     try {
+      // Global fetch to ensure deep data sync
       const response = await fetch(`/api/products`);
       const data = await response.json();
       const rawItems = Array.isArray(data) ? data : (data.data || []);
       setAllProducts(rawItems);
     } catch (error: any) {
       toast({
-        title: "خطأ في الاتصال",
-        description: "تعذر جلب البيانات من الخادم.",
+        title: "Error Syncing Data",
+        description: "Could not retrieve the latest products from the server.",
         variant: "destructive",
       });
     } finally {
@@ -81,8 +91,8 @@ export function ProductSheet({
 
   const handleOrder = (productName: string, variationId: string) => {
     toast({
-      title: "تم استلام طلبك",
-      description: `تم إرسال طلب ${productName} للمعالجة الآلية.`,
+      title: "Order Submitted",
+      description: `Request for ${productName} sent for automatic processing.`,
     });
   };
 
@@ -117,7 +127,7 @@ export function ProductSheet({
               </Button>
             </div>
             <SheetDescription className="text-right text-xs">
-              اختر الفئة والكمية المطلوبة من القائمة أدناه
+              Select the required denomination/quantity from the list below.
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -126,7 +136,7 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-medium">جاري جلب الفئات والأسعار المحدثة...</p>
+              <p className="text-sm font-medium">Syncing official pricing & amounts...</p>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
@@ -135,21 +145,28 @@ export function ProductSheet({
                   <div className="p-4 bg-muted rounded-full">
                     <PackageX className="h-10 w-10 opacity-40" />
                   </div>
-                  <p className="text-sm font-bold text-center">عذراً، لا توجد عروض متاحة حالياً لـ {serviceName}</p>
+                  <p className="text-sm font-bold text-center">No available offers for {serviceName} at this time.</p>
                 </div>
               ) : (
                 <div className="grid gap-4" dir="rtl">
                   {filteredProducts.map((product, idx) => {
-                    // Look for nested variations in various possible fields (params, variations, amounts, items)
+                    // DEEP SCAN for nested denominations/variations
                     const variations = product.params || product.variations || product.amounts || product.items || [];
                     const selectedVarId = selectedVariations[product.id];
+                    
+                    // Business Logic: 4% markup applied to the selected item
                     const currentVariation = variations.find((v: any) => String(v.id) === selectedVarId);
+                    const finalDisplayPrice = currentVariation 
+                      ? Math.ceil(Number(currentVariation.price) * 1.04) 
+                      : null;
 
                     return (
                       <Card key={idx} className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-shadow">
                         <CardContent className="p-5 space-y-4">
                           <div className="flex items-center gap-2">
-                            <Zap className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                            <div className="p-2 bg-primary/10 rounded-lg">
+                              <Zap className="h-4 w-4 text-primary" />
+                            </div>
                             <h4 className="font-bold text-base text-foreground">
                               {product.name}
                             </h4>
@@ -157,8 +174,8 @@ export function ProductSheet({
 
                           {variations.length > 0 ? (
                             <div className="space-y-3">
-                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                                اختر الكمية (الرصيد الواصل)
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block text-right">
+                                الرصيد الواصل / الكمية
                               </label>
                               <Select 
                                 value={selectedVarId} 
@@ -169,6 +186,7 @@ export function ProductSheet({
                                 </SelectTrigger>
                                 <SelectContent className="font-body" dir="rtl">
                                   {variations.map((v: any) => {
+                                    // 4% Profit Margin applied to each list item
                                     const vPrice = Math.ceil(Number(v.price || 0) * 1.04);
                                     return (
                                       <SelectItem key={v.id} value={String(v.id)}>
@@ -181,15 +199,15 @@ export function ProductSheet({
                             </div>
                           ) : (
                             <div className="p-3 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium text-center">
-                              يتم تحديد السعر عند الطلب لهذا المنتج
+                              Price is determined upon ordering for this service.
                             </div>
                           )}
 
                           <div className="flex items-center justify-between pt-2 border-t border-dashed">
-                            <div>
-                              {currentVariation && (
-                                <p className="text-secondary font-bold text-xl">
-                                  {Math.ceil(Number(currentVariation.price) * 1.04).toLocaleString()} <span className="text-xs opacity-70">SYP</span>
+                            <div className="text-right">
+                              {finalDisplayPrice && (
+                                <p className="text-primary font-bold text-xl">
+                                  {finalDisplayPrice.toLocaleString()} <span className="text-xs opacity-70">SYP</span>
                                 </p>
                               )}
                             </div>
