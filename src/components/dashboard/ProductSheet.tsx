@@ -70,7 +70,7 @@ export function ProductSheet({
       
       const rawItems = Array.isArray(data) ? data : (data.data || data.products || []);
       
-      // DEBUG LOG: Inspect raw item structure for nested variations
+      // DEBUG LOG: Inspect raw item structure for nested variations in developer console
       if (rawItems.length > 0) {
         console.log("[DEBUG] Raw Server Data Item:", JSON.stringify(rawItems[0], null, 2));
       }
