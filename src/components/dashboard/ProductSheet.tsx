@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   Sheet,
   SheetContent,
@@ -28,39 +28,42 @@ export function ProductSheet({
   serviceId?: string;
   categoryId?: number;
 }) {
-  const [products, setProducts] = useState<any[]>([]);
+  const [allProducts, setAllProducts] = useState<any[]>([]);
   const [fetching, setFetching] = useState(false);
   const { toast } = useToast();
+
+  // Reactive filtering using useMemo to ensure UI updates when state changes
+  const filteredProducts = useMemo(() => {
+    if (!allProducts || allProducts.length === 0) return [];
+    
+    const targetId = Number(categoryId);
+    return allProducts.filter((item: any) => {
+      const itemParentId = Number(item.parent_id);
+      
+      // Strict matching for parent_id
+      const isMatch = itemParentId === targetId;
+      
+      if (isMatch) {
+        console.log(`[FILTER MATCH] Product: ${item.name}, ParentID: ${item.parent_id} matches Target: ${targetId}`);
+      }
+      
+      return isMatch;
+    });
+  }, [allProducts, categoryId]);
 
   const fetchProducts = useCallback(async () => {
     if (serviceId === 'admin') return;
     
     setFetching(true);
     try {
-      // Fetch global list to filter by parent_id locally
-      // This is the most reliable way since the server-side filter is inconsistent
-      console.log(`[NETWORK] Fetching global product list for section: ${serviceName}...`);
+      console.log(`[NETWORK] Fetching global product list for: ${serviceName}...`);
       const response = await fetch(`/api/products`);
       const data = await response.json();
       
       const rawItems = Array.isArray(data) ? data : (data.data || []);
       
-      // STRICT FILTERING: Use parent_id as the primary identifier
-      // Force both sides to Numbers to ensure 100% type matching
-      const filtered = rawItems.filter((item: any) => {
-        const itemParentId = Number(item.parent_id);
-        const targetCategoryId = Number(categoryId);
-        
-        // Debugging logs as requested
-        if (rawItems.indexOf(item) < 5) { // Log first few items to verify structure
-            console.log(`Filtering: Item ID [${item.parent_id}] vs Active ID [${categoryId}] - Match: ${itemParentId === targetCategoryId}`);
-        }
-        
-        return itemParentId === targetCategoryId;
-      });
-      
-      console.log(`[FILTER RESULT] Section: ${serviceName}, Target ID: ${categoryId}, Found: ${filtered.length} products.`);
-      setProducts(filtered);
+      // Store the full list, useMemo handles the rest reactively
+      setAllProducts(rawItems);
     } catch (error: any) {
       console.error(`[FETCH ERROR]`, error);
       toast({
@@ -71,7 +74,7 @@ export function ProductSheet({
     } finally {
       setFetching(false);
     }
-  }, [categoryId, serviceId, serviceName, toast]);
+  }, [serviceId, serviceName, toast]);
 
   if (serviceId === 'admin') {
     return (
@@ -86,7 +89,12 @@ export function ProductSheet({
 
   return (
     <Sheet onOpenChange={(open) => {
-      if (open) fetchProducts();
+      if (open) {
+        fetchProducts();
+      } else {
+        // Clear state on close to ensure fresh fetch next time
+        setAllProducts([]);
+      }
     }}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex flex-col border-none">
@@ -99,7 +107,7 @@ export function ProductSheet({
               </Button>
             </div>
             <SheetDescription className="text-right text-xs">
-              المنتجات المتاحة حالياً لهذا القسم
+              المنتجات المتاحة حالياً لهذا القسم (ID: {categoryId})
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -112,7 +120,7 @@ export function ProductSheet({
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
-              {products.length === 0 ? (
+              {filteredProducts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center text-muted-foreground gap-4 py-12">
                   <div className="p-4 bg-muted rounded-full">
                     <PackageX className="h-10 w-10 opacity-40" />
@@ -121,7 +129,7 @@ export function ProductSheet({
                 </div>
               ) : (
                 <div className="grid gap-3" dir="rtl">
-                  {products.map((item, idx) => (
+                  {filteredProducts.map((item, idx) => (
                     <Card key={idx} className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-shadow">
                       <CardContent className="p-4 flex justify-between items-center">
                         <div className="space-y-1">
@@ -129,7 +137,7 @@ export function ProductSheet({
                             {item.name || 'منتج غير مسمى'}
                           </p>
                           <p className="text-[10px] text-muted-foreground uppercase">
-                            ID: {item.id}
+                            ID: {item.id} | Parent: {item.parent_id}
                           </p>
                         </div>
                         <div className="text-left">
