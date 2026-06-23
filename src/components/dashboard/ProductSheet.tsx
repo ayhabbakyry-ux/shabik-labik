@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { AdminPanel } from "@/components/admin/AdminPanel";
-import { Loader2, PackageX, RefreshCw } from "lucide-react";
+import { Loader2, PackageX, RefreshCw, Zap } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export function ProductSheet({ 
@@ -24,7 +24,7 @@ export function ProductSheet({
   categoryId
 }: { 
   children: React.ReactNode; 
-  serviceName: string;
+  serviceName: string; 
   serviceId?: string;
   categoryId?: number;
 }) {
@@ -33,56 +33,56 @@ export function ProductSheet({
   const { toast } = useToast();
 
   /**
-   * DOUBLE FILTERING STRATEGY
-   * Stage 1: Filter by parent_id (Discovered category ID)
-   * Stage 2: Keyword match for shared categories (e.g. Category 6 contains both MTN and Syriatel)
+   * REFACTORED DOUBLE-FILTERING STRATEGY
+   * 1. Filter by parent_id (Global grouping)
+   * 2. Filter by keyword for shared parent IDs (e.g. Category 6 contains multiple companies)
    */
   const filteredProducts = useMemo(() => {
     if (!allProducts || allProducts.length === 0) return [];
     
-    const targetId = Number(categoryId);
+    const activeCategoryId = Number(categoryId);
     
-    // Step 1: Filter by the primary Parent ID
-    let items = allProducts.filter((item: any) => {
-      const itemParentId = Number(item.parent_id);
-      return itemParentId === targetId;
-    });
+    // Stage 1: Base Filter by Parent ID
+    let baseFilter = allProducts.filter(item => Number(item.parent_id) === activeCategoryId);
 
-    // Step 2: Sub-filtering for shared categories (like Category 6: Line Shipping)
-    if (targetId === 6) {
-      const nameForCheck = serviceName.toLowerCase();
-      console.log(`[SUB-FILTER] Refining Category 6 for keyword: ${serviceName}`);
+    // Stage 2: Broad Keyword Grouping for shared categories (primarily Parent 6)
+    if (activeCategoryId === 6 && serviceName) {
+      const title = serviceName.toLowerCase();
+      console.log(`[FILTER DEBUG] Refining Category 6 for keyword: ${serviceName}`);
 
-      if (nameForCheck.includes("إم تي إن") || nameForCheck.includes("mtn")) {
-        items = items.filter(p => 
+      if (title.includes("إم تي إن") || title.includes("mtn")) {
+        return baseFilter.filter(p => 
           p.name.includes("إم تي إن") || 
           p.name.toLowerCase().includes("mtn")
         );
-      } else if (nameForCheck.includes("سيريتل") || nameForCheck.includes("syr")) {
-        items = items.filter(p => 
+      } 
+      if (title.includes("سيريتل") || title.includes("syr") || title.includes("syriatel")) {
+        return baseFilter.filter(p => 
           p.name.includes("سيريتل") || 
           p.name.toLowerCase().includes("syr") ||
           p.name.includes("سيرياتيل")
         );
-      } else if (nameForCheck.includes("asiacell")) {
-        items = items.filter(p => p.name.toLowerCase().includes("asiacell"));
-      } else if (nameForCheck.includes("elux")) {
-        items = items.filter(p => p.name.toLowerCase().includes("elux"));
+      }
+      if (title.includes("asiacell")) {
+        return baseFilter.filter(p => p.name.toLowerCase().includes("asiacell"));
+      }
+      if (title.includes("elux")) {
+        return baseFilter.filter(p => p.name.toLowerCase().includes("elux"));
       }
     }
 
-    // Step 3: Handle games sub-filtering if necessary
-    if (targetId === 2) {
-      const nameForCheck = serviceName.toLowerCase();
-      if (nameForCheck.includes("ببجي") || nameForCheck.includes("pubg")) {
-        items = items.filter(p => p.name.includes("ببجي") || p.name.toLowerCase().includes("pubg"));
-      } else if (nameForCheck.includes("فري فاير") || nameForCheck.includes("free fire")) {
-        items = items.filter(p => p.name.includes("فري فاير") || p.name.toLowerCase().includes("free fire"));
+    // Secondary: Handle games sub-filtering (Parent 2)
+    if (activeCategoryId === 2 && serviceName) {
+      const title = serviceName.toLowerCase();
+      if (title.includes("ببجي") || title.includes("pubg")) {
+        return baseFilter.filter(p => p.name.includes("ببجي") || p.name.toLowerCase().includes("pubg"));
+      }
+      if (title.includes("فري فاير") || title.includes("free fire")) {
+        return baseFilter.filter(p => p.name.includes("فري فاير") || p.name.toLowerCase().includes("free fire"));
       }
     }
 
-    console.log(`[FILTER RESULT] Displaying ${items.length} products for ${serviceName}`);
-    return items;
+    return baseFilter;
   }, [allProducts, categoryId, serviceName]);
 
   const fetchProducts = useCallback(async () => {
@@ -90,7 +90,7 @@ export function ProductSheet({
     
     setFetching(true);
     try {
-      console.log(`[NETWORK] Fetching global product catalog for: ${serviceName}...`);
+      console.log(`[NETWORK] Fetching global catalog for: ${serviceName}...`);
       const response = await fetch(`/api/products`);
       const data = await response.json();
       
@@ -138,7 +138,7 @@ export function ProductSheet({
               </Button>
             </div>
             <SheetDescription className="text-right text-xs">
-              المنتجات المتاحة حالياً لقسم: {serviceName}
+              قائمة العروض المتاحة لخدمة {serviceName}
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -147,7 +147,7 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-medium">جاري جلب وتحليل البيانات...</p>
+              <p className="text-sm font-medium">جاري جلب العروض وتطبيق الهامش الربحي...</p>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
@@ -156,33 +156,41 @@ export function ProductSheet({
                   <div className="p-4 bg-muted rounded-full">
                     <PackageX className="h-10 w-10 opacity-40" />
                   </div>
-                  <p className="text-sm font-bold text-center">عذراً، لا توجد منتجات متاحة حالياً لـ {serviceName}</p>
-                  <p className="text-[10px] opacity-60">ID: {categoryId}</p>
+                  <p className="text-sm font-bold text-center">عذراً، لا توجد عروض متاحة حالياً لـ {serviceName}</p>
                 </div>
               ) : (
                 <div className="grid gap-3" dir="rtl">
-                  {filteredProducts.map((item, idx) => (
-                    <Card key={idx} className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-shadow">
-                      <CardContent className="p-4 flex justify-between items-center">
-                        <div className="space-y-1">
-                          <p className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">
-                            {item.name || 'منتج غير مسمى'}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground uppercase">
-                            {item.id} | {item.parent_id}
-                          </p>
-                        </div>
-                        <div className="text-left">
-                          <p className="text-secondary font-bold">
-                            {Number(item.price || 0).toLocaleString()} SYP
-                          </p>
-                          <Button size="sm" className="h-7 text-[10px] px-4 mt-1 rounded-full">
-                            طلب الآن
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                  {filteredProducts.map((item, idx) => {
+                    // APPLY 4% MARGIN CALCULATION
+                    const basePrice = Number(item.price || 0);
+                    const finalPrice = Math.ceil(basePrice * 1.04);
+                    
+                    return (
+                      <Card key={idx} className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-shadow">
+                        <CardContent className="p-4 flex justify-between items-center">
+                          <div className="space-y-1 flex-1">
+                            <div className="flex items-center gap-2">
+                              <Zap className="h-3 w-3 text-yellow-500 fill-yellow-500" />
+                              <p className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">
+                                {item.name || 'منتج غير مسمى'}
+                              </p>
+                            </div>
+                            <p className="text-[9px] text-muted-foreground uppercase font-mono">
+                              REF: {item.id}
+                            </p>
+                          </div>
+                          <div className="text-left min-w-[100px]">
+                            <p className="text-secondary font-bold text-lg leading-none">
+                              {finalPrice.toLocaleString()} <span className="text-[10px] opacity-70">SYP</span>
+                            </p>
+                            <Button size="sm" className="h-7 text-[10px] px-6 mt-2 rounded-full font-bold shadow-sm">
+                              اطلب الآن
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
             </ScrollArea>
