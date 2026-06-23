@@ -21,7 +21,8 @@ export async function GET(request: Request) {
       category_id: categoryId ? Number(categoryId) : undefined
     };
 
-    // إرسال طلب "نظيف" للغاية لتجاوز جدران الحماية في بيئة الإنتاج
+    // إرسال طلب "نظيف" للغاية لتجاوز جدران الحماية في بيئة الإنتاج (Vercel)
+    // نستخدم ترويسات بسيطة جداً لضمان عدم اكتشاف التوقيع السحابي
     const response = await fetch(targetEndpoint, {
       method: 'POST', 
       headers: {
