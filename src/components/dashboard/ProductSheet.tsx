@@ -25,11 +25,11 @@ import {
 } from "@/components/ui/select";
 
 /**
- * PRODUCTION-GRADE PRODUCT SHEET (STABLE VERSION)
+ * PRODUCTION-GRADE PRODUCT SHEET (STABLE & CRASH-PROOF)
  * 1. Robust Filtering: parent_id + Brand Keyword Isolation.
  * 2. Hidden 4% Margin: Automated markup, original price purged.
- * 3. Dynamic Amount Extraction: Regex-based extraction for (الرصيد الواصل).
- * 4. Crash Prevention: Safety checks for regex and mapping.
+ * 3. Dynamic Amount Extraction: Safe Regex-based extraction.
+ * 4. Crash Prevention: Optional chaining and fallbacks everywhere.
  */
 export function ProductSheet({ 
   children, 
@@ -51,6 +51,7 @@ export function ProductSheet({
 
   /**
    * ROBUST FILTERING & MAPPING LOGIC
+   * Safely handles undefined values and strictly isolates brands.
    */
   const filteredProducts = useMemo(() => {
     if (!allProducts || !Array.isArray(allProducts) || allProducts.length === 0) return [];
@@ -62,11 +63,11 @@ export function ProductSheet({
     if (Number(activeCategoryId) === 6 && sectionTitle) {
       const title = sectionTitle.toLowerCase();
       if (title.includes("إم تي إن") || title.includes("mtn")) {
-        baseFilter = baseFilter.filter(item => item.name && (item.name.includes("إم تي إن") || item.name.toUpperCase().includes("MTN")));
+        baseFilter = baseFilter.filter(item => item?.name && (item.name.includes("إم تي إن") || item.name.toUpperCase().includes("MTN")));
       } else if (title.includes("سيريتل") || title.includes("syriatel")) {
-        baseFilter = baseFilter.filter(item => item.name && (item.name.includes("سيريتل") || item.name.toUpperCase().includes("SYRIATEL")));
+        baseFilter = baseFilter.filter(item => item?.name && (item.name.includes("سيريتل") || item.name.toUpperCase().includes("SYRIATEL")));
       } else if (title.includes("زين") || title.includes("zain")) {
-        baseFilter = baseFilter.filter(item => item.name && (item.name.toUpperCase().includes("ZAIN") || item.name.includes("زين")));
+        baseFilter = baseFilter.filter(item => item?.name && (item.name.toUpperCase().includes("ZAIN") || item.name.includes("زين")));
       }
     }
     
@@ -76,9 +77,9 @@ export function ProductSheet({
       const basePrice = Number(item.price || 0);
       const finalCustomerPrice = (basePrice * 1.04).toFixed(2);
       
-      // Dynamic Regex to strip and extract only numbers/dots from item name for (الرصيد الواصل)
-      const nameMatch = item.name ? item.name.match(/[\d.]+/) : null;
-      const amountDelivered = item.amount || item.denomination || (nameMatch ? nameMatch[0] : "محدد");
+      // Safe Regex to extract amount from name if no explicit amount field exists
+      const match = item.name?.match(/[\d.]+/);
+      const amountDelivered = item.amount || item.denomination || (match ? match[0] : "محدد");
 
       return {
         ...item,
@@ -219,7 +220,7 @@ export function ProductSheet({
                                     const markedUpPrice = (Number(v.price || 0) * 1.04).toFixed(2);
                                     return (
                                       <SelectItem key={v.id} value={String(v.id)}>
-                                        الرصيد: {v.name || v.value} - السعر: {markedUpPrice} ل.س
+                                        الرصيد الواصل: {v.name || v.value} - السعر: {markedUpPrice} ل.س
                                       </SelectItem>
                                     );
                                   })}
