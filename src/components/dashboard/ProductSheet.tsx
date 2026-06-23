@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { AdminPanel } from "@/components/admin/AdminPanel";
-import { Loader2, PackageX, RefreshCw, Key } from "lucide-react";
+import { Loader2, PackageX, RefreshCw, Key, AlertCircle } from "lucide-react";
 
 type Product = {
   id: string | number;
@@ -33,10 +33,8 @@ const AL_RAGHEB_ERRORS: Record<number | string, string> = {
   105: "Qty Not Available",
   106: "Qty Not Allowed",
   107: "Player ID Blocked",
-  108: "Two-Step Verification Required",
   109: "Product Not Found (ID Mismatch)",
   110: "Product Unavailable",
-  111: "Try again in 1 minute",
   500: "System Error",
 };
 
@@ -49,7 +47,7 @@ export function ProductSheet({
   children: React.ReactNode; 
   serviceName: string;
   serviceId?: string;
-  categoryId?: number;
+  categoryId: number;
 }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [fetching, setFetching] = useState(false);
@@ -57,52 +55,55 @@ export function ProductSheet({
   const { toast } = useToast();
 
   const fetchProducts = useCallback(async () => {
-    if (serviceId === 'admin' || !categoryId) return;
+    if (serviceId === 'admin') return;
     
     setFetching(true);
-    console.log(`[DEBUG] Initializing fetch for: ${serviceName} (ID: ${categoryId})`);
+    console.log(`[DEBUG] Initializing fetch for: ${serviceName} (Hardcoded ID: ${categoryId})`);
 
     try {
-      // Step 1: Attempt Category-Specific Fetch
+      // TIER 1: Attempt Category-Specific Fetch
       const primaryUrl = `/api/products?categoryId=${categoryId}`;
-      console.log(`[DEBUG] Step 1 Request: ${primaryUrl}`);
+      console.log(`[DEBUG] Attempting Tier 1: ${primaryUrl}`);
       
       const response = await fetch(primaryUrl);
+      console.log(`[DEBUG] Response Status: ${response.status}`);
+      
       const data = await response.json();
       
-      if (data.status === "error" || data.code) {
-        throw new Error(AL_RAGHEB_ERRORS[data.code] || `Server Error ${data.code}`);
+      if (data.code && data.code !== 200) {
+        console.warn(`[AL-RAGHEB] Error Code ${data.code}: ${AL_RAGHEB_ERRORS[data.code] || 'Unknown error'}`);
       }
 
       let rawItems = Array.isArray(data) ? data : (data.data || []);
       
-      // Step 2: Fallback to Global Fetch if needed
+      // TIER 2: Fallback to Global Fetch if Tier 1 is empty or failed
       if (rawItems.length === 0) {
-        console.log(`[DEBUG] Step 1 returned empty. Falling back to Global Fetch.`);
+        console.log(`[DEBUG] Tier 1 returned no items. Attempting Tier 2 (Global Fetch).`);
         const fallbackUrl = `/api/products`;
         const fbResponse = await fetch(fallbackUrl);
         const fbData = await fbResponse.json();
         rawItems = Array.isArray(fbData) ? fbData : (fbData.data || []);
       }
 
-      console.log(`[DEBUG] Total raw items received from server: ${rawItems.length}`);
+      console.log(`[DEBUG] Total raw items received for processing: ${rawItems.length}`);
 
-      // Step 3: ROBUST CLIENT-SIDE FILTERING
+      // TIER 3: ROBUST CLIENT-SIDE FILTERING
       const targetCatId = Number(categoryId);
       const filteredItems = rawItems.filter((item: any) => {
         // Handle various ID field names (Arabic and English)
         const rawItemCatId = item.category_id ?? item.الفئة_id ?? item.cat_id;
         const itemCatId = rawItemCatId !== undefined && rawItemCatId !== null ? Number(rawItemCatId) : null;
         
-        // Log the comparison for debugging
-        console.log(`[FILTER DEBUG] Comparing Product: "${item.الاسم || item.name}" | ItemCatID: ${itemCatId} (Type: ${typeof rawItemCatId}) vs Target: ${targetCatId}`);
+        const itemName = item.الاسم || item.name || "Unknown Product";
+        
+        console.log(`[FILTER DEBUG] Comparing: "${itemName}" | Item ID: ${itemCatId} (Type: ${typeof rawItemCatId}) vs Target: ${targetCatId}`);
 
-        // Match 1: Numeric ID Comparison
+        // Match 1: Numeric ID Comparison (Hardcoded Map)
         if (itemCatId !== null && itemCatId === targetCatId) return true;
 
-        // Match 2: String Name Comparison (as fallback)
+        // Match 2: Localized Name Comparison (as fallback for inconsistently tagged items)
         const itemCatName = item.category_name || item.اسم_الفئة || "";
-        const nameMatch = itemCatName.includes(serviceName) || serviceName.includes(itemCatName);
+        const nameMatch = itemCatName.trim() === serviceName.trim() || itemCatName.includes(serviceName);
         
         if (nameMatch && itemCatName !== "") {
           console.log(`[FILTER MATCH] Found match via NAME: ${itemCatName} matches ${serviceName}`);
@@ -112,7 +113,7 @@ export function ProductSheet({
         return false;
       });
 
-      console.log(`[DEBUG] Total items after strict filtering: ${filteredItems.length}`);
+      console.log(`[DEBUG] Products after strict filtering: ${filteredItems.length}`);
 
       const mappedProducts = filteredItems.map((item: any) => ({
         id: item.id,
@@ -124,7 +125,7 @@ export function ProductSheet({
     } catch (error: any) {
       console.error(`[DEBUG] Fetch process failed:`, error);
       toast({
-        title: "خطأ في جلب البيانات",
+        title: "خطأ في الاتصال بالخادم",
         description: error.message,
         variant: "destructive",
       });
@@ -154,7 +155,7 @@ export function ProductSheet({
           <SheetHeader>
             <SheetTitle className="text-xl font-bold font-headline">{serviceName}</SheetTitle>
             <SheetDescription className="text-xs">
-              خدمة رقمية موثوقة عبر الربط المباشر
+              خدمة رقمية موثوقة عبر الربط المباشر (ID: {categoryId})
             </SheetDescription>
           </SheetHeader>
           <Button variant="ghost" size="icon" onClick={fetchProducts} disabled={fetching}>
@@ -185,9 +186,12 @@ export function ProductSheet({
 
               {products.length === 0 ? (
                 <div className="h-60 flex flex-col items-center justify-center text-muted-foreground gap-4">
-                  <PackageX className="h-12 w-12 opacity-20" />
-                  <p className="text-sm font-medium text-center px-6">
-                    عذراً، لا توجد منتجات متاحة حالياً لهذا القسم (ID: {categoryId})
+                  <div className="p-4 bg-muted rounded-full">
+                    <PackageX className="h-10 w-10 opacity-40" />
+                  </div>
+                  <p className="text-sm font-medium text-center px-6 leading-relaxed">
+                    عذراً، لا توجد منتجات متاحة حالياً لهذا القسم.<br/>
+                    <span className="text-[10px] opacity-70">يتم تحديث المخزون تلقائياً من Al-Ragheb</span>
                   </p>
                 </div>
               ) : (
@@ -205,7 +209,7 @@ export function ProductSheet({
                         </p>
                       </div>
                       <Button size="sm" className="h-9 px-5 text-xs font-bold rounded-lg shadow-sm">
-                        {product.price > 0 ? "طلب" : "عرض"}
+                        طلب
                       </Button>
                     </div>
                   ))}
