@@ -27,7 +27,7 @@ import {
 /**
  * PRODUCTION-GRADE PRODUCT SHEET (REWRITTEN)
  * 1. Deep Sync: Pulls all nested data from Al-Ragheb.
- * 2. Invisible 4% Margin: Markup applied, base price purged.
+ * 2. Invisible 4% Margin: Markup applied globally, base price purged.
  * 3. Strict Isolation: Double-filter (Parent ID + Brand Keyword) for total separation.
  * 4. Quantity Focus: Clearly displays "Delivered Balance" (الرصيد الواصل).
  */
@@ -48,32 +48,48 @@ export function ProductSheet({
   const { toast } = useToast();
 
   /**
-   * RE-IMPLEMENTED FILTERING LOGIC
-   * Stage 1: Filter by parent_id (Numeric group)
-   * Stage 2: Brand Isolation (Keyword match for shared Parent IDs)
+   * RE-IMPLEMENTED FILTERING & MAPPING LOGIC
+   * 1. Filter by parent_id (Numeric group)
+   * 2. Brand Isolation for Telecom (Keyword match for shared Parent IDs)
+   * 3. Apply 4% Markup and extract Display Amount
    */
   const filteredProducts = useMemo(() => {
     if (!allProducts || allProducts.length === 0) return [];
     
-    const activeParentId = Number(categoryId);
-    // Stage 1: Base Grouping
-    let baseFilter = allProducts.filter(item => Number(item.parent_id) === activeParentId);
+    const activeCategoryId = Number(categoryId);
+    // Stage 1: Base Grouping by Parent ID
+    let baseFilter = allProducts.filter(item => Number(item.parent_id) === activeCategoryId);
 
     // Stage 2: Brand Isolation for Telecom (Parent ID 6)
-    if (activeParentId === 6 && serviceName) {
+    if (activeCategoryId === 6 && serviceName) {
       const title = serviceName.toLowerCase();
-      const mtnKeywords = ["إم تي إن", "mtn", "ام تي ان"];
-      const syrKeywords = ["سيريتل", "syr", "syriatel", "سيرياتيل", "ليرة"];
-
-      if (mtnKeywords.some(k => title.includes(k))) {
-        return baseFilter.filter(p => mtnKeywords.some(k => p.name.toLowerCase().includes(k)));
-      } 
-      if (syrKeywords.some(k => title.includes(k))) {
-        return baseFilter.filter(p => syrKeywords.some(k => p.name.toLowerCase().includes(k)));
+      if (title.includes("إم تي إن") || title.includes("mtn")) {
+        baseFilter = baseFilter.filter(item => item.name.includes("إم تي إن") || item.name.toLowerCase().includes("mtn"));
+      } else if (title.includes("سيريتل") || title.includes("syriatel")) {
+        baseFilter = baseFilter.filter(item => item.name.includes("سيريتل"));
+      } else if (title.includes("زين") || title.includes("zain")) {
+        baseFilter = baseFilter.filter(item => item.name.toLowerCase().includes("zain") || item.name.includes("زين"));
       }
     }
 
-    return baseFilter;
+    // Stage 3: Map with 4% Markup and Quantity Extraction
+    return baseFilter.map(item => {
+      const basePrice = Number(item.price || 0);
+      // Add automatic 4% margin hidden from customer
+      const finalCustomerPrice = (basePrice * 1.04).toLocaleString(undefined, { 
+        minimumFractionDigits: 0, 
+        maximumFractionDigits: 0 
+      });
+      
+      // Extract the denomination quantity (الكمية / الرصيد الواصل)
+      const amountDelivered = item.amount || item.denomination || item.value || item.name.match(/\d+/) || "محدد";
+
+      return {
+        ...item,
+        displayPrice: finalCustomerPrice, // Overwrite to show ONLY the marked-up price
+        displayAmount: amountDelivered
+      };
+    });
   }, [allProducts, categoryId, serviceName]);
 
   const fetchProducts = useCallback(async () => {
@@ -163,11 +179,11 @@ export function ProductSheet({
                     const variations = product.params || product.variations || product.amounts || product.items || [];
                     const selectedVarId = selectedVariations[product.id];
                     
-                    // BUSINESS LOGIC: Strict 4% profit margin calculation
+                    // Markup for nested options
                     const currentVariation = variations.find((v: any) => String(v.id) === selectedVarId);
-                    const apiPrice = Number(currentVariation?.price || 0);
-                    const finalCustomerPrice = apiPrice > 0 
-                      ? (apiPrice * 1.04).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) 
+                    const varPrice = Number(currentVariation?.price || 0);
+                    const finalVarPrice = varPrice > 0 
+                      ? Math.ceil(varPrice * 1.04).toLocaleString()
                       : null;
 
                     return (
@@ -177,30 +193,34 @@ export function ProductSheet({
                             <div className="p-2 bg-primary/10 rounded-lg">
                               <Zap className="h-4 w-4 text-primary" />
                             </div>
-                            <h4 className="font-bold text-base text-foreground">
-                              {product.name}
-                            </h4>
+                            <div className="text-right">
+                              <h4 className="font-bold text-base text-foreground leading-tight">
+                                {product.name}
+                              </h4>
+                              <p className="text-[11px] text-primary font-bold">
+                                الرصيد الواصل: {product.displayAmount}
+                              </p>
+                            </div>
                           </div>
 
                           {variations.length > 0 ? (
                             <div className="space-y-3">
                               <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block text-right">
-                                اختر الكمية / الرصيد الواصل
+                                اختر الكمية المطلوبة
                               </label>
                               <Select 
                                 value={selectedVarId} 
                                 onValueChange={(val) => setSelectedVariations(prev => ({ ...prev, [product.id]: val }))}
                               >
                                 <SelectTrigger className="w-full text-right bg-muted/30 border-none h-12">
-                                  <SelectValue placeholder="اختر الفئة المطلوبة..." />
+                                  <SelectValue placeholder="اختر الفئة..." />
                                 </SelectTrigger>
                                 <SelectContent className="font-body" dir="rtl">
                                   {variations.map((v: any) => {
-                                    // 4% Hidden Markup applied to each list item
                                     const markedUpPrice = Math.ceil(Number(v.price || 0) * 1.04).toLocaleString();
                                     return (
                                       <SelectItem key={v.id} value={String(v.id)}>
-                                        الرصيد الواصل: {v.name || v.value} - السعر: {markedUpPrice} ل.س
+                                        الرصيد: {v.name || v.value} - السعر: {markedUpPrice} ل.س
                                       </SelectItem>
                                     );
                                   })}
@@ -209,17 +229,15 @@ export function ProductSheet({
                             </div>
                           ) : (
                             <div className="p-3 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium text-center">
-                              الأسعار تختلف حسب الكمية. اختر خياراً لعرض السعر النهائي.
+                              السعر الموضح أدناه هو السعر النهائي للرصيد المحدد.
                             </div>
                           )}
 
                           <div className="flex items-center justify-between pt-2 border-t border-dashed">
                             <div className="text-right">
-                              {finalCustomerPrice && (
-                                <p className="text-primary font-bold text-xl">
-                                  {finalCustomerPrice} <span className="text-xs opacity-70">ل.س</span>
-                                </p>
-                              )}
+                              <p className="text-primary font-bold text-xl">
+                                {finalVarPrice || product.displayPrice} <span className="text-xs opacity-70">ل.س</span>
+                              </p>
                             </div>
                             <Button 
                               disabled={variations.length > 0 && !selectedVarId}
