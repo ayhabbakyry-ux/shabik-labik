@@ -51,7 +51,7 @@ export function ProductSheet({
     if (!activeCategoryId) return;
     setFetching(true);
     try {
-      // Fetching from local backend proxy which handles anonymization and spoofing
+      // Fetching from local backend proxy with sanitized request block
       const response = await fetch(`/api/products?categoryId=${activeCategoryId}`, {
         cache: 'no-store'
       });
@@ -64,8 +64,8 @@ export function ProductSheet({
     } catch (error: any) {
       console.error("Fetch Error:", error);
       toast({
-        title: "خطأ في جلب البيانات",
-        description: "تعذر تجاوز جدار الحماية.",
+        title: "خطأ في الاتصال",
+        description: "تعذر جلب البيانات من المزود (Blocked/Offline).",
         variant: "destructive",
       });
     } finally {
@@ -102,7 +102,7 @@ export function ProductSheet({
         groups[groupKey] = { id: groupKey, mainTitle: cleanTitle, items: [] };
       }
 
-      // Check for nested variations in various fields
+      // Scan all possible nested fields (Al-Ragheb standard)
       const subItems = item.options || item.variants || item.params || [];
       
       if (Array.isArray(subItems) && subItems.length > 0 && typeof subItems[0] === 'object') {
@@ -162,13 +162,13 @@ export function ProductSheet({
     <Sheet onOpenChange={(open) => { if (open) fetchProducts(); }}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col border-none bg-background" dir="rtl">
-        {/* DEBUG BLOCK - RAW SERVER RESPONSE */}
-        <div className="bg-red-50 border-b-2 border-red-200 p-4 max-h-[200px] overflow-auto">
-          <p className="text-[10px] font-bold text-red-700 uppercase mb-1">Server Raw Response Debug:</p>
+        {/* DEBUG BLOCK - LIVE DATA SIGNATURE */}
+        <div className="bg-red-50 border-b-2 border-red-200 p-4 max-h-[160px] overflow-auto">
+          <p className="text-[10px] font-bold text-red-700 uppercase mb-1">Raw API Trace:</p>
           <pre className="text-[10px] text-red-600 font-mono" dir="ltr">
             {allProducts && allProducts.length > 0 
               ? JSON.stringify(allProducts[0], null, 2) 
-              : fetching ? "FETCHING VIA ANONYMOUS PROXY..." : "DATA IS EMPTY FROM SERVER"}
+              : fetching ? "FETCHING CLEAN REQUEST..." : "RESPONSE DATA IS NULL"}
           </pre>
         </div>
 
@@ -180,7 +180,7 @@ export function ProductSheet({
                 <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
               </Button>
             </div>
-            <SheetDescription className="text-right text-xs">مزامنة البيانات حياً عبر بوابة تشفير (Spoofed Gateway).</SheetDescription>
+            <SheetDescription className="text-right text-xs">مزامنة البيانات حياً (Untraceable Fetch Mode).</SheetDescription>
           </SheetHeader>
         </div>
 
@@ -188,7 +188,7 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-bold text-muted-foreground">جاري فك تشفير البيانات من السيرفر...</p>
+              <p className="text-sm font-bold text-muted-foreground">جاري طلب البيانات عبر قناة آمنة...</p>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
@@ -250,7 +250,7 @@ export function ProductSheet({
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4">
                   <PackageX className="h-12 w-12 opacity-30" />
-                  <p className="text-sm font-bold text-center px-4">لا تتوفر فئات حالياً. تأكد من استقرار بوابة التشفير وصلاحية الحساب.</p>
+                  <p className="text-sm font-bold text-center px-4">لا تتوفر فئات حالياً. السيرفر قد يكون في وضع الصيانة أو جدار الحماية نشط.</p>
                 </div>
               )}
             </ScrollArea>
