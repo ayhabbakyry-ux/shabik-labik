@@ -25,7 +25,7 @@ export async function GET(request: Request) {
       category_id: categoryId ? Number(categoryId) : undefined
     };
 
-    console.log(`[CLEAN FETCH] Calling: ${targetEndpoint} for Category: ${categoryId}`);
+    console.log(`[PRODUCTION FETCH] Calling Al-Ragheb for Category: ${categoryId}`);
 
     // SANITIZED REQUEST: No extra headers, no traces.
     const response = await fetch(targetEndpoint, {
@@ -53,9 +53,9 @@ export async function GET(request: Request) {
       }
     });
   } catch (error: any) {
-    console.error("[CLEAN FETCH ERROR]:", error);
+    console.error("[FETCH ERROR]:", error);
     return NextResponse.json(
-      { error: "Untraceable fetch failed.", details: error.message },
+      { error: "Fetch failed.", details: error.message },
       { 
         status: 500,
         headers: { 'Cache-Control': 'no-store, max-age=0' }
