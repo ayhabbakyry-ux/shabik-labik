@@ -58,7 +58,7 @@ export function ProductSheet({
       });
       const result = await response.json();
       
-      // استخراج المصفوفة الصحيحة حسب هيكلية الراغب
+      // استخراج المصفوفة الصحيحة حسب هيكلية الراغب (دائماً نبحث عن data أو المصفوفة المباشرة)
       const rawItems = Array.isArray(result) ? result : (result.data || result.products || []);
       setAllProducts(rawItems);
     } catch (error: any) {
@@ -80,7 +80,7 @@ export function ProductSheet({
       (item) => Number(item.parent_id) === Number(activeCategoryId)
     );
 
-    // عزل الشبكات
+    // عزل الشبكات لضمان عدم التداخل
     if (Number(activeCategoryId) === 6 && serviceName) {
       const title = serviceName.toLowerCase();
       if (title.includes("إم تي إن") || title.includes("mtn")) {
@@ -102,9 +102,10 @@ export function ProductSheet({
         groups[groupKey] = { id: groupKey, mainTitle: cleanTitle, items: [] };
       }
 
+      // البحث في الخيارات المندرجة (المكان الذي يضع فيه الراغب الكميات الحقيقية)
       const subItems = item.options || item.variants || item.params || [];
       
-      if (Array.isArray(subItems) && subItems.length > 0) {
+      if (Array.isArray(subItems) && subItems.length > 0 && typeof subItems[0] === 'object') {
         subItems.forEach((sub: any) => {
           const nameNums = sub.name?.match(/[\d.]+/);
           const amount = nameNums ? nameNums[0] : (sub.amount || sub.value || "محدد");
@@ -119,6 +120,7 @@ export function ProductSheet({
           });
         });
       } else {
+        // حالة المنتج البسيط بدون خيارات
         const nameNums = item.name?.match(/[\d.]+/);
         const amount = nameNums ? nameNums[0] : (item.amount || "محدد");
         const basePrice = Number(item.price || 0);
@@ -161,11 +163,11 @@ export function ProductSheet({
     <Sheet onOpenChange={(open) => { if (open) fetchProducts(); }}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col border-none bg-background" dir="rtl">
-        {/* DEBUG BLOCK - لروية البيانات الحقيقية من السيرفر */}
+        {/* DEBUG BLOCK - لرؤية نجاح عملية الجلب بعد إضافة المعرف */}
         <pre className="text-[10px] text-red-600 bg-red-50 p-2 max-h-32 overflow-auto font-mono border-b" dir="ltr">
           {allProducts && allProducts.length > 0 
-            ? `API RESPONSE (${allProducts.length} items):\n` + JSON.stringify(allProducts[0], null, 2) 
-            : "DATA IS EMPTY FROM SERVER (Check API Proxy)"}
+            ? `API SUCCESS (${allProducts.length} items found):\n` + JSON.stringify(allProducts[0], null, 2) 
+            : "DATA IS EMPTY FROM SERVER (Checking with ID 2225...)"}
         </pre>
 
         <div className="p-4 border-b bg-white">
@@ -184,7 +186,7 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-bold text-muted-foreground">جاري مزامنة السيرفر...</p>
+              <p className="text-sm font-bold text-muted-foreground">جاري جلب البيانات من السيرفر...</p>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
@@ -246,7 +248,7 @@ export function ProductSheet({
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4">
                   <PackageX className="h-12 w-12 opacity-30" />
-                  <p className="text-sm font-bold">لا تتوفر فئات حالياً لهذا القسم.</p>
+                  <p className="text-sm font-bold">لا تتوفر فئات حالياً لهذا القسم بعد إضافة المعرف.</p>
                 </div>
               )}
             </ScrollArea>
