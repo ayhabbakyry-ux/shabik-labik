@@ -39,7 +39,7 @@ export function ProductSheet({
   const [selectedVariations, setSelectedVariations] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
-  // 1. الفلترة المتقدمة وعزل الشبكات واستخراج الأسعار مع مربح 4%
+  // 1. منطق الفلترة والعزل وحساب المربح 4%
   const filteredProducts = useMemo(() => {
     if (!allProducts || !Array.isArray(allProducts) || allProducts.length === 0) return [];
     
@@ -64,7 +64,7 @@ export function ProductSheet({
       }
     }
     
-    // معالجة البيانات: حساب المربح 4% واستخراج الرصيد الواصل بأمان
+    // معالجة البيانات: حساب المربح 4% واستخراج الرصيد الواصل بأمان (Regex)
     return baseFilter.map(item => {
       // حساب المربح المخفي 4%
       const basePrice = Number(item.price || 0);
@@ -82,7 +82,7 @@ export function ProductSheet({
     });
   }, [allProducts, activeCategoryId, serviceName]);
 
-  // 2. دالة جلب المنتجات من السيرفر
+  // 2. جلب المنتجات من السيرفر
   const fetchProducts = useCallback(async () => {
     if (serviceId === 'admin') return;
     
@@ -90,7 +90,6 @@ export function ProductSheet({
     try {
       const response = await fetch(`/api/products`);
       const data = await response.json();
-      // استخراج المصفوفة الفعلية سواء كانت في data أو products أو هي الاستجابة نفسها
       const rawItems = Array.isArray(data) ? data : (data.data || data.products || []);
       setAllProducts(Array.isArray(rawItems) ? rawItems : []);
     } catch (error: any) {
@@ -111,7 +110,7 @@ export function ProductSheet({
     });
   };
 
-  // عرض لوحة التحكم إذا كان المستخدم أدمن
+  // عرض لوحة التحكم للأدمن
   if (serviceId === 'admin') {
     return (
       <Sheet>
@@ -124,9 +123,7 @@ export function ProductSheet({
   }
 
   return (
-    <Sheet onOpenChange={(open) => {
-      if (open) fetchProducts();
-    }}>
+    <Sheet onOpenChange={(open) => { if (open) fetchProducts(); }}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex flex-col border-none bg-background">
         <div className="p-4 border-b bg-white">
@@ -158,8 +155,7 @@ export function ProductSheet({
                 </div>
               ) : (
                 <div className="grid gap-4" dir="rtl">
-                  {filteredProducts.map((product) => {
-                    // معالجة الخيارات المندرجة (Variations) إن وجدت
+                  {filteredProducts.map((product, pIdx) => {
                     const variations = product.params || product.variations || product.amounts || product.items || [];
                     const selectedVarId = selectedVariations[product.id];
                     const currentVariation = variations.find((v: any) => v && String(v.id) === selectedVarId);
@@ -170,7 +166,7 @@ export function ProductSheet({
                       : product.displayPrice;
 
                     return (
-                      <Card key={product.id} className="border-none shadow-sm bg-white overflow-hidden">
+                      <Card key={product.id || `prod-${pIdx}`} className="border-none shadow-sm bg-white overflow-hidden">
                         <CardContent className="p-5 space-y-4">
                           <div className="flex items-center gap-3">
                             <div className="p-3 bg-primary/10 rounded-xl">
@@ -194,13 +190,13 @@ export function ProductSheet({
                                   <SelectValue placeholder="اختر القيمة المطلوبة..." />
                                 </SelectTrigger>
                                 <SelectContent className="font-body" dir="rtl">
-                                  {variations.map((v: any) => {
+                                  {variations.map((v: any, vIdx: number) => {
                                     if (!v) return null;
                                     const markedUp = (Number(v.price || 0) * 1.04).toFixed(2);
                                     const vMatch = v.name?.match(/[\d.]+/);
                                     const vAmount = v.amount || v.value || (vMatch ? vMatch[0] : v.name || "محدد");
                                     return (
-                                      <SelectItem key={v.id} value={String(v.id)}>
+                                      <SelectItem key={`${product.id}-v-${v.id || vIdx}`} value={String(v.id)}>
                                         الرصيد الواصل: {vAmount} - السعر: {markedUp} ل.س
                                       </SelectItem>
                                     );
