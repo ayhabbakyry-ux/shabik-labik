@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { AdminPanel } from "@/components/admin/AdminPanel";
 import { Loader2, PackageX, RefreshCw, ShoppingCart, Zap } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -37,12 +36,10 @@ interface ProductItem {
 export function ProductSheet({ 
   children, 
   serviceName, 
-  serviceId,
   categoryId: activeCategoryId 
 }: { 
   children: React.ReactNode; 
   serviceName: string; 
-  serviceId?: string;
   categoryId?: number;
 }) {
   const [allProducts, setAllProducts] = useState<ProductItem[]>([]);
@@ -50,17 +47,22 @@ export function ProductSheet({
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
-  // جلب البيانات من السيرفر بناءً على الفئة
+  // جلب البيانات مباشرة من السيرفر داخل المكون لضمان التحديث التلقائي
   const fetchProducts = useCallback(async () => {
-    if (serviceId === 'admin') return;
+    if (!activeCategoryId) return;
     setFetching(true);
     try {
       const response = await fetch(`/api/products?categoryId=${activeCategoryId}`);
       if (!response.ok) throw new Error("Server Error");
       const data = await response.json();
+      
+      // طباعة البيانات للتأكد من هيكلية السيرفر (للديبيغ)
+      console.log("[API DEBUG] Raw response for category", activeCategoryId, data);
+      
       const rawItems = Array.isArray(data) ? data : (data.data || data.products || []);
       setAllProducts(rawItems);
     } catch (error: any) {
+      console.error("Fetch Error:", error);
       toast({
         title: "خطأ في المزامنة",
         description: "تعذر تحديث البيانات من السيرفر.",
@@ -69,7 +71,7 @@ export function ProductSheet({
     } finally {
       setFetching(false);
     }
-  }, [activeCategoryId, serviceId, toast]);
+  }, [activeCategoryId, toast]);
 
   // معالجة البيانات وتجميعها (المنطق البرمجي المطلوب)
   const groupedServices = useMemo(() => {
@@ -104,12 +106,14 @@ export function ProductSheet({
         groups[groupKey] = { id: groupKey, mainTitle: cleanTitle, items: [] };
       }
 
-      // فحص الخيارات المندرجة (Nested Options/Variants)
+      // فحص الخيارات المندرجة (Nested Options/Variants) وهي النقطة التي كان فيها الخلل
       const nestedOptions = item.options || item.variants || [];
       if (Array.isArray(nestedOptions) && nestedOptions.length > 0) {
         nestedOptions.forEach((opt: any) => {
           const nameNumbers = opt.name?.match(/[\d.]+/);
-          const extractedAmount = nameNumbers ? nameNumbers[0] : (opt.amount || "محدد");
+          const extractedAmount = nameNumbers ? nameNumbers[0] : (opt.amount || opt.denomination || "محدد");
+          
+          // تطبيق المربح المخفي 4%
           const basePrice = Number(opt.price || item.price || 0);
           const finalCustomerPrice = (basePrice * 1.04).toFixed(2);
 
@@ -122,8 +126,9 @@ export function ProductSheet({
           });
         });
       } else {
+        // إذا لم يوجد خيارات مندرجة، نأخذ المنتج الأساسي نفسه
         const nameNumbers = item.name?.match(/[\d.]+/);
-        const extractedAmount = nameNumbers ? nameNumbers[0] : "محدد";
+        const extractedAmount = nameNumbers ? nameNumbers[0] : (item.amount || "محدد");
         const basePrice = Number(item.price || 0);
         const finalCustomerPrice = (basePrice * 1.04).toFixed(2);
 
@@ -163,17 +168,6 @@ export function ProductSheet({
     });
   };
 
-  if (serviceId === 'admin') {
-    return (
-      <Sheet>
-        <SheetTrigger asChild>{children}</SheetTrigger>
-        <SheetContent side="bottom" className="h-[80vh] overflow-y-auto">
-          <AdminPanel />
-        </SheetContent>
-      </Sheet>
-    );
-  }
-
   return (
     <Sheet onOpenChange={(open) => { if (open) fetchProducts(); }}>
       <SheetTrigger asChild>{children}</SheetTrigger>
@@ -187,7 +181,7 @@ export function ProductSheet({
               </Button>
             </div>
             <SheetDescription className="text-right text-xs">
-              اختر الفئة المطلوبة من القائمة وسيظهر لك السعر النهائي المشمول بالمربح.
+              اختر الفئة المطلوبة وسيظهر لك السعر النهائي المشمول بالمربح.
             </SheetDescription>
           </SheetHeader>
         </div>
