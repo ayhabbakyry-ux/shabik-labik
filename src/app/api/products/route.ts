@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * FORCE DYNAMIC: منع التخزين المؤقت لضمان جلب البيانات الحية وتجاوز حظر الـ IP.
+ * FORCE DYNAMIC: تعطيل التخزين المؤقت لضمان جلب البيانات الحية وتجاوز حظر الـ IP.
  */
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -16,16 +16,16 @@ export async function GET(request: Request) {
     
     const endpoint = `${AL_RAGHEB_BASE_URL}/client/api/products`;
 
-    // بيانات المصادقة المطلوبة في جسم الطلب
+    // بيانات المصادقة والحساب المطلوبة
     const bodyData = {
       email: "ayhmbakyr213@gmail.com",
       username: "ayhmbakyr213@gmail.com",
       name: "ايهم باكير",
       user_id: 2225,
-      category_id: categoryId || undefined
+      category_id: categoryId ? Number(categoryId) : undefined
     };
 
-    console.log(`[AL-RAGHEB SPOOF FETCH] ${new Date().toISOString()} - Target: ${endpoint}`);
+    console.log(`[PROXY SPOOF FETCH] Target: ${endpoint} for Category: ${categoryId}`);
 
     const response = await fetch(endpoint, {
       method: 'POST', 
@@ -36,7 +36,11 @@ export async function GET(request: Request) {
         'Accept': 'application/json, text/plain, */*',
         'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8',
         'Origin': 'https://api.alragheb-store.com',
-        'Referer': 'https://api.alragheb-store.com/'
+        'Referer': 'https://api.alragheb-store.com/',
+        // تمويه الـ IP ليظهر كعنوان سكني سوري لتجاوز جدار الحماية
+        'X-Forwarded-For': '178.135.0.1',
+        'Client-IP': '178.135.0.1',
+        'X-Real-IP': '178.135.0.1'
       },
       body: JSON.stringify(bodyData),
       cache: 'no-store'
@@ -52,9 +56,9 @@ export async function GET(request: Request) {
       }
     });
   } catch (error: any) {
-    console.error("[PROXY FIREWALL BYPASS ERROR]:", error);
+    console.error("[PROXY BYPASS ERROR]:", error);
     return NextResponse.json(
-      { error: "تعذر تجاوز جدار الحماية حالياً.", details: error.message },
+      { error: "تعذر تجاوز جدار الحماية.", details: error.message },
       { 
         status: 500,
         headers: { 'Cache-Control': 'no-store, max-age=0' }

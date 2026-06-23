@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
@@ -48,30 +47,13 @@ export function ProductSheet({
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
-  // ثوابت الاتصال المباشر
-  const AL_RAGHEB_BASE_URL = "https://api.alragheb-store.com/client/api/products";
-  const AL_RAGHEB_AUTH_TOKEN = "64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0";
-
   const fetchProducts = useCallback(async () => {
     if (!activeCategoryId) return;
     setFetching(true);
     try {
-      // جلب مباشر من المتصفح لتجاوز حظر الـ IP السحابي
-      const response = await fetch(AL_RAGHEB_BASE_URL, {
-        method: 'POST',
-        headers: {
-          'api-token': AL_RAGHEB_AUTH_TOKEN,
-          'Content-Type': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
-          'Accept': 'application/json, text/plain, */*',
-        },
-        body: JSON.stringify({
-          email: "ayhmbakyr213@gmail.com",
-          username: "ayhmbakyr213@gmail.com",
-          name: "ايهم باكير",
-          user_id: 2225,
-          category_id: activeCategoryId
-        }),
+      // الاتصال بالبروكسي المحلي الذي يقوم بتمويه الـ IP
+      const response = await fetch(`/api/products?categoryId=${activeCategoryId}`, {
+        cache: 'no-store'
       });
       
       const result = await response.json();
@@ -80,10 +62,10 @@ export function ProductSheet({
       const rawItems = Array.isArray(result) ? result : (result.data || result.products || []);
       setAllProducts(rawItems);
     } catch (error: any) {
-      console.error("Direct Browser Fetch Error:", error);
+      console.error("Fetch Error:", error);
       toast({
-        title: "خطأ في الاتصال المباشر",
-        description: "تعذر الجلب من المتصفح. قد يكون هناك حظر CORS أو مشكلة في الشبكة.",
+        title: "خطأ في جلب البيانات",
+        description: "تعذر الاتصال بالخادم الخلفي.",
         variant: "destructive",
       });
     } finally {
@@ -180,11 +162,11 @@ export function ProductSheet({
     <Sheet onOpenChange={(open) => { if (open) fetchProducts(); }}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col border-none bg-background" dir="rtl">
-        {/* Debug Block - Client Side Response */}
-        <pre className="text-[10px] text-blue-600 bg-blue-50 p-2 max-h-32 overflow-auto font-mono border-b" dir="ltr">
+        {/* Debug Block - Raw Server Response */}
+        <pre className="text-[10px] text-primary bg-primary/5 p-2 max-h-32 overflow-auto font-mono border-b" dir="ltr">
           {allProducts && allProducts.length > 0 
-            ? `DIRECT BROWSER FETCH SUCCESS:\n` + JSON.stringify(allProducts[0], null, 2) 
-            : fetching ? "FETCHING DIRECTLY FROM YOUR BROWSER..." : "NO DATA LOADED"}
+            ? `SERVER DATA SUCCESS: ${allProducts.length} items` 
+            : fetching ? "FETCHING FROM BACKEND PROXY..." : "DATA IS EMPTY FROM SERVER"}
         </pre>
 
         <div className="p-4 border-b bg-white">
@@ -195,7 +177,7 @@ export function ProductSheet({
                 <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
               </Button>
             </div>
-            <SheetDescription className="text-right text-xs">مزامنة مباشرة من متصفحك (تجاوز حظر السحابة).</SheetDescription>
+            <SheetDescription className="text-right text-xs">مزامنة البيانات حياً عبر بروكسي محمي.</SheetDescription>
           </SheetHeader>
         </div>
 
@@ -203,7 +185,7 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-bold text-muted-foreground">جاري الجلب المباشر من السيرفر...</p>
+              <p className="text-sm font-bold text-muted-foreground">جاري جلب البيانات من السيرفر...</p>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
@@ -265,7 +247,7 @@ export function ProductSheet({
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4">
                   <PackageX className="h-12 w-12 opacity-30" />
-                  <p className="text-sm font-bold text-center px-4">لا تتوفر فئات حالياً. تأكد من إعدادات CORS في المتصفح أو صلاحية الحساب.</p>
+                  <p className="text-sm font-bold text-center px-4">لا تتوفر فئات حالياً. تأكد من استقرار اتصال البروكسي وصلاحية الحساب.</p>
                 </div>
               )}
             </ScrollArea>
