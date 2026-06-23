@@ -149,7 +149,7 @@ export function ProductSheet({
                     const selectedVarId = selectedVariations[product.id];
                     const currentVariation = variations.find((v: any) => v && String(v.id) === selectedVarId);
                     
-                    // CRASH-PROOF EXPRESSIONS AS REQUESTED
+                    // CRASH-PROOF EXPRESSIONS
                     const priceToDisplay = (Number(currentVariation?.price || product.price || 0) * 1.04).toFixed(2);
                     const amountToDisplay = product.amount || product.denomination || product.name?.match(/[\d.]+/)?.[0] || "محدد";
 
