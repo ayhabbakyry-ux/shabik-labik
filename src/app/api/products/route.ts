@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
 
-/**
- * FORCE DYNAMIC: Disable caching to ensure live data and bypass cloud detection.
- */
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
@@ -23,7 +20,6 @@ export async function GET(request: Request) {
       category_id: categoryId ? Number(categoryId) : undefined
     };
 
-    // Clean, isolated fetch to bypass data center signatures
     const response = await fetch(targetEndpoint, {
       method: 'POST', 
       headers: {
@@ -48,7 +44,7 @@ export async function GET(request: Request) {
       }
     });
   } catch (error: any) {
-    console.error("[FETCH ERROR]:", error);
+    console.error("[PROXY ERROR]:", error);
     return NextResponse.json(
       { error: "Fetch failed.", details: error.message },
       { 

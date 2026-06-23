@@ -55,14 +55,12 @@ export function ProductSheet({
         cache: 'no-store'
       });
       const result = await response.json();
-      
-      // Handle different API response structures
       const rawItems = Array.isArray(result) ? result : (result.data || result.products || []);
       setAllProducts(rawItems);
     } catch (error: any) {
       toast({
         title: "خطأ في الاتصال",
-        description: "تعذر جلب البيانات. يرجى التأكد من حالة النشر.",
+        description: "تعذر جلب البيانات. يرجى المحاولة لاحقاً.",
         variant: "destructive",
       });
     } finally {
@@ -77,7 +75,6 @@ export function ProductSheet({
       (item) => Number(item.parent_id) === Number(activeCategoryId)
     );
 
-    // Filter by brand for dynamic categories
     if (Number(activeCategoryId) === 6 && serviceName) {
       const title = serviceName.toLowerCase();
       if (title.includes("إم تي إن") || title.includes("mtn")) {
@@ -111,7 +108,7 @@ export function ProductSheet({
             id: sub.id || `${item.id}-${Math.random()}`,
             name: sub.name || item.name,
             extractedAmount: amount,
-            customerPrice: (basePrice * 1.04).toFixed(0), // 4% profit
+            customerPrice: (basePrice * 1.04).toFixed(0),
             price: basePrice
           });
         });
@@ -124,7 +121,7 @@ export function ProductSheet({
           id: item.id,
           name: item.name,
           extractedAmount: amount,
-          customerPrice: (basePrice * 1.04).toFixed(0), // 4% profit
+          customerPrice: (basePrice * 1.04).toFixed(0),
           price: basePrice
         });
       }
