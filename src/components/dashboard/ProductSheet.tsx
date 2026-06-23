@@ -37,16 +37,19 @@ export function ProductSheet({
     
     setFetching(true);
     try {
-      // Fetch global list to filter by parent_id
+      // Fetch global list to filter by parent_id locally
+      // This is the most reliable way since the server-side filter is inconsistent
       const response = await fetch(`/api/products`);
       const data = await response.json();
       
       const rawItems = Array.isArray(data) ? data : (data.data || []);
       
-      // STRICT FILTERING: Use parent_id as the key
+      // STRICT FILTERING: Use parent_id as the primary identifier
+      // We convert both to Number to avoid type-mismatch errors
       const filtered = rawItems.filter((item: any) => {
         const itemParentId = Number(item.parent_id);
-        return itemParentId === Number(categoryId);
+        const targetCategoryId = Number(categoryId);
+        return itemParentId === targetCategoryId;
       });
       
       console.log(`[FILTER] Section: ${serviceName}, Target parent_id: ${categoryId}, Found: ${filtered.length}`);
