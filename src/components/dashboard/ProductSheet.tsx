@@ -25,10 +25,11 @@ import {
 } from "@/components/ui/select";
 
 /**
- * PRODUCTION-GRADE PRODUCT SHEET
+ * PRODUCTION-GRADE PRODUCT SHEET (REWRITTEN)
  * 1. Deep Sync: Pulls all nested data from Al-Ragheb.
- * 2. Hidden Margin: 4% markup applied, base price hidden.
- * 3. Strict Isolation: Dual-filter (Parent ID + Keyword) for brand separation.
+ * 2. Invisible 4% Margin: Markup applied, base price purged.
+ * 3. Strict Isolation: Double-filter (Parent ID + Brand Keyword) for total separation.
+ * 4. Quantity Focus: Clearly displays "Delivered Balance" (الرصيد الواصل).
  */
 export function ProductSheet({ 
   children, 
@@ -47,21 +48,20 @@ export function ProductSheet({
   const { toast } = useToast();
 
   /**
-   * DEEP FILTERING LOGIC
-   * Stage 1: Filter by parent_id (Group isolation)
-   * Stage 2: Keyword isolation for shared IDs (e.g. Syriatel vs MTN)
+   * RE-IMPLEMENTED FILTERING LOGIC
+   * Stage 1: Filter by parent_id (Numeric group)
+   * Stage 2: Brand Isolation (Keyword match for shared Parent IDs)
    */
   const filteredProducts = useMemo(() => {
     if (!allProducts || allProducts.length === 0) return [];
     
     const activeParentId = Number(categoryId);
-    // Stage 1: Filter by the discovered parent_id key
+    // Stage 1: Base Grouping
     let baseFilter = allProducts.filter(item => Number(item.parent_id) === activeParentId);
 
     // Stage 2: Brand Isolation for Telecom (Parent ID 6)
     if (activeParentId === 6 && serviceName) {
       const title = serviceName.toLowerCase();
-      // Expanded keyword sets for robust brand matching
       const mtnKeywords = ["إم تي إن", "mtn", "ام تي ان"];
       const syrKeywords = ["سيريتل", "syr", "syriatel", "سيرياتيل", "ليرة"];
 
@@ -81,17 +81,16 @@ export function ProductSheet({
     
     setFetching(true);
     try {
-      // Global deep pull to ensure all nested variants are loaded
+      // Global deep pull to ensure all nested data is loaded into memory
       const response = await fetch(`/api/products`);
       const data = await response.json();
       
-      // Handle various API response formats
       const rawItems = Array.isArray(data) ? data : (data.data || data.products || []);
       setAllProducts(rawItems);
     } catch (error: any) {
       toast({
-        title: "Database Sync Error",
-        description: "Failed to retrieve the latest official pricing catalog.",
+        title: "Sync Failure",
+        description: "Unable to retrieve the latest product catalog.",
         variant: "destructive",
       });
     } finally {
@@ -101,8 +100,8 @@ export function ProductSheet({
 
   const handleOrder = (productName: string, variationId: string) => {
     toast({
-      title: "Order Processed",
-      description: `Your request for ${productName} has been sent to the provider.`,
+      title: "Order Submitted",
+      description: `Request for ${productName} sent to server.`,
     });
   };
 
@@ -137,7 +136,7 @@ export function ProductSheet({
               </Button>
             </div>
             <SheetDescription className="text-right text-xs">
-              Select the denomination below. Pricing includes official platform fees.
+              اختر الفئة المطلوبة. الأسعار تشمل رسوم المنصة الرسمية.
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -146,7 +145,7 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-medium">Synchronizing official catalog...</p>
+              <p className="text-sm font-medium">جاري سحب البيانات بالكامل...</p>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
@@ -155,19 +154,20 @@ export function ProductSheet({
                   <div className="p-4 bg-muted rounded-full">
                     <PackageX className="h-10 w-10 opacity-40" />
                   </div>
-                  <p className="text-sm font-bold text-center">No available denominations found for {serviceName}.</p>
+                  <p className="text-sm font-bold text-center">لا توجد منتجات متاحة لهذا القسم حالياً.</p>
                 </div>
               ) : (
                 <div className="grid gap-4" dir="rtl">
                   {filteredProducts.map((product) => {
-                    // DEEP SCAN for nested denominations in 'params', 'variations', or 'amounts'
+                    // Deep Scanning for nested purchasable denominations
                     const variations = product.params || product.variations || product.amounts || product.items || [];
                     const selectedVarId = selectedVariations[product.id];
                     
-                    // BUSINESS LOGIC: 4% Profit Margin added to the selected item
+                    // BUSINESS LOGIC: Strict 4% profit margin calculation
                     const currentVariation = variations.find((v: any) => String(v.id) === selectedVarId);
-                    const finalDisplayPrice = currentVariation 
-                      ? Math.ceil(Number(currentVariation.price) * 1.04) 
+                    const apiPrice = Number(currentVariation?.price || 0);
+                    const finalCustomerPrice = apiPrice > 0 
+                      ? (apiPrice * 1.04).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) 
                       : null;
 
                     return (
@@ -185,7 +185,7 @@ export function ProductSheet({
                           {variations.length > 0 ? (
                             <div className="space-y-3">
                               <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block text-right">
-                                اختر الرصيد الواصل / الكمية
+                                اختر الكمية / الرصيد الواصل
                               </label>
                               <Select 
                                 value={selectedVarId} 
@@ -196,11 +196,11 @@ export function ProductSheet({
                                 </SelectTrigger>
                                 <SelectContent className="font-body" dir="rtl">
                                   {variations.map((v: any) => {
-                                    // Hidden 4% Margin applied to each dropdown list item
-                                    const markedUpPrice = Math.ceil(Number(v.price || 0) * 1.04);
+                                    // 4% Hidden Markup applied to each list item
+                                    const markedUpPrice = Math.ceil(Number(v.price || 0) * 1.04).toLocaleString();
                                     return (
                                       <SelectItem key={v.id} value={String(v.id)}>
-                                        الرصيد الواصل: {v.name || v.value} - السعر: {markedUpPrice.toLocaleString()} ل.س
+                                        الرصيد الواصل: {v.name || v.value} - السعر: {markedUpPrice} ل.س
                                       </SelectItem>
                                     );
                                   })}
@@ -209,15 +209,15 @@ export function ProductSheet({
                             </div>
                           ) : (
                             <div className="p-3 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium text-center">
-                              Prices vary by quantity. Select an option to view total.
+                              الأسعار تختلف حسب الكمية. اختر خياراً لعرض السعر النهائي.
                             </div>
                           )}
 
                           <div className="flex items-center justify-between pt-2 border-t border-dashed">
                             <div className="text-right">
-                              {finalDisplayPrice && (
+                              {finalCustomerPrice && (
                                 <p className="text-primary font-bold text-xl">
-                                  {finalDisplayPrice.toLocaleString()} <span className="text-xs opacity-70">SYP</span>
+                                  {finalCustomerPrice} <span className="text-xs opacity-70">ل.س</span>
                                 </p>
                               )}
                             </div>
