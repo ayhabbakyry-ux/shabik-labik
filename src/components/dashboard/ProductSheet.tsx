@@ -27,9 +27,8 @@ import {
 /**
  * PRODUCTION-GRADE PRODUCT SHEET (STABLE & CRASH-PROOF)
  * 1. Robust Filtering: parent_id + Brand Keyword Isolation.
- * 2. Hidden 4% Margin: Automated markup, original price purged.
- * 3. Dynamic Amount Extraction: Safe Regex-based extraction.
- * 4. Crash Prevention: Optional chaining and fallbacks everywhere.
+ * 2. Hidden 4% Margin: Automated markup applied in render.
+ * 3. Crash Prevention: Optional chaining and fallbacks everywhere.
  */
 export function ProductSheet({ 
   children, 
@@ -50,16 +49,14 @@ export function ProductSheet({
   const sectionTitle = serviceName;
 
   /**
-   * ROBUST FILTERING & MAPPING LOGIC
-   * Safely handles undefined values and strictly isolates brands.
+   * ROBUST FILTERING LOGIC
+   * Strictly isolates brands and filters by category ID.
    */
   const filteredProducts = useMemo(() => {
     if (!allProducts || !Array.isArray(allProducts) || allProducts.length === 0) return [];
     
-    // 1. Get base products matching the current category
     let baseFilter = allProducts.filter(item => item && Number(item.parent_id) === Number(activeCategoryId));
 
-    // 2. Strict Grouping & Isolation for Telecom (Parent ID 6)
     if (Number(activeCategoryId) === 6 && sectionTitle) {
       const title = sectionTitle.toLowerCase();
       if (title.includes("إم تي إن") || title.includes("mtn")) {
@@ -71,22 +68,7 @@ export function ProductSheet({
       }
     }
     
-    // 3. Map over filtered results to inject 4% profit margin and extract exact dynamic amount
-    return baseFilter.map(item => {
-      // Hidden 4% Margin math
-      const basePrice = Number(item.price || 0);
-      const finalCustomerPrice = (basePrice * 1.04).toFixed(2);
-      
-      // Safe Regex to extract amount from name if no explicit amount field exists
-      const match = item.name?.match(/[\d.]+/);
-      const amountDelivered = item.amount || item.denomination || (match ? match[0] : "محدد");
-
-      return {
-        ...item,
-        displayPrice: finalCustomerPrice, // Replaces original price completely
-        displayAmount: amountDelivered     // Replaces dynamic amount text
-      };
-    });
+    return baseFilter;
   }, [allProducts, activeCategoryId, sectionTitle]);
 
   const fetchProducts = useCallback(async () => {
@@ -96,17 +78,12 @@ export function ProductSheet({
     try {
       const response = await fetch(`/api/products`);
       const data = await response.json();
-      
-      // Deep data pull logic: Check multiple possible response paths
-      const rawItems = Array.isArray(data) 
-        ? data 
-        : (data.data || data.products || data.items || []);
-        
+      const rawItems = Array.isArray(data) ? data : (data.data || data.products || []);
       setAllProducts(Array.isArray(rawItems) ? rawItems : []);
     } catch (error: any) {
       toast({
         title: "فشل المزامنة",
-        description: "تعذر استرداد قائمة المنتجات من السيرفر.",
+        description: "تعذر استرداد قائمة المنتجات.",
         variant: "destructive",
       });
     } finally {
@@ -134,12 +111,7 @@ export function ProductSheet({
 
   return (
     <Sheet onOpenChange={(open) => {
-      if (open) {
-        fetchProducts();
-      } else {
-        setAllProducts([]);
-        setSelectedVariations({});
-      }
+      if (open) fetchProducts();
     }}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex flex-col border-none bg-background">
@@ -167,46 +139,37 @@ export function ProductSheet({
             <ScrollArea className="h-full p-4">
               {filteredProducts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center text-muted-foreground gap-4 py-12">
-                  <div className="p-4 bg-white rounded-full shadow-sm">
-                    <PackageX className="h-10 w-10 opacity-40" />
-                  </div>
+                  <PackageX className="h-10 w-10 opacity-40" />
                   <p className="text-sm font-bold text-center">لا توجد منتجات متاحة حالياً.</p>
                 </div>
               ) : (
                 <div className="grid gap-4" dir="rtl">
                   {filteredProducts.map((product) => {
-                    // Safety check for nested variations
                     const variations = product.params || product.variations || product.amounts || product.items || [];
                     const selectedVarId = selectedVariations[product.id];
-                    
                     const currentVariation = variations.find((v: any) => v && String(v.id) === selectedVarId);
-                    const varPrice = Number(currentVariation?.price || 0);
-                    const finalVarPrice = varPrice > 0 
-                      ? (varPrice * 1.04).toFixed(2)
-                      : null;
+                    
+                    // CRASH-PROOF EXPRESSIONS AS REQUESTED
+                    const priceToDisplay = (Number(currentVariation?.price || product.price || 0) * 1.04).toFixed(2);
+                    const amountToDisplay = product.amount || product.denomination || product.name?.match(/[\d.]+/)?.[0] || "محدد";
 
                     return (
-                      <Card key={product.id} className="border-none shadow-sm bg-white overflow-hidden hover:shadow-md transition-shadow">
+                      <Card key={product.id} className="border-none shadow-sm bg-white overflow-hidden">
                         <CardContent className="p-5 space-y-4">
                           <div className="flex items-center gap-3">
                             <div className="p-3 bg-primary/10 rounded-xl">
                               <Zap className="h-5 w-5 text-primary" />
                             </div>
                             <div className="text-right">
-                              <h4 className="font-bold text-base text-foreground leading-tight">
-                                {product.name}
-                              </h4>
+                              <h4 className="font-bold text-base text-foreground leading-tight">{product.name}</h4>
                               <p className="text-[11px] text-primary font-bold mt-1">
-                                الرصيد الواصل: {product.displayAmount}
+                                الرصيد الواصل: {amountToDisplay}
                               </p>
                             </div>
                           </div>
 
                           {variations.length > 0 && (
                             <div className="space-y-3">
-                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block text-right">
-                                اختر الفئة المطلوبة
-                              </label>
                               <Select 
                                 value={selectedVarId} 
                                 onValueChange={(val) => setSelectedVariations(prev => ({ ...prev, [product.id]: val }))}
@@ -217,10 +180,10 @@ export function ProductSheet({
                                 <SelectContent className="font-body" dir="rtl">
                                   {variations.map((v: any) => {
                                     if (!v) return null;
-                                    const markedUpPrice = (Number(v.price || 0) * 1.04).toFixed(2);
+                                    const markedUp = (Number(v.price || 0) * 1.04).toFixed(2);
                                     return (
                                       <SelectItem key={v.id} value={String(v.id)}>
-                                        الرصيد الواصل: {v.name || v.value} - السعر: {markedUpPrice} ل.س
+                                        الرصيد الواصل: {v.name || v.value} - السعر: {markedUp} ل.س
                                       </SelectItem>
                                     );
                                   })}
@@ -233,13 +196,13 @@ export function ProductSheet({
                             <div className="text-right">
                               <p className="text-xs text-muted-foreground mb-1">السعر النهائي</p>
                               <p className="text-primary font-bold text-xl leading-none">
-                                {finalVarPrice || product.displayPrice} <span className="text-xs opacity-70">ل.س</span>
+                                {priceToDisplay} <span className="text-xs opacity-70">ل.س</span>
                               </p>
                             </div>
                             <Button 
                               disabled={variations.length > 0 && !selectedVarId}
                               onClick={() => handleOrder(product.name, selectedVarId || "")}
-                              className="rounded-full px-8 h-12 shadow-lg hover:scale-105 transition-transform bg-primary text-white font-bold"
+                              className="rounded-full px-8 h-12 bg-primary text-white font-bold"
                             >
                               <ShoppingCart className="ml-2 h-4 w-4" />
                               اطلب الآن
