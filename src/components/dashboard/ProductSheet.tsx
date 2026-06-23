@@ -61,20 +61,43 @@ export function ProductSheet({
     if (serviceId === 'admin' || !categoryId) return;
     
     setFetching(true);
+    console.log(`[DEBUG] Attempting fetch for Service: ${serviceName}, ID: ${categoryId}`);
 
     try {
-      // Using direct category mapping as per production documentation
-      const endpoint = `/api/products?categoryId=${categoryId}`;
+      // Step 1: Direct Category Fetch
+      const primaryUrl = `/api/products?categoryId=${categoryId}`;
+      console.log(`[DEBUG] Requesting URL: ${primaryUrl}`);
       
-      const response = await fetch(endpoint);
+      const response = await fetch(primaryUrl);
       const data = await response.json();
+      console.log(`[DEBUG] Server Response:`, data);
       
       if (data.status === "error" || data.code) {
         throw new Error(AL_RAGHEB_ERRORS[data.code] || `Server Error ${data.code}`);
       }
 
-      const rawItems = Array.isArray(data) ? data : (data.data || []);
+      let rawItems = Array.isArray(data) ? data : (data.data || []);
       
+      // Step 2: Fallback - Fetch All and Filter if primary is empty
+      if (rawItems.length === 0) {
+        console.log(`[DEBUG] Specific category returned empty. Attempting Fallback (Fetch All).`);
+        const fallbackUrl = `/api/products`;
+        const fbResponse = await fetch(fallbackUrl);
+        const fbData = await fbResponse.json();
+        const allItems = Array.isArray(fbData) ? fbData : (fbData.data || []);
+        
+        console.log(`[DEBUG] Fallback Data Total Count: ${allItems.length}`);
+
+        // Filter by common keys found in Al-Ragheb documentation
+        rawItems = allItems.filter((item: any) => 
+          Number(item.category_id) === categoryId || 
+          item.اسم_الفئة === serviceName ||
+          item.category_name === serviceName
+        );
+        
+        console.log(`[DEBUG] Items matching Category "${serviceName}" (ID ${categoryId}): ${rawItems.length}`);
+      }
+
       const mappedProducts = rawItems.map((item: any) => ({
         id: item.id,
         name: item.الاسم || item.name || "Unknown Item",
@@ -83,6 +106,7 @@ export function ProductSheet({
 
       setProducts(mappedProducts);
     } catch (error: any) {
+      console.error(`[DEBUG] Fetch Failed:`, error);
       toast({
         title: "خطأ في الاتصال",
         description: error.message,
@@ -91,7 +115,7 @@ export function ProductSheet({
     } finally {
       setFetching(false);
     }
-  }, [categoryId, serviceId, toast]);
+  }, [categoryId, serviceId, serviceName, toast]);
 
   if (serviceId === 'admin') {
     return (

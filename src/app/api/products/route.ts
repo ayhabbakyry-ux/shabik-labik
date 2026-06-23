@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 /**
  * SERVER-SIDE PROXY: Al-Ragheb API
- * Adheres strictly to parts 1-5 of the provided documentation.
+ * Adheres strictly to the 5-part documentation.
  */
 const AL_RAGHEB_BASE_URL = "https://api.alragheb-store.com";
 const AL_RAGHEB_AUTH_TOKEN = "64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0";
@@ -33,15 +33,14 @@ export async function GET(request: Request) {
         endpoint = `${AL_RAGHEB_BASE_URL}/client/api/check?orders=${orderId}`;
       }
     } else if (categoryId !== null) {
-      // Content/Discovery Endpoint: GET /client/api/content/[id]
-      // Documentation Part 2: root is 0
-      endpoint = `${AL_RAGHEB_BASE_URL}/client/api/content/${categoryId}`;
+      // Per User Instruction: Use /client/api/products?category_id={ID}
+      endpoint = `${AL_RAGHEB_BASE_URL}/client/api/products?category_id=${categoryId}`;
     } else {
       // Default to Product List: GET /client/api/products
       endpoint = `${AL_RAGHEB_BASE_URL}/client/api/products`;
     }
 
-    console.log(`[PROXY] Fetching: ${endpoint}`);
+    console.log(`[PROXY REQUEST] Target: ${endpoint}`);
 
     const response = await fetch(endpoint, {
       method: 'GET',
@@ -54,6 +53,7 @@ export async function GET(request: Request) {
     });
 
     const data = await response.json();
+    console.log(`[PROXY RESPONSE] Status: ${response.status}, Data Keys: ${Object.keys(data)}`);
     return NextResponse.json(data);
   } catch (error: any) {
     console.error("[PROXY ERROR]:", error);
