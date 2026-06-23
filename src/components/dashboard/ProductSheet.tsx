@@ -163,11 +163,11 @@ export function ProductSheet({
     <Sheet onOpenChange={(open) => { if (open) fetchProducts(); }}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col border-none bg-background" dir="rtl">
-        {/* DEBUG BLOCK - لرؤية نجاح عملية الجلب بعد إضافة المعرف */}
+        {/* DEBUG BLOCK - لرؤية نجاح عملية الجلب بعد إضافة ترويسات المحاكاة */}
         <pre className="text-[10px] text-red-600 bg-red-50 p-2 max-h-32 overflow-auto font-mono border-b" dir="ltr">
           {allProducts && allProducts.length > 0 
-            ? `API SUCCESS (${allProducts.length} items found):\n` + JSON.stringify(allProducts[0], null, 2) 
-            : "DATA IS EMPTY FROM SERVER (Checking with ID 2225...)"}
+            ? `API SUCCESS (SPOOFED):\n` + JSON.stringify(allProducts[0], null, 2) 
+            : "DATA IS EMPTY (Wait for spoof to bypass firewall...)"}
         </pre>
 
         <div className="p-4 border-b bg-white">
@@ -248,7 +248,7 @@ export function ProductSheet({
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4">
                   <PackageX className="h-12 w-12 opacity-30" />
-                  <p className="text-sm font-bold">لا تتوفر فئات حالياً لهذا القسم بعد إضافة المعرف.</p>
+                  <p className="text-sm font-bold">لا تتوفر فئات حالياً لهذا القسم (تحقق من الـ Debug في الأعلى).</p>
                 </div>
               )}
             </ScrollArea>

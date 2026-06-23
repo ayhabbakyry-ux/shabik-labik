@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * FORCE DYNAMIC: تعطيل التخزين المؤقت لضمان جلب أحدث الأسعار والبيانات دائماً.
+ * FORCE DYNAMIC: منع التخزين المؤقت لضمان جلب البيانات الحية وتجاوز حظر الـ IP.
  */
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -15,10 +15,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get('categoryId');
     
-    // بناء الرابط الأساسي
     const endpoint = `${AL_RAGHEB_BASE_URL}/client/api/products`;
 
-    // تجهيز البيانات المطلوبة للمصادقة كما يتوقعها السيرفر لفك الحظر
+    // بيانات المصادقة المطلوبة في جسم الطلب
     const bodyData = {
       email: "ayhmbakyr213@gmail.com",
       username: "ayhmbakyr213@gmail.com",
@@ -27,7 +26,7 @@ export async function GET(request: Request) {
       category_id: categoryId || undefined
     };
 
-    console.log(`[AL-RAGHEB AUTH FETCH] ${new Date().toISOString()} - Payload with Browser Spoofing:`, bodyData);
+    console.log(`[AL-RAGHEB SPOOF FETCH] ${new Date().toISOString()} - Target: ${endpoint}`);
 
     const response = await fetch(endpoint, {
       method: 'POST', 
@@ -54,9 +53,9 @@ export async function GET(request: Request) {
       }
     });
   } catch (error: any) {
-    console.error("[PROXY SYSTEM CRITICAL ERROR]:", error);
+    console.error("[PROXY FIREWALL BYPASS ERROR]:", error);
     return NextResponse.json(
-      { error: "تعذر الاتصال بسيرفر الراغب حالياً.", details: error.message },
+      { error: "تعذر تجاوز جدار الحماية حالياً.", details: error.message },
       { 
         status: 500,
         headers: { 'Cache-Control': 'no-store, max-age=0' }
