@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
@@ -23,10 +24,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-/**
- * مكون عرض المنتجات: 
- * يطبق منطق المربح 4%، عزل الشبكات، واستخراج الكمية آلياً.
- */
+interface Product {
+  id: string | number;
+  name: string;
+  price: string | number;
+  parent_id: string | number;
+  [key: string]: any;
+}
+
+interface GroupedService {
+  baseName: string;
+  items: Array<Product & { displayPrice: string; displayAmount: string }>;
+}
+
 export function ProductSheet({ 
   children, 
   serviceName, 
@@ -38,88 +48,101 @@ export function ProductSheet({
   serviceId?: string;
   categoryId?: number;
 }) {
-  const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [fetching, setFetching] = useState(false);
-  const [selectedVariations, setSelectedVariations] = useState<Record<string, string>>({});
+  const [selectedItemIds, setSelectedItemIds] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
-  // 1. دالة الفرز والتجهيز الآمنة 100%
-  const filteredProducts = useMemo(() => {
+  // 1. منطق الفرز والتجميع الذكي (Grouping Logic)
+  const groupedServices = useMemo(() => {
     if (!allProducts || !Array.isArray(allProducts) || allProducts.length === 0) {
       return [];
     }
     
-    // الفلترة الأساسية حسب الـ categoryId
-    let baseFilter = allProducts.filter(item => item && Number(item.parent_id) === Number(activeCategoryId));
+    // الفلترة الأولية حسب القسم
+    let baseFilter = allProducts.filter(item => Number(item.parent_id) === Number(activeCategoryId));
 
-    // العزل القطعي لشبكات الاتصال بناءً على الاسم لمنع تداخل المنتجات
+    // العزل القطعي للشبكات (تليكوم)
     if (Number(activeCategoryId) === 6 && serviceName) {
       const title = serviceName.toLowerCase();
       if (title.includes("إم تي إن") || title.includes("mtn")) {
         baseFilter = baseFilter.filter(item => 
-          item?.name && (item.name.includes("إم تي إن") || item.name.toUpperCase().includes("MTN"))
+          item.name?.includes("إم تي إن") || item.name?.toUpperCase().includes("MTN")
         );
       } else if (title.includes("سيريتل") || title.includes("syriatel")) {
         baseFilter = baseFilter.filter(item => 
-          item?.name && (item.name.includes("سيريتل") || item.name.toUpperCase().includes("SYRIATEL"))
+          item.name?.includes("سيريتل") || item.name?.toUpperCase().includes("SYRIATEL")
         );
       } else if (title.includes("زين") || title.includes("zain")) {
         baseFilter = baseFilter.filter(item => 
-          item?.name && (item.name.toUpperCase().includes("ZAIN") || item.name.includes("زين"))
+          item.name?.toUpperCase().includes("ZAIN") || item.name?.includes("زين")
         );
       }
     }
-    
-    // معالجة البيانات: حساب المربح 4% واستخراج الرصيد الواصل بأمان
-    return baseFilter.map(item => {
-      // حساب المربح المخفي 4%
-      const basePrice = Number(item.price || 0);
-      const finalCustomerPrice = (basePrice * 1.04).toFixed(2);
-      
-      // استخراج الرقم من الاسم تلقائياً بأسلوب آمن لمنع الكراش
-      const nameMatch = item.name?.match(/[\d.]+/);
-      const amountDelivered = item.amount || item.denomination || (nameMatch ? nameMatch[0] : "محدد");
 
+    // تجهيز البيانات وحساب المربح واستخراج الرصيد
+    const processedItems = baseFilter.map(item => {
+      const basePrice = Number(item.price || 0);
+      const finalPrice = (basePrice * 1.04).toFixed(2);
+      const match = item.name?.match(/[\d.]+/);
+      const amount = item.amount || item.denomination || (match ? match[0] : "محدد");
+      
       return {
         ...item,
-        displayPrice: finalCustomerPrice, // السعر المرفوع فقط
-        displayAmount: amountDelivered     // الكمية المستخرجة
+        displayPrice: finalPrice,
+        displayAmount: amount
       };
     });
+
+    // التجميع بناءً على "اسم الخدمة الأساسي" (بدون الأرقام)
+    const groups: Record<string, GroupedService> = {};
+    
+    processedItems.forEach(item => {
+      // استخراج الاسم الأساسي بحذف الأرقام والكميات من النهاية
+      const baseName = item.name.replace(/[\d.]+.*$/, '').trim();
+      
+      if (!groups[baseName]) {
+        groups[baseName] = { baseName, items: [] };
+      }
+      groups[baseName].items.push(item);
+    });
+
+    // ترتيب العناصر داخل كل مجموعة حسب الكمية (من الأصغر للأكبر)
+    Object.values(groups).forEach(group => {
+      group.items.sort((a, b) => Number(a.displayAmount) - Number(b.displayAmount));
+    });
+
+    return Object.values(groups);
   }, [allProducts, activeCategoryId, serviceName]);
 
-  // 2. جلب المنتجات من السيرفر
+  // 2. جلب البيانات من السيرفر
   const fetchProducts = useCallback(async () => {
     if (serviceId === 'admin') return;
-    
     setFetching(true);
     try {
-      const response = await fetch(`/api/products`);
+      const response = await fetch(`/api/products?categoryId=${activeCategoryId}`);
       if (!response.ok) throw new Error("Server Error");
       const data = await response.json();
-      
-      // استخراج المصفوفة مهما كان شكل الرد
       const rawItems = Array.isArray(data) ? data : (data.data || data.products || []);
       setAllProducts(Array.isArray(rawItems) ? rawItems : []);
     } catch (error: any) {
       toast({
-        title: "فشل المزامنة",
-        description: "تعذر استرداد قائمة المنتجات من السيرفر.",
+        title: "خطأ في المزامنة",
+        description: "تعذر تحديث البيانات من السيرفر.",
         variant: "destructive",
       });
     } finally {
       setFetching(false);
     }
-  }, [serviceId, toast]);
+  }, [activeCategoryId, serviceId, toast]);
 
-  const handleOrder = (productName: string, variationId: string) => {
+  const handleOrder = (product: any) => {
     toast({
       title: "تم استلام الطلب",
-      description: `تم إرسال طلب ${productName} للمعالجة بنجاح.`,
+      description: `طلب ${product.name} بقيمة ${product.displayPrice} ل.س قيد المعالجة.`,
     });
   };
 
-  // لوحة الإدارة
   if (serviceId === 'admin') {
     return (
       <Sheet>
@@ -144,7 +167,7 @@ export function ProductSheet({
               </Button>
             </div>
             <SheetDescription className="text-right text-xs">
-              الأسعار نهائية وشاملة لكافة الضرائب والرسوم.
+              اختر الفئة المطلوبة من القائمة المنسدلة لكل خدمة.
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -153,75 +176,58 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-medium">جاري تحديث الأسعار المباشرة...</p>
+              <p className="text-sm font-medium">جاري مزامنة الأسعار المباشرة...</p>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
-              {Array.isArray(filteredProducts) && filteredProducts.length > 0 ? (
-                <div className="grid gap-4" dir="rtl">
-                  {filteredProducts.map((product, pIdx) => {
-                    // استخراج الخيارات المندرجة (إن وجدت)
-                    const variations = product.params || product.variations || product.amounts || [];
-                    const selectedVarId = selectedVariations[product.id];
-                    const currentVariation = Array.isArray(variations) ? variations.find((v: any) => v && String(v.id) === selectedVarId) : null;
-                    
-                    // حساب السعر النهائي مع المربح 4% (الخيار المحدد أو المنتج الأساسي)
-                    const finalPrice = currentVariation 
-                      ? (Number(currentVariation.price || 0) * 1.04).toFixed(2)
-                      : product.displayPrice;
+              {groupedServices.length > 0 ? (
+                <div className="grid gap-6" dir="rtl">
+                  {groupedServices.map((group, gIdx) => {
+                    const selectedId = selectedItemIds[group.baseName];
+                    const selectedProduct = group.items.find(i => String(i.id) === selectedId) || group.items[0];
 
                     return (
-                      <Card key={product.id || `p-${pIdx}`} className="border-none shadow-sm bg-white overflow-hidden">
+                      <Card key={gIdx} className="border-none shadow-md bg-white overflow-hidden">
                         <CardContent className="p-5 space-y-4">
                           <div className="flex items-center gap-3">
                             <div className="p-3 bg-primary/10 rounded-xl">
                               <Zap className="h-5 w-5 text-primary" />
                             </div>
                             <div className="text-right flex-1">
-                              <h4 className="font-bold text-base text-foreground leading-tight">{product.name}</h4>
-                              <p className="text-[12px] text-primary font-bold mt-1">
-                                الرصيد الواصل: {product.displayAmount}
-                              </p>
+                              <h4 className="font-bold text-lg text-foreground leading-tight">{group.baseName}</h4>
+                              <p className="text-[12px] text-muted-foreground">متوفر {group.items.length} فئة شحن</p>
                             </div>
                           </div>
 
-                          {Array.isArray(variations) && variations.length > 0 && (
-                            <div className="space-y-3">
-                              <Select 
-                                value={selectedVarId} 
-                                onValueChange={(val) => setSelectedVariations(prev => ({ ...prev, [product.id]: val }))}
-                              >
-                                <SelectTrigger className="w-full text-right bg-muted/30 border-none h-12">
-                                  <SelectValue placeholder="اختر القيمة المطلوبة..." />
-                                </SelectTrigger>
-                                <SelectContent className="font-body" dir="rtl">
-                                  {variations.map((v: any, vIdx: number) => {
-                                    if (!v) return null;
-                                    const vMarkedUp = (Number(v.price || 0) * 1.04).toFixed(2);
-                                    const vMatch = v.name?.match(/[\d.]+/);
-                                    const vAmount = v.amount || (vMatch ? vMatch[0] : v.name || "محدد");
-                                    return (
-                                      <SelectItem key={`${product.id}-v-${v.id || vIdx}`} value={String(v.id)}>
-                                        الواصل: {vAmount} - السعر: {vMarkedUp} ل.س
-                                      </SelectItem>
-                                    );
-                                  })}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
+                          <div className="space-y-2">
+                            <label className="text-[11px] font-bold text-muted-foreground pr-1">الكمية / الفئة</label>
+                            <Select 
+                              value={String(selectedProduct.id)} 
+                              onValueChange={(val) => setSelectedItemIds(prev => ({ ...prev, [group.baseName]: val }))}
+                            >
+                              <SelectTrigger className="w-full text-right bg-muted/30 border-none h-12 text-sm font-medium">
+                                <SelectValue placeholder="اختر الفئة..." />
+                              </SelectTrigger>
+                              <SelectContent dir="rtl" className="font-body">
+                                {group.items.map((item) => (
+                                  <SelectItem key={item.id} value={String(item.id)}>
+                                    الرصيد الواصل: {item.displayAmount}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
 
                           <div className="flex items-center justify-between pt-4 border-t border-dashed">
                             <div className="text-right">
-                              <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-tighter">السعر للمستهلك</p>
-                              <p className="text-primary font-bold text-xl leading-none">
-                                {finalPrice} <span className="text-xs opacity-70">ل.س</span>
+                              <p className="text-[10px] text-muted-foreground mb-1 font-bold">السعر النهائي للمستهلك</p>
+                              <p className="text-primary font-bold text-2xl leading-none">
+                                {selectedProduct.displayPrice} <span className="text-xs opacity-70">ل.س</span>
                               </p>
                             </div>
                             <Button 
-                              disabled={Array.isArray(variations) && variations.length > 0 && !selectedVarId}
-                              onClick={() => handleOrder(product.name, selectedVarId || "")}
-                              className="rounded-full px-8 h-12 bg-primary text-white font-bold"
+                              onClick={() => handleOrder(selectedProduct)}
+                              className="rounded-full px-8 h-12 bg-primary text-white font-bold hover:scale-105 transition-transform"
                             >
                               <ShoppingCart className="ml-2 h-4 w-4" />
                               اطلب الآن
@@ -235,7 +241,7 @@ export function ProductSheet({
               ) : (
                 <div className="flex flex-col items-center justify-center text-muted-foreground gap-4 py-12">
                   <PackageX className="h-10 w-10 opacity-40" />
-                  <p className="text-sm font-bold text-center">لا توجد منتجات متوفرة حالياً في هذا القسم.</p>
+                  <p className="text-sm font-bold text-center">لا توجد خدمات متوفرة حالياً.</p>
                 </div>
               )}
             </ScrollArea>
@@ -245,3 +251,4 @@ export function ProductSheet({
     </Sheet>
   );
 }
+
