@@ -10,6 +10,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get('categoryId');
     
+    // استخدام الرابط المباشر للإنتاج
     const targetEndpoint = `${AL_RAGHEB_BASE_URL}/client/api/products`;
 
     const bodyData = {
@@ -20,6 +21,7 @@ export async function GET(request: Request) {
       category_id: categoryId ? Number(categoryId) : undefined
     };
 
+    // إرسال طلب نظيف جداً لتجنب أي تعارض مع جدار الحماية في الإنتاج
     const response = await fetch(targetEndpoint, {
       method: 'POST', 
       headers: {

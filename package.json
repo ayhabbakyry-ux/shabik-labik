@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "deploy": "vercel --prod"
+    "deploy": "vercel --prod",
+    "deploy:token": "vercel --prod --token=$VERCEL_TOKEN"
   },
   "dependencies": {
     "@genkit-ai/google-genai": "^1.28.0",
