@@ -24,17 +24,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+interface Variation {
+  id: string | number;
+  name: string;
+  price: string | number;
+  amount?: string | number;
+  [key: string]: any;
+}
+
 interface Product {
   id: string | number;
   name: string;
   price: string | number;
   parent_id: string | number;
+  options?: Variation[];
+  variants?: Variation[];
+  product_options?: Variation[];
   [key: string]: any;
-}
-
-interface GroupedService {
-  baseName: string;
-  items: Array<Product & { displayPrice: string; displayAmount: string }>;
 }
 
 export function ProductSheet({ 
@@ -50,83 +56,10 @@ export function ProductSheet({
 }) {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [fetching, setFetching] = useState(false);
-  const [selectedItemIds, setSelectedItemIds] = useState<Record<string, string>>({});
+  const [selectedIds, setSelectedIds] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
-  // 1. منطق التجميع الذكي (Smart Grouping) مثل تطبيق الراغب
-  const groupedServices = useMemo(() => {
-    if (!allProducts || !Array.isArray(allProducts) || allProducts.length === 0) {
-      return [];
-    }
-    
-    // الفلترة الأولية حسب القسم
-    let baseFilter = allProducts.filter(item => Number(item.parent_id) === Number(activeCategoryId));
-
-    // عزل الشبكات بشكل قطعي (Syriatel vs MTN)
-    if (Number(activeCategoryId) === 6 && serviceName) {
-      const title = serviceName.toLowerCase();
-      if (title.includes("إم تي إن") || title.includes("mtn")) {
-        baseFilter = baseFilter.filter(item => 
-          item.name?.includes("إم تي إن") || item.name?.toUpperCase().includes("MTN")
-        );
-      } else if (title.includes("سيريتل") || title.includes("syriatel")) {
-        baseFilter = baseFilter.filter(item => 
-          item.name?.includes("سيريتل") || item.name?.toUpperCase().includes("SYRIATEL")
-        );
-      }
-    }
-
-    // تجهيز البيانات وحساب المربح واستخراج الرصيد
-    const processedItems = baseFilter.map(item => {
-      // تطبيق المربح المخفي 4%
-      const basePrice = Number(item.price || 0);
-      const finalPrice = (basePrice * 1.04).toFixed(2);
-      
-      // استخراج الرقم من الاسم بأمان (الرصيد الواصل)
-      const match = item.name?.match(/[\d.]+/);
-      const amount = item.amount || item.denomination || (match ? match[0] : "محدد");
-      
-      return {
-        ...item,
-        displayPrice: finalPrice,
-        displayAmount: amount
-      };
-    });
-
-    // التجميع بناءً على اسم الخدمة (بدون الأرقام)
-    const groups: Record<string, GroupedService> = {};
-    
-    processedItems.forEach(item => {
-      // استخراج الاسم الأساسي (مثلاً "إم تي إن وحدات") وحذف الأرقام والكميات من النهاية
-      const baseName = item.name.replace(/[\d.]+.*$/, '').trim();
-      
-      if (!groups[baseName]) {
-        groups[baseName] = { baseName, items: [] };
-      }
-      groups[baseName].items.push(item);
-    });
-
-    // ترتيب العناصر داخل كل مجموعة حسب الرصيد الواصل
-    Object.values(groups).forEach(group => {
-      group.items.sort((a, b) => Number(a.displayAmount) - Number(b.displayAmount));
-    });
-
-    return Object.values(groups);
-  }, [allProducts, activeCategoryId, serviceName]);
-
-  // تعيين أول فئة تلقائياً عند تحميل البيانات
-  useEffect(() => {
-    if (groupedServices.length > 0) {
-      const initial: Record<string, string> = {};
-      groupedServices.forEach(group => {
-        if (group.items.length > 0) {
-          initial[group.baseName] = String(group.items[0].id);
-        }
-      });
-      setSelectedItemIds(initial);
-    }
-  }, [groupedServices]);
-
+  // 1. Fetching logic with Debug Log
   const fetchProducts = useCallback(async () => {
     if (serviceId === 'admin') return;
     setFetching(true);
@@ -134,7 +67,14 @@ export function ProductSheet({
       const response = await fetch(`/api/products?categoryId=${activeCategoryId}`);
       if (!response.ok) throw new Error("Server Error");
       const data = await response.json();
+      
       const rawItems = Array.isArray(data) ? data : (data.data || data.products || []);
+      
+      // DEBUG LOG: Let's see the structure of the first item to find nested options
+      if (rawItems.length > 0) {
+        console.log("[DEBUG] First Product Structure:", JSON.stringify(rawItems[0], null, 2));
+      }
+
       setAllProducts(Array.isArray(rawItems) ? rawItems : []);
     } catch (error: any) {
       toast({
@@ -147,10 +87,74 @@ export function ProductSheet({
     }
   }, [activeCategoryId, serviceId, toast]);
 
-  const handleOrder = (product: any) => {
+  // 2. Production-Grade Filtering & Nesting Logic
+  const groupedServices = useMemo(() => {
+    if (!allProducts || allProducts.length === 0) return [];
+
+    // Filter by parent category (e.g., Telecom ID 6)
+    let filtered = allProducts.filter(p => Number(p.parent_id) === Number(activeCategoryId));
+
+    // Brand Isolation for Telecom
+    if (Number(activeCategoryId) === 6 && serviceName) {
+      const title = serviceName.toLowerCase();
+      if (title.includes("إم تي إن") || title.includes("mtn")) {
+        filtered = filtered.filter(p => p.name?.includes("إم تي إن") || p.name?.toUpperCase().includes("MTN"));
+      } else if (title.includes("سيريتل") || title.includes("syriatel")) {
+        filtered = filtered.filter(p => p.name?.includes("سيريتل") || p.name?.toUpperCase().includes("SYRIATEL"));
+      }
+    }
+
+    // Process nested variations or treat product as single variation
+    return filtered.map(product => {
+      // Look for nested variations in common property names
+      const nestedRaw = product.options || product.variants || product.product_options || [];
+      
+      // Map variations with 4% markup and regex balance extraction
+      const variations = nestedRaw.length > 0 
+        ? nestedRaw.map((v: any) => {
+            const vMatch = v.name?.match(/[\d.]+/);
+            return {
+              id: v.id || `${product.id}-${v.name}`,
+              name: v.name,
+              displayPrice: (Number(v.price || 0) * 1.04).toFixed(2),
+              displayAmount: v.amount || v.value || (vMatch ? vMatch[0] : "محدد")
+            };
+          })
+        : [{
+            id: product.id,
+            name: product.name,
+            displayPrice: (Number(product.price || 0) * 1.04).toFixed(2),
+            displayAmount: product.name?.match(/[\d.]+/)?.[0] || product.amount || "محدد"
+          }];
+
+      // Clean the product title (remove numbers for header)
+      const cleanTitle = product.name?.split(/[\d.]+/)[0].trim() || serviceName;
+
+      return {
+        id: String(product.id),
+        title: cleanTitle,
+        variations
+      };
+    });
+  }, [allProducts, activeCategoryId, serviceName]);
+
+  // Handle default selections
+  useEffect(() => {
+    if (groupedServices.length > 0) {
+      const defaults: Record<string, string> = {};
+      groupedServices.forEach(group => {
+        if (group.variations.length > 0) {
+          defaults[group.id] = String(group.variations[0].id);
+        }
+      });
+      setSelectedIds(defaults);
+    }
+  }, [groupedServices]);
+
+  const handleOrder = (variation: any) => {
     toast({
       title: "تم استلام الطلب",
-      description: `طلب ${product.name} بقيمة ${product.displayPrice} ل.س قيد المعالجة.`,
+      description: `طلب شحن بقيمة ${variation.displayPrice} ل.س قيد المعالجة.`,
     });
   };
 
@@ -168,7 +172,7 @@ export function ProductSheet({
   return (
     <Sheet onOpenChange={(open) => { if (open) fetchProducts(); }}>
       <SheetTrigger asChild>{children}</SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex flex-col border-none bg-background">
+      <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col border-none bg-background">
         <div className="p-4 border-b bg-white">
           <SheetHeader>
             <div className="flex items-center justify-between">
@@ -178,7 +182,7 @@ export function ProductSheet({
               </Button>
             </div>
             <SheetDescription className="text-right text-xs">
-              اختر الرصيد المطلوب من القائمة لتحديث السعر.
+              اختر الفئة المطلوبة من القائمة وسيظهر لك السعر النهائي.
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -187,42 +191,42 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-medium">جاري مزامنة الأسعار المباشرة...</p>
+              <p className="text-sm font-medium">جاري مزامنة الأسعار من الراغب...</p>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
-              {Array.isArray(groupedServices) && groupedServices.length > 0 ? (
+              {groupedServices.length > 0 ? (
                 <div className="grid gap-6" dir="rtl">
-                  {groupedServices.map((group, gIdx) => {
-                    const selectedId = selectedItemIds[group.baseName];
-                    const selectedProduct = group.items.find(i => String(i.id) === selectedId) || group.items[0];
+                  {groupedServices.map((group) => {
+                    const selectedId = selectedIds[group.id];
+                    const currentVariation = group.variations.find(v => String(v.id) === selectedId) || group.variations[0];
 
                     return (
-                      <Card key={gIdx} className="border-none shadow-md bg-white overflow-hidden">
+                      <Card key={group.id} className="border-none shadow-md bg-white overflow-hidden">
                         <CardContent className="p-5 space-y-4">
                           <div className="flex items-center gap-3">
                             <div className="p-3 bg-primary/10 rounded-xl">
                               <Zap className="h-5 w-5 text-primary" />
                             </div>
                             <div className="text-right flex-1">
-                              <h4 className="font-bold text-lg text-foreground leading-tight">{group.baseName}</h4>
-                              <p className="text-[12px] text-muted-foreground">متوفر {group.items.length} فئات شحن</p>
+                              <h4 className="font-bold text-lg text-foreground leading-tight">{group.title}</h4>
+                              <p className="text-[11px] text-muted-foreground">متوفر {group.variations.length} فئة شحن</p>
                             </div>
                           </div>
 
                           <div className="space-y-2">
                             <label className="text-[11px] font-bold text-muted-foreground pr-1">الرصيد الواصل / الكمية</label>
                             <Select 
-                              value={selectedId || String(group.items[0]?.id)} 
-                              onValueChange={(val) => setSelectedItemIds(prev => ({ ...prev, [group.baseName]: val }))}
+                              value={selectedId || String(group.variations[0]?.id)} 
+                              onValueChange={(val) => setSelectedIds(prev => ({ ...prev, [group.id]: val }))}
                             >
                               <SelectTrigger className="w-full text-right bg-muted/30 border-none h-12 text-sm font-medium">
                                 <SelectValue placeholder="اختر الفئة..." />
                               </SelectTrigger>
-                              <SelectContent dir="rtl" className="font-body">
-                                {group.items.map((item) => (
-                                  <SelectItem key={item.id} value={String(item.id)}>
-                                    الرصيد الواصل: {item.displayAmount}
+                              <SelectContent dir="rtl">
+                                {group.variations.map((v) => (
+                                  <SelectItem key={v.id} value={String(v.id)}>
+                                    الرصيد الواصل: {v.displayAmount}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -231,13 +235,13 @@ export function ProductSheet({
 
                           <div className="flex items-center justify-between pt-4 border-t border-dashed">
                             <div className="text-right">
-                              <p className="text-[10px] text-muted-foreground mb-1 font-bold">السعر النهائي للمستهلك</p>
+                              <p className="text-[10px] text-muted-foreground mb-1 font-bold">السعر للمستهلك (شامل الربح)</p>
                               <p className="text-primary font-bold text-2xl leading-none">
-                                {selectedProduct?.displayPrice || "0.00"} <span className="text-xs opacity-70">ل.س</span>
+                                {currentVariation?.displayPrice || "0.00"} <span className="text-xs opacity-70">ل.س</span>
                               </p>
                             </div>
                             <Button 
-                              onClick={() => handleOrder(selectedProduct)}
+                              onClick={() => handleOrder(currentVariation)}
                               className="rounded-full px-8 h-12 bg-primary text-white font-bold hover:scale-105 transition-transform shadow-lg"
                             >
                               <ShoppingCart className="ml-2 h-4 w-4" />
@@ -252,7 +256,7 @@ export function ProductSheet({
               ) : (
                 <div className="flex flex-col items-center justify-center text-muted-foreground gap-4 py-12">
                   <PackageX className="h-10 w-10 opacity-40" />
-                  <p className="text-sm font-bold text-center">لا توجد خدمات متوفرة حالياً.</p>
+                  <p className="text-sm font-bold text-center">لا توجد منتجات متاحة في هذا القسم حالياً.</p>
                 </div>
               )}
             </ScrollArea>
