@@ -1,4 +1,3 @@
-
 import { NextResponse } from 'next/server';
 
 /**
@@ -33,8 +32,8 @@ export async function GET(request: Request) {
       headers: {
         'api-token': AL_RAGHEB_AUTH_TOKEN,
         'Content-Type': 'application/json',
-        'Accept': 'application/json, text/plain, */*',
         'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
         'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8',
         'Origin': 'https://api.alragheb-store.com',
         'Referer': 'https://api.alragheb-store.com/'
