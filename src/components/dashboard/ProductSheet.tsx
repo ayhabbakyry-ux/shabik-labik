@@ -39,20 +39,27 @@ export function ProductSheet({
     try {
       // Fetch global list to filter by parent_id locally
       // This is the most reliable way since the server-side filter is inconsistent
+      console.log(`[NETWORK] Fetching global product list for section: ${serviceName}...`);
       const response = await fetch(`/api/products`);
       const data = await response.json();
       
       const rawItems = Array.isArray(data) ? data : (data.data || []);
       
       // STRICT FILTERING: Use parent_id as the primary identifier
-      // We convert both to Number to avoid type-mismatch errors
+      // Force both sides to Numbers to ensure 100% type matching
       const filtered = rawItems.filter((item: any) => {
         const itemParentId = Number(item.parent_id);
         const targetCategoryId = Number(categoryId);
+        
+        // Debugging logs as requested
+        if (rawItems.indexOf(item) < 5) { // Log first few items to verify structure
+            console.log(`Filtering: Item ID [${item.parent_id}] vs Active ID [${categoryId}] - Match: ${itemParentId === targetCategoryId}`);
+        }
+        
         return itemParentId === targetCategoryId;
       });
       
-      console.log(`[FILTER] Section: ${serviceName}, Target parent_id: ${categoryId}, Found: ${filtered.length}`);
+      console.log(`[FILTER RESULT] Section: ${serviceName}, Target ID: ${categoryId}, Found: ${filtered.length} products.`);
       setProducts(filtered);
     } catch (error: any) {
       console.error(`[FETCH ERROR]`, error);
