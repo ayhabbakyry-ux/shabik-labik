@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useUser } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { Loader2, PackageX, RefreshCw, Key } from "lucide-react";
@@ -61,16 +60,15 @@ export function ProductSheet({
     if (serviceId === 'admin' || !categoryId) return;
     
     setFetching(true);
-    console.log(`[DEBUG] Attempting fetch for Service: ${serviceName}, ID: ${categoryId}`);
+    console.log(`[DEBUG] Initializing fetch for: ${serviceName} (ID: ${categoryId})`);
 
     try {
-      // Step 1: Direct Category Fetch
+      // Step 1: Attempt Category-Specific Fetch
       const primaryUrl = `/api/products?categoryId=${categoryId}`;
-      console.log(`[DEBUG] Requesting URL: ${primaryUrl}`);
+      console.log(`[DEBUG] Step 1 Request: ${primaryUrl}`);
       
       const response = await fetch(primaryUrl);
       const data = await response.json();
-      console.log(`[DEBUG] Server Response:`, data);
       
       if (data.status === "error" || data.code) {
         throw new Error(AL_RAGHEB_ERRORS[data.code] || `Server Error ${data.code}`);
@@ -78,37 +76,38 @@ export function ProductSheet({
 
       let rawItems = Array.isArray(data) ? data : (data.data || []);
       
-      // Step 2: Fallback - Fetch All and Filter if primary is empty
+      // Step 2: Fallback to Global Fetch if needed
       if (rawItems.length === 0) {
-        console.log(`[DEBUG] Specific category returned empty. Attempting Fallback (Fetch All).`);
+        console.log(`[DEBUG] Step 1 returned empty. Falling back to Global Fetch.`);
         const fallbackUrl = `/api/products`;
         const fbResponse = await fetch(fallbackUrl);
         const fbData = await fbResponse.json();
-        const allItems = Array.isArray(fbData) ? fbData : (fbData.data || []);
-        
-        console.log(`[DEBUG] Fallback Data Total Count: ${allItems.length}`);
-
-        // Filter by common keys found in Al-Ragheb documentation
-        rawItems = allItems.filter((item: any) => 
-          Number(item.category_id) === categoryId || 
-          item.اسم_الفئة === serviceName ||
-          item.category_name === serviceName
-        );
-        
-        console.log(`[DEBUG] Items matching Category "${serviceName}" (ID ${categoryId}): ${rawItems.length}`);
+        rawItems = Array.isArray(fbData) ? fbData : (fbData.data || []);
       }
 
-      const mappedProducts = rawItems.map((item: any) => ({
+      console.log(`[DEBUG] Total items before filtering: ${rawItems.length}`);
+
+      // Step 3: STRICT CLIENT-SIDE FILTERING
+      // We must filter by categoryId regardless of which API call provided the data
+      const filteredItems = rawItems.filter((item: any) => {
+        const itemCatId = Number(item.category_id || item.الفئة_id);
+        const nameMatch = item.اسم_الفئة === serviceName || item.category_name === serviceName;
+        return itemCatId === categoryId || nameMatch;
+      });
+
+      console.log(`[DEBUG] Total items after filtering for ID ${categoryId}: ${filteredItems.length}`);
+
+      const mappedProducts = filteredItems.map((item: any) => ({
         id: item.id,
-        name: item.الاسم || item.name || "Unknown Item",
+        name: item.الاسم || item.name || "منتج غير معروف",
         price: Number(item.السعر || item.price || 0)
       }));
 
       setProducts(mappedProducts);
     } catch (error: any) {
-      console.error(`[DEBUG] Fetch Failed:`, error);
+      console.error(`[DEBUG] Fetch process failed:`, error);
       toast({
-        title: "خطأ في الاتصال",
+        title: "خطأ في جلب البيانات",
         description: error.message,
         variant: "destructive",
       });
@@ -138,7 +137,7 @@ export function ProductSheet({
           <SheetHeader>
             <SheetTitle className="text-xl font-bold font-headline">{serviceName}</SheetTitle>
             <SheetDescription className="text-xs">
-              خدمة رقمية موثوقة
+              خدمة رقمية موثوقة عبر الربط المباشر
             </SheetDescription>
           </SheetHeader>
           <Button variant="ghost" size="icon" onClick={fetchProducts} disabled={fetching}>
@@ -150,7 +149,7 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-60 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-medium animate-pulse">جاري تحديث القائمة...</p>
+              <p className="text-sm font-medium animate-pulse">جاري فحص الخادم وتصفية النتائج...</p>
             </div>
           ) : (
             <>
@@ -160,7 +159,7 @@ export function ProductSheet({
                 </Label>
                 <Input 
                   id="playerId" 
-                  placeholder="أدخل المعرف الخاص بك" 
+                  placeholder="أدخل المعرف الخاص بك هنا" 
                   value={playerId}
                   onChange={(e) => setPlayerId(e.target.value)}
                   className="bg-white h-11 border-none shadow-sm focus-visible:ring-primary rounded-xl"
@@ -171,7 +170,7 @@ export function ProductSheet({
                 <div className="h-60 flex flex-col items-center justify-center text-muted-foreground gap-4">
                   <PackageX className="h-12 w-12 opacity-20" />
                   <p className="text-sm font-medium text-center px-6">
-                    عذراً، لا توجد منتجات متاحة حالياً لهذا القسم
+                    عذراً، لا توجد منتجات متاحة حالياً لهذا القسم (ID: {categoryId})
                   </p>
                 </div>
               ) : (
@@ -185,11 +184,11 @@ export function ProductSheet({
                       <div className="space-y-1">
                         <p className="font-bold text-sm leading-none">{product.name}</p>
                         <p className="text-sm font-bold text-secondary">
-                          {product.price > 0 ? `${product.price.toLocaleString()} SYP` : "تتوفر خيارات"}
+                          {product.price > 0 ? `${product.price.toLocaleString()} SYP` : "السعر حسب الكمية"}
                         </p>
                       </div>
                       <Button size="sm" className="h-9 px-5 text-xs font-bold rounded-lg shadow-sm">
-                        {product.price > 0 ? "طلب" : "فتح"}
+                        {product.price > 0 ? "طلب" : "عرض"}
                       </Button>
                     </div>
                   ))}
