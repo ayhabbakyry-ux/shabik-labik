@@ -1,5 +1,17 @@
-# Firebase Studio
+# Shabik Labik Digital - Vercel Edition
 
-This is a NextJS starter in Firebase Studio.
+This project is optimized for deployment on Vercel to bypass Cloud IP restrictions.
 
-To get started, take a look at src/app/page.tsx.
+## Production Deployment
+To deploy this project to Vercel:
+1. `npm install -g vercel`
+2. `vercel login`
+3. `vercel` (for preview)
+4. `vercel --prod` (for production)
+
+## Tech Stack
+- Next.js 15 (App Router)
+- Tailwind CSS
+- Shadcn UI
+- Lucide Icons
+- Al-Ragheb API Integration
