@@ -23,6 +23,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+/**
+ * مكون عرض المنتجات: 
+ * يطبق منطق المربح 4%، عزل الشبكات، واستخراج الكمية آلياً.
+ */
 export function ProductSheet({ 
   children, 
   serviceName, 
@@ -39,14 +43,16 @@ export function ProductSheet({
   const [selectedVariations, setSelectedVariations] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
-  // 1. منطق الفلترة والعزل وحساب المربح 4% المستقر
+  // 1. دالة الفرز والتجهيز الآمنة 100%
   const filteredProducts = useMemo(() => {
-    if (!allProducts || !Array.isArray(allProducts) || allProducts.length === 0) return [];
+    if (!allProducts || !Array.isArray(allProducts) || allProducts.length === 0) {
+      return [];
+    }
     
     // الفلترة الأساسية حسب الـ categoryId
     let baseFilter = allProducts.filter(item => item && Number(item.parent_id) === Number(activeCategoryId));
 
-    // العزل القطعي لشبكات الاتصال (سيريتل، MTN، زين)
+    // العزل القطعي لشبكات الاتصال بناءً على الاسم لمنع تداخل المنتجات
     if (Number(activeCategoryId) === 6 && serviceName) {
       const title = serviceName.toLowerCase();
       if (title.includes("إم تي إن") || title.includes("mtn")) {
@@ -64,20 +70,20 @@ export function ProductSheet({
       }
     }
     
-    // معالجة البيانات: حساب المربح 4% واستخراج الرصيد الواصل بأمان (Regex)
+    // معالجة البيانات: حساب المربح 4% واستخراج الرصيد الواصل بأمان
     return baseFilter.map(item => {
       // حساب المربح المخفي 4%
       const basePrice = Number(item.price || 0);
       const finalCustomerPrice = (basePrice * 1.04).toFixed(2);
       
-      // استخراج الرقم من الاسم بأمان (Regex) لمنع الكراش
+      // استخراج الرقم من الاسم تلقائياً بأسلوب آمن لمنع الكراش
       const nameMatch = item.name?.match(/[\d.]+/);
       const amountDelivered = item.amount || item.denomination || (nameMatch ? nameMatch[0] : "محدد");
 
       return {
         ...item,
-        displayPrice: finalCustomerPrice,
-        displayAmount: amountDelivered
+        displayPrice: finalCustomerPrice, // السعر المرفوع فقط
+        displayAmount: amountDelivered     // الكمية المستخرجة
       };
     });
   }, [allProducts, activeCategoryId, serviceName]);
@@ -89,8 +95,10 @@ export function ProductSheet({
     setFetching(true);
     try {
       const response = await fetch(`/api/products`);
+      if (!response.ok) throw new Error("Server Error");
       const data = await response.json();
-      // استخراج البيانات مهما كان شكل الرد من السيرفر
+      
+      // استخراج المصفوفة مهما كان شكل الرد
       const rawItems = Array.isArray(data) ? data : (data.data || data.products || []);
       setAllProducts(Array.isArray(rawItems) ? rawItems : []);
     } catch (error: any) {
@@ -111,12 +119,12 @@ export function ProductSheet({
     });
   };
 
-  // عرض لوحة التحكم للأدمن
+  // لوحة الإدارة
   if (serviceId === 'admin') {
     return (
       <Sheet>
         <SheetTrigger asChild>{children}</SheetTrigger>
-        <SheetContent side="bottom" className="h-[80vh] sm:h-screen sm:max-w-full overflow-y-auto">
+        <SheetContent side="bottom" className="h-[80vh] overflow-y-auto">
           <AdminPanel />
         </SheetContent>
       </Sheet>
@@ -152,48 +160,49 @@ export function ProductSheet({
               {Array.isArray(filteredProducts) && filteredProducts.length > 0 ? (
                 <div className="grid gap-4" dir="rtl">
                   {filteredProducts.map((product, pIdx) => {
-                    const variations = product.params || product.variations || product.amounts || product.items || [];
+                    // استخراج الخيارات المندرجة (إن وجدت)
+                    const variations = product.params || product.variations || product.amounts || [];
                     const selectedVarId = selectedVariations[product.id];
-                    const currentVariation = variations.find((v: any) => v && String(v.id) === selectedVarId);
+                    const currentVariation = Array.isArray(variations) ? variations.find((v: any) => v && String(v.id) === selectedVarId) : null;
                     
-                    // حساب السعر النهائي للمنتج أو الخيار المحدد مع مربح 4%
-                    const displayPrice = currentVariation 
+                    // حساب السعر النهائي مع المربح 4% (الخيار المحدد أو المنتج الأساسي)
+                    const finalPrice = currentVariation 
                       ? (Number(currentVariation.price || 0) * 1.04).toFixed(2)
                       : product.displayPrice;
 
                     return (
-                      <Card key={product.id || `prod-${pIdx}`} className="border-none shadow-sm bg-white overflow-hidden">
+                      <Card key={product.id || `p-${pIdx}`} className="border-none shadow-sm bg-white overflow-hidden">
                         <CardContent className="p-5 space-y-4">
                           <div className="flex items-center gap-3">
                             <div className="p-3 bg-primary/10 rounded-xl">
                               <Zap className="h-5 w-5 text-primary" />
                             </div>
-                            <div className="text-right">
+                            <div className="text-right flex-1">
                               <h4 className="font-bold text-base text-foreground leading-tight">{product.name}</h4>
-                              <p className="text-[11px] text-primary font-bold mt-1">
+                              <p className="text-[12px] text-primary font-bold mt-1">
                                 الرصيد الواصل: {product.displayAmount}
                               </p>
                             </div>
                           </div>
 
-                          {variations.length > 0 && (
+                          {Array.isArray(variations) && variations.length > 0 && (
                             <div className="space-y-3">
                               <Select 
                                 value={selectedVarId} 
                                 onValueChange={(val) => setSelectedVariations(prev => ({ ...prev, [product.id]: val }))}
                               >
-                                <SelectTrigger className="w-full text-right bg-muted/30 border-none h-12 focus:ring-0">
+                                <SelectTrigger className="w-full text-right bg-muted/30 border-none h-12">
                                   <SelectValue placeholder="اختر القيمة المطلوبة..." />
                                 </SelectTrigger>
                                 <SelectContent className="font-body" dir="rtl">
                                   {variations.map((v: any, vIdx: number) => {
                                     if (!v) return null;
-                                    const markedUp = (Number(v.price || 0) * 1.04).toFixed(2);
+                                    const vMarkedUp = (Number(v.price || 0) * 1.04).toFixed(2);
                                     const vMatch = v.name?.match(/[\d.]+/);
-                                    const vAmount = v.amount || v.value || (vMatch ? vMatch[0] : v.name || "محدد");
+                                    const vAmount = v.amount || (vMatch ? vMatch[0] : v.name || "محدد");
                                     return (
                                       <SelectItem key={`${product.id}-v-${v.id || vIdx}`} value={String(v.id)}>
-                                        الرصيد الواصل: {vAmount} - السعر: {markedUp} ل.س
+                                        الواصل: {vAmount} - السعر: {vMarkedUp} ل.س
                                       </SelectItem>
                                     );
                                   })}
@@ -204,13 +213,13 @@ export function ProductSheet({
 
                           <div className="flex items-center justify-between pt-4 border-t border-dashed">
                             <div className="text-right">
-                              <p className="text-xs text-muted-foreground mb-1">السعر للمستهلك</p>
+                              <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-tighter">السعر للمستهلك</p>
                               <p className="text-primary font-bold text-xl leading-none">
-                                {displayPrice} <span className="text-xs opacity-70">ل.س</span>
+                                {finalPrice} <span className="text-xs opacity-70">ل.س</span>
                               </p>
                             </div>
                             <Button 
-                              disabled={variations.length > 0 && !selectedVarId}
+                              disabled={Array.isArray(variations) && variations.length > 0 && !selectedVarId}
                               onClick={() => handleOrder(product.name, selectedVarId || "")}
                               className="rounded-full px-8 h-12 bg-primary text-white font-bold"
                             >
@@ -226,7 +235,7 @@ export function ProductSheet({
               ) : (
                 <div className="flex flex-col items-center justify-center text-muted-foreground gap-4 py-12">
                   <PackageX className="h-10 w-10 opacity-40" />
-                  <p className="text-sm font-bold text-center">لا توجد منتجات متوفرة حالياً أو جاري التحميل...</p>
+                  <p className="text-sm font-bold text-center">لا توجد منتجات متوفرة حالياً في هذا القسم.</p>
                 </div>
               )}
             </ScrollArea>
