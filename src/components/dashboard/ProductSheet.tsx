@@ -32,37 +32,69 @@ export function ProductSheet({
   const [fetching, setFetching] = useState(false);
   const { toast } = useToast();
 
-  // Reactive filtering using useMemo to ensure UI updates when state changes
+  /**
+   * DOUBLE FILTERING STRATEGY
+   * Stage 1: Filter by parent_id (Discovered category ID)
+   * Stage 2: Keyword match for shared categories (e.g. Category 6 contains both MTN and Syriatel)
+   */
   const filteredProducts = useMemo(() => {
     if (!allProducts || allProducts.length === 0) return [];
     
     const targetId = Number(categoryId);
-    return allProducts.filter((item: any) => {
+    
+    // Step 1: Filter by the primary Parent ID
+    let items = allProducts.filter((item: any) => {
       const itemParentId = Number(item.parent_id);
-      
-      // Strict matching for parent_id
-      const isMatch = itemParentId === targetId;
-      
-      if (isMatch) {
-        console.log(`[FILTER MATCH] Product: ${item.name}, ParentID: ${item.parent_id} matches Target: ${targetId}`);
-      }
-      
-      return isMatch;
+      return itemParentId === targetId;
     });
-  }, [allProducts, categoryId]);
+
+    // Step 2: Sub-filtering for shared categories (like Category 6: Line Shipping)
+    if (targetId === 6) {
+      const nameForCheck = serviceName.toLowerCase();
+      console.log(`[SUB-FILTER] Refining Category 6 for keyword: ${serviceName}`);
+
+      if (nameForCheck.includes("إم تي إن") || nameForCheck.includes("mtn")) {
+        items = items.filter(p => 
+          p.name.includes("إم تي إن") || 
+          p.name.toLowerCase().includes("mtn")
+        );
+      } else if (nameForCheck.includes("سيريتل") || nameForCheck.includes("syr")) {
+        items = items.filter(p => 
+          p.name.includes("سيريتل") || 
+          p.name.toLowerCase().includes("syr") ||
+          p.name.includes("سيرياتيل")
+        );
+      } else if (nameForCheck.includes("asiacell")) {
+        items = items.filter(p => p.name.toLowerCase().includes("asiacell"));
+      } else if (nameForCheck.includes("elux")) {
+        items = items.filter(p => p.name.toLowerCase().includes("elux"));
+      }
+    }
+
+    // Step 3: Handle games sub-filtering if necessary
+    if (targetId === 2) {
+      const nameForCheck = serviceName.toLowerCase();
+      if (nameForCheck.includes("ببجي") || nameForCheck.includes("pubg")) {
+        items = items.filter(p => p.name.includes("ببجي") || p.name.toLowerCase().includes("pubg"));
+      } else if (nameForCheck.includes("فري فاير") || nameForCheck.includes("free fire")) {
+        items = items.filter(p => p.name.includes("فري فاير") || p.name.toLowerCase().includes("free fire"));
+      }
+    }
+
+    console.log(`[FILTER RESULT] Displaying ${items.length} products for ${serviceName}`);
+    return items;
+  }, [allProducts, categoryId, serviceName]);
 
   const fetchProducts = useCallback(async () => {
     if (serviceId === 'admin') return;
     
     setFetching(true);
     try {
-      console.log(`[NETWORK] Fetching global product list for: ${serviceName}...`);
+      console.log(`[NETWORK] Fetching global product catalog for: ${serviceName}...`);
       const response = await fetch(`/api/products`);
       const data = await response.json();
       
       const rawItems = Array.isArray(data) ? data : (data.data || []);
-      
-      // Store the full list, useMemo handles the rest reactively
       setAllProducts(rawItems);
     } catch (error: any) {
       console.error(`[FETCH ERROR]`, error);
@@ -92,7 +124,6 @@ export function ProductSheet({
       if (open) {
         fetchProducts();
       } else {
-        // Clear state on close to ensure fresh fetch next time
         setAllProducts([]);
       }
     }}>
@@ -107,7 +138,7 @@ export function ProductSheet({
               </Button>
             </div>
             <SheetDescription className="text-right text-xs">
-              المنتجات المتاحة حالياً لهذا القسم (ID: {categoryId})
+              المنتجات المتاحة حالياً لقسم: {serviceName}
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -116,7 +147,7 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-medium">جاري جلب المنتجات...</p>
+              <p className="text-sm font-medium">جاري جلب وتحليل البيانات...</p>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
@@ -125,7 +156,8 @@ export function ProductSheet({
                   <div className="p-4 bg-muted rounded-full">
                     <PackageX className="h-10 w-10 opacity-40" />
                   </div>
-                  <p className="text-sm font-bold text-center">عذراً، لا توجد منتجات متاحة حالياً لهذا القسم</p>
+                  <p className="text-sm font-bold text-center">عذراً، لا توجد منتجات متاحة حالياً لـ {serviceName}</p>
+                  <p className="text-[10px] opacity-60">ID: {categoryId}</p>
                 </div>
               ) : (
                 <div className="grid gap-3" dir="rtl">
@@ -137,7 +169,7 @@ export function ProductSheet({
                             {item.name || 'منتج غير مسمى'}
                           </p>
                           <p className="text-[10px] text-muted-foreground uppercase">
-                            ID: {item.id} | Parent: {item.parent_id}
+                            {item.id} | {item.parent_id}
                           </p>
                         </div>
                         <div className="text-left">
