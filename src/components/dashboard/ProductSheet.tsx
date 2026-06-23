@@ -59,7 +59,7 @@ export function ProductSheet({
   const [selectedIds, setSelectedIds] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
-  // 1. Fetching logic with Debug Log
+  // 1. Fetching logic with Debug Log to inspect nested data
   const fetchProducts = useCallback(async () => {
     if (serviceId === 'admin') return;
     setFetching(true);
@@ -70,9 +70,9 @@ export function ProductSheet({
       
       const rawItems = Array.isArray(data) ? data : (data.data || data.products || []);
       
-      // DEBUG LOG: Let's see the structure of the first item to find nested options
+      // DEBUG LOG: Inspect raw item structure for nested variations
       if (rawItems.length > 0) {
-        console.log("[DEBUG] First Product Structure:", JSON.stringify(rawItems[0], null, 2));
+        console.log("[DEBUG] Raw Server Data Item:", JSON.stringify(rawItems[0], null, 2));
       }
 
       setAllProducts(Array.isArray(rawItems) ? rawItems : []);
@@ -87,14 +87,14 @@ export function ProductSheet({
     }
   }, [activeCategoryId, serviceId, toast]);
 
-  // 2. Production-Grade Filtering & Nesting Logic
+  // 2. Production-Grade Filtering & Nested Mapping Logic
   const groupedServices = useMemo(() => {
     if (!allProducts || allProducts.length === 0) return [];
 
-    // Filter by parent category (e.g., Telecom ID 6)
+    // Filter by category parent_id
     let filtered = allProducts.filter(p => Number(p.parent_id) === Number(activeCategoryId));
 
-    // Brand Isolation for Telecom
+    // Brand Isolation for Telecom (ID 6)
     if (Number(activeCategoryId) === 6 && serviceName) {
       const title = serviceName.toLowerCase();
       if (title.includes("إم تي إن") || title.includes("mtn")) {
@@ -104,30 +104,30 @@ export function ProductSheet({
       }
     }
 
-    // Process nested variations or treat product as single variation
+    // Process nested variations and apply business rules
     return filtered.map(product => {
-      // Look for nested variations in common property names
+      // Look for nested variations in potential server property names
       const nestedRaw = product.options || product.variants || product.product_options || [];
       
-      // Map variations with 4% markup and regex balance extraction
       const variations = nestedRaw.length > 0 
-        ? nestedRaw.map((v: any) => {
+        ? nestedRaw.map((v: any, index: number) => {
             const vMatch = v.name?.match(/[\d.]+/);
+            const markedUp = (Number(v.price || 0) * 1.04).toFixed(2);
             return {
-              id: v.id || `${product.id}-${v.name}`,
+              id: v.id ? String(v.id) : `${product.id}-v-${index}`,
               name: v.name,
-              displayPrice: (Number(v.price || 0) * 1.04).toFixed(2),
+              displayPrice: markedUp,
               displayAmount: v.amount || v.value || (vMatch ? vMatch[0] : "محدد")
             };
           })
         : [{
-            id: product.id,
+            id: String(product.id),
             name: product.name,
             displayPrice: (Number(product.price || 0) * 1.04).toFixed(2),
             displayAmount: product.name?.match(/[\d.]+/)?.[0] || product.amount || "محدد"
           }];
 
-      // Clean the product title (remove numbers for header)
+      // Header clean-up (Removes numbers from the main product title)
       const cleanTitle = product.name?.split(/[\d.]+/)[0].trim() || serviceName;
 
       return {
@@ -138,7 +138,7 @@ export function ProductSheet({
     });
   }, [allProducts, activeCategoryId, serviceName]);
 
-  // Handle default selections
+  // Sync initial selections
   useEffect(() => {
     if (groupedServices.length > 0) {
       const defaults: Record<string, string> = {};
@@ -182,7 +182,7 @@ export function ProductSheet({
               </Button>
             </div>
             <SheetDescription className="text-right text-xs">
-              اختر الفئة المطلوبة من القائمة وسيظهر لك السعر النهائي.
+              اختر الفئة المطلوبة من القائمة وسيظهر لك السعر النهائي المشمول بالمربح.
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -210,7 +210,7 @@ export function ProductSheet({
                             </div>
                             <div className="text-right flex-1">
                               <h4 className="font-bold text-lg text-foreground leading-tight">{group.title}</h4>
-                              <p className="text-[11px] text-muted-foreground">متوفر {group.variations.length} فئة شحن</p>
+                              <p className="text-[11px] text-muted-foreground">متوفر {group.variations.length} فئات شحن مختلفة</p>
                             </div>
                           </div>
 
@@ -235,7 +235,7 @@ export function ProductSheet({
 
                           <div className="flex items-center justify-between pt-4 border-t border-dashed">
                             <div className="text-right">
-                              <p className="text-[10px] text-muted-foreground mb-1 font-bold">السعر للمستهلك (شامل الربح)</p>
+                              <p className="text-[10px] text-muted-foreground mb-1 font-bold">السعر النهائي (شامل المربح)</p>
                               <p className="text-primary font-bold text-2xl leading-none">
                                 {currentVariation?.displayPrice || "0.00"} <span className="text-xs opacity-70">ل.س</span>
                               </p>
@@ -256,7 +256,7 @@ export function ProductSheet({
               ) : (
                 <div className="flex flex-col items-center justify-center text-muted-foreground gap-4 py-12">
                   <PackageX className="h-10 w-10 opacity-40" />
-                  <p className="text-sm font-bold text-center">لا توجد منتجات متاحة في هذا القسم حالياً.</p>
+                  <p className="text-sm font-bold text-center">لا توجد منتجات متاحة لهذا القسم حالياً.</p>
                 </div>
               )}
             </ScrollArea>
