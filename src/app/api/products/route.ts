@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * FORCE DYNAMIC: تعطيل التخزين المؤقت لضمان جلب البيانات الحية وتجاوز حظر الـ IP.
+ * FORCE DYNAMIC: Disable caching to ensure live data and bypass IP blocks.
  */
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -9,14 +9,18 @@ export const revalidate = 0;
 const AL_RAGHEB_BASE_URL = "https://api.alragheb-store.com";
 const AL_RAGHEB_AUTH_TOKEN = "64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0";
 
+// Use an anonymizing gateway/proxy to mask the Google Cloud signature
+const PROXY_WRAPPER = "https://corsproxy.io/?url=";
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get('categoryId');
     
-    const endpoint = `${AL_RAGHEB_BASE_URL}/client/api/products`;
+    const targetEndpoint = `${AL_RAGHEB_BASE_URL}/client/api/products`;
+    // Construct the anonymized URL
+    const finalUrl = `${PROXY_WRAPPER}${encodeURIComponent(targetEndpoint)}`;
 
-    // بيانات المصادقة والحساب المطلوبة
     const bodyData = {
       email: "ayhmbakyr213@gmail.com",
       username: "ayhmbakyr213@gmail.com",
@@ -25,9 +29,9 @@ export async function GET(request: Request) {
       category_id: categoryId ? Number(categoryId) : undefined
     };
 
-    console.log(`[PROXY SPOOF FETCH] Target: ${endpoint} for Category: ${categoryId}`);
+    console.log(`[ANONYMIZED FETCH] Proxying via: ${PROXY_WRAPPER} for Category: ${categoryId}`);
 
-    const response = await fetch(endpoint, {
+    const response = await fetch(finalUrl, {
       method: 'POST', 
       headers: {
         'api-token': AL_RAGHEB_AUTH_TOKEN,
@@ -37,7 +41,7 @@ export async function GET(request: Request) {
         'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8',
         'Origin': 'https://api.alragheb-store.com',
         'Referer': 'https://api.alragheb-store.com/',
-        // تمويه الـ IP ليظهر كعنوان سكني سوري لتجاوز جدار الحماية
+        // Spoof Syrian IP to bypass regional firewalls
         'X-Forwarded-For': '178.135.0.1',
         'Client-IP': '178.135.0.1',
         'X-Real-IP': '178.135.0.1'
@@ -45,6 +49,10 @@ export async function GET(request: Request) {
       body: JSON.stringify(bodyData),
       cache: 'no-store'
     });
+
+    if (!response.ok) {
+      throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+    }
 
     const data = await response.json();
     
@@ -56,9 +64,9 @@ export async function GET(request: Request) {
       }
     });
   } catch (error: any) {
-    console.error("[PROXY BYPASS ERROR]:", error);
+    console.error("[PROXY ANONYMIZER ERROR]:", error);
     return NextResponse.json(
-      { error: "تعذر تجاوز جدار الحماية.", details: error.message },
+      { error: "Firewall bypass failed.", details: error.message, proxy_attempted: true },
       { 
         status: 500,
         headers: { 'Cache-Control': 'no-store, max-age=0' }

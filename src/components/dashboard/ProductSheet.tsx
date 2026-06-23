@@ -51,21 +51,21 @@ export function ProductSheet({
     if (!activeCategoryId) return;
     setFetching(true);
     try {
-      // الاتصال بالبروكسي المحلي الذي يقوم بتمويه الـ IP
+      // Fetching from local backend proxy which handles anonymization and spoofing
       const response = await fetch(`/api/products?categoryId=${activeCategoryId}`, {
         cache: 'no-store'
       });
       
       const result = await response.json();
       
-      // استخراج مصفوفة المنتجات من الرد
+      // Extract products from result
       const rawItems = Array.isArray(result) ? result : (result.data || result.products || []);
       setAllProducts(rawItems);
     } catch (error: any) {
       console.error("Fetch Error:", error);
       toast({
         title: "خطأ في جلب البيانات",
-        description: "تعذر الاتصال بالخادم الخلفي.",
+        description: "تعذر تجاوز جدار الحماية.",
         variant: "destructive",
       });
     } finally {
@@ -80,7 +80,7 @@ export function ProductSheet({
       (item) => Number(item.parent_id) === Number(activeCategoryId)
     );
 
-    // تصفية الشبكات للاتصالات
+    // Filter for telecom specific networks
     if (Number(activeCategoryId) === 6 && serviceName) {
       const title = serviceName.toLowerCase();
       if (title.includes("إم تي إن") || title.includes("mtn")) {
@@ -102,7 +102,7 @@ export function ProductSheet({
         groups[groupKey] = { id: groupKey, mainTitle: cleanTitle, items: [] };
       }
 
-      // البحث عن الخيارات المندرجة (Nested Options/Variants)
+      // Check for nested variations in various fields
       const subItems = item.options || item.variants || item.params || [];
       
       if (Array.isArray(subItems) && subItems.length > 0 && typeof subItems[0] === 'object') {
@@ -162,12 +162,15 @@ export function ProductSheet({
     <Sheet onOpenChange={(open) => { if (open) fetchProducts(); }}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col border-none bg-background" dir="rtl">
-        {/* Debug Block - Raw Server Response */}
-        <pre className="text-[10px] text-primary bg-primary/5 p-2 max-h-32 overflow-auto font-mono border-b" dir="ltr">
-          {allProducts && allProducts.length > 0 
-            ? `SERVER DATA SUCCESS: ${allProducts.length} items` 
-            : fetching ? "FETCHING FROM BACKEND PROXY..." : "DATA IS EMPTY FROM SERVER"}
-        </pre>
+        {/* DEBUG BLOCK - RAW SERVER RESPONSE */}
+        <div className="bg-red-50 border-b-2 border-red-200 p-4 max-h-[200px] overflow-auto">
+          <p className="text-[10px] font-bold text-red-700 uppercase mb-1">Server Raw Response Debug:</p>
+          <pre className="text-[10px] text-red-600 font-mono" dir="ltr">
+            {allProducts && allProducts.length > 0 
+              ? JSON.stringify(allProducts[0], null, 2) 
+              : fetching ? "FETCHING VIA ANONYMOUS PROXY..." : "DATA IS EMPTY FROM SERVER"}
+          </pre>
+        </div>
 
         <div className="p-4 border-b bg-white">
           <SheetHeader>
@@ -177,7 +180,7 @@ export function ProductSheet({
                 <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
               </Button>
             </div>
-            <SheetDescription className="text-right text-xs">مزامنة البيانات حياً عبر بروكسي محمي.</SheetDescription>
+            <SheetDescription className="text-right text-xs">مزامنة البيانات حياً عبر بوابة تشفير (Spoofed Gateway).</SheetDescription>
           </SheetHeader>
         </div>
 
@@ -185,7 +188,7 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-bold text-muted-foreground">جاري جلب البيانات من السيرفر...</p>
+              <p className="text-sm font-bold text-muted-foreground">جاري فك تشفير البيانات من السيرفر...</p>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
@@ -247,7 +250,7 @@ export function ProductSheet({
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4">
                   <PackageX className="h-12 w-12 opacity-30" />
-                  <p className="text-sm font-bold text-center px-4">لا تتوفر فئات حالياً. تأكد من استقرار اتصال البروكسي وصلاحية الحساب.</p>
+                  <p className="text-sm font-bold text-center px-4">لا تتوفر فئات حالياً. تأكد من استقرار بوابة التشفير وصلاحية الحساب.</p>
                 </div>
               )}
             </ScrollArea>
