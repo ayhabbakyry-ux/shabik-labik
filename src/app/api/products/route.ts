@@ -9,7 +9,6 @@ export const revalidate = 0;
 
 const AL_RAGHEB_BASE_URL = "https://api.alragheb-store.com";
 const AL_RAGHEB_AUTH_TOKEN = "64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0";
-const FIXED_USER_ID = "2225";
 
 export async function GET(request: Request) {
   try {
@@ -19,16 +18,19 @@ export async function GET(request: Request) {
     // بناء الرابط الأساسي
     const endpoint = `${AL_RAGHEB_BASE_URL}/client/api/products`;
 
-    // تجهيز البيانات المطلوبة في الـ Body كما يتوقعها السيرفر
+    // تجهيز البيانات المطلوبة للمصادقة كما يتوقعها السيرفر لفك الحظر
     const bodyData = {
-      user_id: FIXED_USER_ID,
+      email: "ayhmbakyr213@gmail.com",
+      username: "ayhmbakyr213@gmail.com",
+      name: "ايهم باكير",
+      user_id: 2225,
       category_id: categoryId || undefined
     };
 
-    console.log(`[AL-RAGHEB LIVE POST FETCH] ${new Date().toISOString()} - Payload:`, bodyData);
+    console.log(`[AL-RAGHEB AUTH FETCH] ${new Date().toISOString()} - Payload:`, bodyData);
 
     const response = await fetch(endpoint, {
-      method: 'POST', // تحويل الطلب لـ POST لفك حظر المنتجات
+      method: 'POST', 
       headers: {
         'api-token': AL_RAGHEB_AUTH_TOKEN,
         'Content-Type': 'application/json',
