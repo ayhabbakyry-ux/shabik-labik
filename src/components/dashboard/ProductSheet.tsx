@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { AdminPanel } from "@/components/admin/AdminPanel";
-import { Loader2, PackageX, RefreshCw, Key, AlertCircle, Globe } from "lucide-react";
+import { Loader2, PackageX, RefreshCw, Key, Globe } from "lucide-react";
 
 type Product = {
   id: string | number;
@@ -44,23 +44,36 @@ export function ProductSheet({
     if (serviceId === 'admin') return;
     
     setFetching(true);
+    // Direct category request
     const targetUrl = `/api/products?categoryId=${categoryId}`;
     setDebugInfo({ url: targetUrl, status: null });
 
-    console.log(`[NETWORK REQUEST] Initiating: ${targetUrl}`);
+    console.log(`[NETWORK REQUEST] Fetching for category: ${categoryId} at ${targetUrl}`);
 
     try {
       const response = await fetch(targetUrl);
-      setDebugInfo(prev => ({ ...prev, status: response.status }));
+      const status = response.status;
+      setDebugInfo({ url: targetUrl, status });
       
       const data = await response.json();
-      
-      // Strict: Just use what the server returns for this specific ID
       const rawItems = Array.isArray(data) ? data : (data.data || []);
       
-      console.log(`[NETWORK RESPONSE] Status: ${response.status}, Items: ${rawItems.length}`);
+      console.log(`[NETWORK RESPONSE] Status: ${status}, Raw Items Received: ${rawItems.length}`);
 
-      const mappedProducts = rawItems.map((item: any) => ({
+      // STRICT CLIENT-SIDE FILTERING
+      // We filter based on the raw category_id field from the Al-Ragheb API response
+      const filteredItems = rawItems.filter((item: any) => {
+        const itemCatId = item.category_id || item.الفئة_id;
+        const match = Number(itemCatId) === Number(categoryId);
+        if (match) {
+          console.log(`[FILTER MATCH] Product: ${item.الاسم || item.name}, ID: ${itemCatId} matches Target: ${categoryId}`);
+        }
+        return match;
+      });
+
+      console.log(`[FILTER RESULT] Displaying ${filteredItems.length} items for Category ${categoryId}`);
+
+      const mappedProducts = filteredItems.map((item: any) => ({
         id: item.id,
         name: item.الاسم || item.name || "منتج غير معروف",
         price: Number(item.السعر || item.price || 0)
@@ -101,7 +114,7 @@ export function ProductSheet({
           <SheetHeader>
             <SheetTitle className="text-xl font-bold font-headline">{serviceName}</SheetTitle>
             <SheetDescription className="text-xs">
-              Direct API Mapping (ID: {categoryId})
+              Category ID: {categoryId}
             </SheetDescription>
           </SheetHeader>
           <Button variant="ghost" size="icon" onClick={fetchProducts} disabled={fetching}>
@@ -143,8 +156,8 @@ export function ProductSheet({
                     </p>
                   </div>
 
-                  {/* RAW DEBUGGING UI */}
-                  <div className="bg-slate-900 rounded-xl p-4 text-[10px] font-mono text-slate-300 space-y-2 border border-slate-700">
+                  {/* TRANSPARENT NETWORK TRACE */}
+                  <div className="bg-slate-900 rounded-xl p-4 text-[10px] font-mono text-slate-300 space-y-2 border border-slate-700 mx-2">
                     <div className="flex items-center gap-2 text-yellow-500 font-bold border-b border-slate-700 pb-2 mb-2 uppercase tracking-widest">
                       <Globe className="h-3 w-3" /> Network Trace
                     </div>
