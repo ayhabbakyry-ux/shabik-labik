@@ -48,24 +48,43 @@ export function ProductSheet({
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
+  // الثوابت المطلوبة للاتصال المباشر من المتصفح
+  const AL_RAGHEB_BASE_URL = "https://api.alragheb-store.com/client/api/products";
+  const AL_RAGHEB_AUTH_TOKEN = "64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0";
+
   const fetchProducts = useCallback(async () => {
     if (!activeCategoryId) return;
     setFetching(true);
     try {
-      const response = await fetch(`/api/products?categoryId=${activeCategoryId}`, {
-        cache: 'no-store',
-        headers: { 'Pragma': 'no-cache' }
+      // جلب مباشر من المتصفح لتجاوز حظر الـ IP السحابي
+      const response = await fetch(AL_RAGHEB_BASE_URL, {
+        method: 'POST',
+        headers: {
+          'api-token': AL_RAGHEB_AUTH_TOKEN,
+          'Content-Type': 'application/json',
+          // ترويسات المحاكاة للظهور كمتصفح حقيقي
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+          'Accept': 'application/json, text/plain, */*',
+        },
+        body: JSON.stringify({
+          email: "ayhmbakyr213@gmail.com",
+          username: "ayhmbakyr213@gmail.com",
+          name: "ايهم باكير",
+          user_id: 2225,
+          category_id: activeCategoryId
+        }),
       });
+      
       const result = await response.json();
       
-      // استخراج المصفوفة الصحيحة حسب هيكلية الراغب
+      // استخراج مصفوفة المنتجات من الرد
       const rawItems = Array.isArray(result) ? result : (result.data || result.products || []);
       setAllProducts(rawItems);
     } catch (error: any) {
-      console.error("Fetch Error:", error);
+      console.error("Browser-Side Fetch Error:", error);
       toast({
-        title: "خطأ في الاتصال",
-        description: "تعذر تحديث الأسعار من السيرفر.",
+        title: "خطأ في الاتصال المباشر",
+        description: "قد يكون هناك حظر CORS في المتصفح. تأكد من فتح الرابط من بيئة تسمح بالطلبات الخارجية.",
         variant: "destructive",
       });
     } finally {
@@ -80,7 +99,7 @@ export function ProductSheet({
       (item) => Number(item.parent_id) === Number(activeCategoryId)
     );
 
-    // عزل الشبكات لضمان عدم التداخل
+    // تصفية الشبكات للاتصالات
     if (Number(activeCategoryId) === 6 && serviceName) {
       const title = serviceName.toLowerCase();
       if (title.includes("إم تي إن") || title.includes("mtn")) {
@@ -102,7 +121,7 @@ export function ProductSheet({
         groups[groupKey] = { id: groupKey, mainTitle: cleanTitle, items: [] };
       }
 
-      // البحث في الخيارات المندرجة (المكان الذي يضع فيه الراغب الكميات الحقيقية)
+      // البحث عن الخيارات المندرجة
       const subItems = item.options || item.variants || item.params || [];
       
       if (Array.isArray(subItems) && subItems.length > 0 && typeof subItems[0] === 'object') {
@@ -120,7 +139,6 @@ export function ProductSheet({
           });
         });
       } else {
-        // حالة المنتج البسيط بدون خيارات
         const nameNums = item.name?.match(/[\d.]+/);
         const amount = nameNums ? nameNums[0] : (item.amount || "محدد");
         const basePrice = Number(item.price || 0);
@@ -163,11 +181,11 @@ export function ProductSheet({
     <Sheet onOpenChange={(open) => { if (open) fetchProducts(); }}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col border-none bg-background" dir="rtl">
-        {/* DEBUG BLOCK - لرؤية نجاح عملية الجلب بعد إضافة ترويسات المحاكاة */}
-        <pre className="text-[10px] text-red-600 bg-red-50 p-2 max-h-32 overflow-auto font-mono border-b" dir="ltr">
+        {/* Debug Block - Client Side Response */}
+        <pre className="text-[10px] text-blue-600 bg-blue-50 p-2 max-h-32 overflow-auto font-mono border-b" dir="ltr">
           {allProducts && allProducts.length > 0 
-            ? `API SUCCESS (SPOOFED):\n` + JSON.stringify(allProducts[0], null, 2) 
-            : "DATA IS EMPTY (Wait for spoof to bypass firewall...)"}
+            ? `DIRECT BROWSER FETCH SUCCESS:\n` + JSON.stringify(allProducts[0], null, 2) 
+            : "FETCHING DIRECTLY FROM YOUR BROWSER..."}
         </pre>
 
         <div className="p-4 border-b bg-white">
@@ -178,7 +196,7 @@ export function ProductSheet({
                 <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
               </Button>
             </div>
-            <SheetDescription className="text-right text-xs">مزامنة الأسعار المباشرة مع مربح 4% شامل الضرائب.</SheetDescription>
+            <SheetDescription className="text-right text-xs">مزامنة مباشرة من متصفحك (تجاوز حظر السحابة).</SheetDescription>
           </SheetHeader>
         </div>
 
@@ -186,7 +204,7 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-bold text-muted-foreground">جاري جلب البيانات من السيرفر...</p>
+              <p className="text-sm font-bold text-muted-foreground">جاري الجلب المباشر من السيرفر...</p>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
@@ -248,7 +266,7 @@ export function ProductSheet({
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4">
                   <PackageX className="h-12 w-12 opacity-30" />
-                  <p className="text-sm font-bold">لا تتوفر فئات حالياً لهذا القسم (تحقق من الـ Debug في الأعلى).</p>
+                  <p className="text-sm font-bold text-center px-4">لا تتوفر فئات حالياً. تأكد من إعدادات CORS في المتصفح أو صلاحية الحساب.</p>
                 </div>
               )}
             </ScrollArea>
