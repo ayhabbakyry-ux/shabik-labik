@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { AdminPanel } from "@/components/admin/AdminPanel";
-import { Loader2, PackageX, RefreshCw, Zap, ShoppingCart } from "lucide-react";
+import { Loader2, PackageX, RefreshCw, ShoppingCart, Zap } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
@@ -24,23 +24,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-interface Variation {
+interface ProductItem {
   id: string | number;
-  name: string;
-  price: string | number;
-  amount?: string | number;
-  [key: string]: any;
-}
-
-interface Product {
-  id: string | number;
-  name: string;
-  price: string | number;
+  product_id?: string | number;
   parent_id: string | number;
-  options?: Variation[];
-  variants?: Variation[];
-  product_options?: Variation[];
-  [key: string]: any;
+  name: string;
+  price: string | number;
+  options?: any;
+  variants?: any;
 }
 
 export function ProductSheet({ 
@@ -54,12 +45,12 @@ export function ProductSheet({
   serviceId?: string;
   categoryId?: number;
 }) {
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<ProductItem[]>([]);
   const [fetching, setFetching] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Record<string, string>>({});
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
-  // 1. Fetching logic with Debug Log to inspect nested data
+  // جلب البيانات من السيرفر بناءً على الفئة
   const fetchProducts = useCallback(async () => {
     if (serviceId === 'admin') return;
     setFetching(true);
@@ -67,15 +58,8 @@ export function ProductSheet({
       const response = await fetch(`/api/products?categoryId=${activeCategoryId}`);
       if (!response.ok) throw new Error("Server Error");
       const data = await response.json();
-      
       const rawItems = Array.isArray(data) ? data : (data.data || data.products || []);
-      
-      // DEBUG LOG: Inspect raw item structure for nested variations in developer console
-      if (rawItems.length > 0) {
-        console.log("[DEBUG] Raw Server Data Item:", JSON.stringify(rawItems[0], null, 2));
-      }
-
-      setAllProducts(Array.isArray(rawItems) ? rawItems : []);
+      setAllProducts(rawItems);
     } catch (error: any) {
       toast({
         title: "خطأ في المزامنة",
@@ -87,74 +71,95 @@ export function ProductSheet({
     }
   }, [activeCategoryId, serviceId, toast]);
 
-  // 2. Production-Grade Filtering & Nested Mapping Logic
+  // معالجة البيانات وتجميعها (المنطق البرمجي المطلوب)
   const groupedServices = useMemo(() => {
-    if (!allProducts || allProducts.length === 0) return [];
+    if (!allProducts || !Array.isArray(allProducts)) return [];
 
-    // Filter by category parent_id
-    let filtered = allProducts.filter(p => Number(p.parent_id) === Number(activeCategoryId));
+    let baseFilter = allProducts.filter(
+      (item) => Number(item.parent_id) === Number(activeCategoryId)
+    );
 
-    // Brand Isolation for Telecom (ID 6)
+    // عزل الشبكات لخدمات الاتصال (الفئة 6)
     if (Number(activeCategoryId) === 6 && serviceName) {
       const title = serviceName.toLowerCase();
       if (title.includes("إم تي إن") || title.includes("mtn")) {
-        filtered = filtered.filter(p => p.name?.includes("إم تي إن") || p.name?.toUpperCase().includes("MTN"));
+        baseFilter = baseFilter.filter(
+          (item) => item.name?.includes("إم تي إن") || item.name?.toUpperCase().includes("MTN")
+        );
       } else if (title.includes("سيريتل") || title.includes("syriatel")) {
-        filtered = filtered.filter(p => p.name?.includes("سيريتل") || p.name?.toUpperCase().includes("SYRIATEL"));
+        baseFilter = baseFilter.filter((item) => item.name?.includes("سيريتل"));
       }
     }
 
-    // Process nested variations and apply business rules
-    return filtered.map(product => {
-      // Look for nested variations in potential server property names
-      const nestedRaw = product.options || product.variants || product.product_options || [];
-      
-      const variations = nestedRaw.length > 0 
-        ? nestedRaw.map((v: any, index: number) => {
-            const vMatch = v.name?.match(/[\d.]+/);
-            const markedUp = (Number(v.price || 0) * 1.04).toFixed(2);
-            return {
-              id: v.id ? String(v.id) : `${product.id}-v-${index}`,
-              name: v.name,
-              displayPrice: markedUp,
-              displayAmount: v.amount || v.value || (vMatch ? vMatch[0] : "محدد")
-            };
-          })
-        : [{
-            id: String(product.id),
-            name: product.name,
-            displayPrice: (Number(product.price || 0) * 1.04).toFixed(2),
-            displayAmount: product.name?.match(/[\d.]+/)?.[0] || product.amount || "محدد"
-          }];
+    const groups: Record<string, { id: string; mainTitle: string; items: any[] }> = {};
 
-      // Header clean-up (Removes numbers from the main product title)
-      const cleanTitle = product.name?.split(/[\d.]+/)[0].trim() || serviceName;
+    baseFilter.forEach((item) => {
+      let groupKey = "عام";
+      if (item.name?.includes("وحدات")) groupKey = "وحدات";
+      else if (item.name?.includes("فاتورة")) groupKey = "فاتورة";
 
-      return {
-        id: String(product.id),
-        title: cleanTitle,
-        variations
-      };
+      const cleanTitle = item.name ? item.name.split(/[\d.]+/)[0].trim() : (serviceName || "خدمة شحن");
+
+      if (!groups[groupKey]) {
+        groups[groupKey] = { id: groupKey, mainTitle: cleanTitle, items: [] };
+      }
+
+      // فحص الخيارات المندرجة (Nested Options/Variants)
+      const nestedOptions = item.options || item.variants || [];
+      if (Array.isArray(nestedOptions) && nestedOptions.length > 0) {
+        nestedOptions.forEach((opt: any) => {
+          const nameNumbers = opt.name?.match(/[\d.]+/);
+          const extractedAmount = nameNumbers ? nameNumbers[0] : (opt.amount || "محدد");
+          const basePrice = Number(opt.price || item.price || 0);
+          const finalCustomerPrice = (basePrice * 1.04).toFixed(2);
+
+          groups[groupKey].items.push({
+            id: opt.id || `${item.id}-${Math.random()}`,
+            name: item.name,
+            extractedAmount: extractedAmount,
+            customerPrice: finalCustomerPrice,
+            price: basePrice
+          });
+        });
+      } else {
+        const nameNumbers = item.name?.match(/[\d.]+/);
+        const extractedAmount = nameNumbers ? nameNumbers[0] : "محدد";
+        const basePrice = Number(item.price || 0);
+        const finalCustomerPrice = (basePrice * 1.04).toFixed(2);
+
+        groups[groupKey].items.push({
+          id: item.id,
+          name: item.name,
+          extractedAmount: extractedAmount,
+          customerPrice: finalCustomerPrice,
+          price: basePrice
+        });
+      }
     });
+
+    // ترتيب المنتجات تصاعدياً حسب السعر داخل كل مجموعة
+    Object.values(groups).forEach(g => {
+      g.items.sort((a, b) => Number(a.price) - Number(b.price));
+    });
+
+    return Object.values(groups);
   }, [allProducts, activeCategoryId, serviceName]);
 
-  // Sync initial selections
+  // تعيين الخيار الأول تلقائياً عند تحميل المجموعات
   useEffect(() => {
-    if (groupedServices.length > 0) {
-      const defaults: Record<string, string> = {};
-      groupedServices.forEach(group => {
-        if (group.variations.length > 0) {
-          defaults[group.id] = String(group.variations[0].id);
-        }
-      });
-      setSelectedIds(defaults);
-    }
+    const initialSelections: Record<string, string> = {};
+    groupedServices.forEach((group) => {
+      if (group.items.length > 0) {
+        initialSelections[group.id] = group.items[0].id.toString();
+      }
+    });
+    setSelectedOptions(initialSelections);
   }, [groupedServices]);
 
   const handleOrder = (variation: any) => {
     toast({
       title: "تم استلام الطلب",
-      description: `طلب شحن بقيمة ${variation.displayPrice} ل.س قيد المعالجة.`,
+      description: `طلب شحن بقيمة ${variation.customerPrice} ل.س قيد المعالجة.`,
     });
   };
 
@@ -172,7 +177,7 @@ export function ProductSheet({
   return (
     <Sheet onOpenChange={(open) => { if (open) fetchProducts(); }}>
       <SheetTrigger asChild>{children}</SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col border-none bg-background">
+      <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col border-none bg-background" dir="rtl">
         <div className="p-4 border-b bg-white">
           <SheetHeader>
             <div className="flex items-center justify-between">
@@ -191,15 +196,15 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-medium">جاري مزامنة الأسعار من الراغب...</p>
+              <p className="text-sm font-medium">جاري مزامنة الأسعار من السيرفر...</p>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
               {groupedServices.length > 0 ? (
-                <div className="grid gap-6" dir="rtl">
+                <div className="grid gap-6">
                   {groupedServices.map((group) => {
-                    const selectedId = selectedIds[group.id];
-                    const currentVariation = group.variations.find(v => String(v.id) === selectedId) || group.variations[0];
+                    const selectedId = selectedOptions[group.id];
+                    const currentItem = group.items.find((i) => i.id.toString() === selectedId) || group.items[0];
 
                     return (
                       <Card key={group.id} className="border-none shadow-md bg-white overflow-hidden">
@@ -209,24 +214,24 @@ export function ProductSheet({
                               <Zap className="h-5 w-5 text-primary" />
                             </div>
                             <div className="text-right flex-1">
-                              <h4 className="font-bold text-lg text-foreground leading-tight">{group.title}</h4>
-                              <p className="text-[11px] text-muted-foreground">متوفر {group.variations.length} فئات شحن مختلفة</p>
+                              <h4 className="font-bold text-lg text-foreground leading-tight">{group.mainTitle}</h4>
+                              <p className="text-[11px] text-muted-foreground">الرصيد الواصل: {currentItem ? currentItem.extractedAmount : "محدد"}</p>
                             </div>
                           </div>
 
                           <div className="space-y-2">
-                            <label className="text-[11px] font-bold text-muted-foreground pr-1">الرصيد الواصل / الكمية</label>
+                            <label className="text-[11px] font-bold text-muted-foreground pr-1">اختر القيمة / الكمية المطلوبة</label>
                             <Select 
-                              value={selectedId || String(group.variations[0]?.id)} 
-                              onValueChange={(val) => setSelectedIds(prev => ({ ...prev, [group.id]: val }))}
+                              value={selectedId || (group.items[0]?.id.toString())} 
+                              onValueChange={(val) => setSelectedOptions(prev => ({ ...prev, [group.id]: val }))}
                             >
                               <SelectTrigger className="w-full text-right bg-muted/30 border-none h-12 text-sm font-medium">
                                 <SelectValue placeholder="اختر الفئة..." />
                               </SelectTrigger>
                               <SelectContent dir="rtl">
-                                {group.variations.map((v) => (
-                                  <SelectItem key={v.id} value={String(v.id)}>
-                                    الرصيد الواصل: {v.displayAmount}
+                                {group.items.map((item) => (
+                                  <SelectItem key={item.id} value={item.id.toString()}>
+                                    رصيد {item.extractedAmount}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -235,13 +240,13 @@ export function ProductSheet({
 
                           <div className="flex items-center justify-between pt-4 border-t border-dashed">
                             <div className="text-right">
-                              <p className="text-[10px] text-muted-foreground mb-1 font-bold">السعر النهائي (شامل المربح)</p>
+                              <p className="text-[10px] text-muted-foreground mb-1 font-bold">السعر للمستهلك (4%+)</p>
                               <p className="text-primary font-bold text-2xl leading-none">
-                                {currentVariation?.displayPrice || "0.00"} <span className="text-xs opacity-70">ل.س</span>
+                                {currentItem ? currentItem.customerPrice : "0.00"} <span className="text-xs opacity-70">ل.س</span>
                               </p>
                             </div>
                             <Button 
-                              onClick={() => handleOrder(currentVariation)}
+                              onClick={() => handleOrder(currentItem)}
                               className="rounded-full px-8 h-12 bg-primary text-white font-bold hover:scale-105 transition-transform shadow-lg"
                             >
                               <ShoppingCart className="ml-2 h-4 w-4" />
@@ -256,7 +261,7 @@ export function ProductSheet({
               ) : (
                 <div className="flex flex-col items-center justify-center text-muted-foreground gap-4 py-12">
                   <PackageX className="h-10 w-10 opacity-40" />
-                  <p className="text-sm font-bold text-center">لا توجد منتجات متاحة لهذا القسم حالياً.</p>
+                  <p className="text-sm font-bold text-center">لا توجد بيانات متاحة لهذا القسم حالياً.</p>
                 </div>
               )}
             </ScrollArea>
