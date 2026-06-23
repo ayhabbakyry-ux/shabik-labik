@@ -52,13 +52,13 @@ export function ProductSheet({
     if (!activeCategoryId) return;
     setFetching(true);
     try {
-      const response = await fetch(`/api/products?categoryId=${activeCategoryId}`);
+      const response = await fetch(`/api/products?categoryId=${activeCategoryId}`, {
+        cache: 'no-store',
+        headers: { 'Pragma': 'no-cache' }
+      });
       const result = await response.json();
       
-      // طباعة البيانات الحقيقية للديبيغ
-      console.log("[LIVE API DATA]", result);
-      
-      // استخراج المصفوفة الصحيحة حسب هيكلية الراغب (غالباً تكون في data أو هي الاستجابة نفسها)
+      // استخراج المصفوفة الصحيحة حسب هيكلية الراغب
       const rawItems = Array.isArray(result) ? result : (result.data || result.products || []);
       setAllProducts(rawItems);
     } catch (error: any) {
@@ -76,12 +76,11 @@ export function ProductSheet({
   const groupedServices = useMemo(() => {
     if (!allProducts || !Array.isArray(allProducts)) return [];
 
-    // الفرز الأولي حسب الفئة
     let baseFilter = allProducts.filter(
       (item) => Number(item.parent_id) === Number(activeCategoryId)
     );
 
-    // عزل الشبكات (MTN / Syriatel)
+    // عزل الشبكات
     if (Number(activeCategoryId) === 6 && serviceName) {
       const title = serviceName.toLowerCase();
       if (title.includes("إم تي إن") || title.includes("mtn")) {
@@ -103,7 +102,6 @@ export function ProductSheet({
         groups[groupKey] = { id: groupKey, mainTitle: cleanTitle, items: [] };
       }
 
-      // دمج الخيارات المندرجة (هنا تكمن البيانات الحقيقية في سيرفر الراغب)
       const subItems = item.options || item.variants || item.params || [];
       
       if (Array.isArray(subItems) && subItems.length > 0) {
@@ -121,7 +119,6 @@ export function ProductSheet({
           });
         });
       } else {
-        // إذا لم توجد خيارات مندرجة، نأخذ المنتج الأساسي
         const nameNums = item.name?.match(/[\d.]+/);
         const amount = nameNums ? nameNums[0] : (item.amount || "محدد");
         const basePrice = Number(item.price || 0);
@@ -136,7 +133,6 @@ export function ProductSheet({
       }
     });
 
-    // ترتيب المجموعات تصاعدياً حسب السعر
     Object.values(groups).forEach(g => {
       g.items.sort((a, b) => Number(a.price) - Number(b.price));
     });
@@ -165,6 +161,13 @@ export function ProductSheet({
     <Sheet onOpenChange={(open) => { if (open) fetchProducts(); }}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col border-none bg-background" dir="rtl">
+        {/* DEBUG BLOCK - لروية البيانات الحقيقية من السيرفر */}
+        <pre className="text-[10px] text-red-600 bg-red-50 p-2 max-h-32 overflow-auto font-mono border-b" dir="ltr">
+          {allProducts && allProducts.length > 0 
+            ? `API RESPONSE (${allProducts.length} items):\n` + JSON.stringify(allProducts[0], null, 2) 
+            : "DATA IS EMPTY FROM SERVER (Check API Proxy)"}
+        </pre>
+
         <div className="p-4 border-b bg-white">
           <SheetHeader>
             <div className="flex items-center justify-between">
@@ -214,7 +217,7 @@ export function ProductSheet({
                               <SelectContent dir="rtl">
                                 {group.items.map((item) => (
                                   <SelectItem key={item.id} value={item.id.toString()}>
-                                    فئة {item.extractedAmount}
+                                    الرصيد الواصل: {item.extractedAmount}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
