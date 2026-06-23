@@ -27,14 +27,18 @@ export async function GET(request: Request) {
       category_id: categoryId || undefined
     };
 
-    console.log(`[AL-RAGHEB AUTH FETCH] ${new Date().toISOString()} - Payload:`, bodyData);
+    console.log(`[AL-RAGHEB AUTH FETCH] ${new Date().toISOString()} - Payload with Browser Spoofing:`, bodyData);
 
     const response = await fetch(endpoint, {
       method: 'POST', 
       headers: {
         'api-token': AL_RAGHEB_AUTH_TOKEN,
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        'Accept': 'application/json, text/plain, */*',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+        'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8',
+        'Origin': 'https://api.alragheb-store.com',
+        'Referer': 'https://api.alragheb-store.com/'
       },
       body: JSON.stringify(bodyData),
       cache: 'no-store'
