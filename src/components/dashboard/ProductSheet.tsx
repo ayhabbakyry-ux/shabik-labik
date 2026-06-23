@@ -85,17 +85,34 @@ export function ProductSheet({
         rawItems = Array.isArray(fbData) ? fbData : (fbData.data || []);
       }
 
-      console.log(`[DEBUG] Total items before filtering: ${rawItems.length}`);
+      console.log(`[DEBUG] Total raw items received from server: ${rawItems.length}`);
 
-      // Step 3: STRICT CLIENT-SIDE FILTERING
-      // We must filter by categoryId regardless of which API call provided the data
+      // Step 3: ROBUST CLIENT-SIDE FILTERING
+      const targetCatId = Number(categoryId);
       const filteredItems = rawItems.filter((item: any) => {
-        const itemCatId = Number(item.category_id || item.الفئة_id);
-        const nameMatch = item.اسم_الفئة === serviceName || item.category_name === serviceName;
-        return itemCatId === categoryId || nameMatch;
+        // Handle various ID field names (Arabic and English)
+        const rawItemCatId = item.category_id ?? item.الفئة_id ?? item.cat_id;
+        const itemCatId = rawItemCatId !== undefined && rawItemCatId !== null ? Number(rawItemCatId) : null;
+        
+        // Log the comparison for debugging
+        console.log(`[FILTER DEBUG] Comparing Product: "${item.الاسم || item.name}" | ItemCatID: ${itemCatId} (Type: ${typeof rawItemCatId}) vs Target: ${targetCatId}`);
+
+        // Match 1: Numeric ID Comparison
+        if (itemCatId !== null && itemCatId === targetCatId) return true;
+
+        // Match 2: String Name Comparison (as fallback)
+        const itemCatName = item.category_name || item.اسم_الفئة || "";
+        const nameMatch = itemCatName.includes(serviceName) || serviceName.includes(itemCatName);
+        
+        if (nameMatch && itemCatName !== "") {
+          console.log(`[FILTER MATCH] Found match via NAME: ${itemCatName} matches ${serviceName}`);
+          return true;
+        }
+
+        return false;
       });
 
-      console.log(`[DEBUG] Total items after filtering for ID ${categoryId}: ${filteredItems.length}`);
+      console.log(`[DEBUG] Total items after strict filtering: ${filteredItems.length}`);
 
       const mappedProducts = filteredItems.map((item: any) => ({
         id: item.id,

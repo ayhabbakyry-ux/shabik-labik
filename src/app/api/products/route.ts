@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get('categoryId');
-    const type = searchParams.get('type'); // 'list', 'content', 'order', 'check'
+    const type = searchParams.get('type');
     const productId = searchParams.get('productId');
     const qty = searchParams.get('qty') || '1';
     const playerId = searchParams.get('playerId');
@@ -22,21 +22,17 @@ export async function GET(request: Request) {
     let endpoint = "";
 
     if (type === 'order' && productId && orderUuid) {
-      // Create Order Endpoint: GET /client/api/newOrder/{product_id}/params
       endpoint = `${AL_RAGHEB_BASE_URL}/client/api/newOrder/${productId}/params?qty=${qty}&order_uuid=${orderUuid}`;
       if (playerId) endpoint += `&playerId=${encodeURIComponent(playerId)}`;
     } else if (type === 'check' && (orderId || orderUuid)) {
-      // Order Check Endpoint
       if (orderUuid) {
         endpoint = `${AL_RAGHEB_BASE_URL}/client/api/check?orders=${orderUuid}&uuid=1`;
       } else {
         endpoint = `${AL_RAGHEB_BASE_URL}/client/api/check?orders=${orderId}`;
       }
     } else if (categoryId !== null) {
-      // Per User Instruction: Use /client/api/products?category_id={ID}
       endpoint = `${AL_RAGHEB_BASE_URL}/client/api/products?category_id=${categoryId}`;
     } else {
-      // Default to Product List: GET /client/api/products
       endpoint = `${AL_RAGHEB_BASE_URL}/client/api/products`;
     }
 
@@ -53,7 +49,8 @@ export async function GET(request: Request) {
     });
 
     const data = await response.json();
-    console.log(`[PROXY RESPONSE] Status: ${response.status}, Data Keys: ${Object.keys(data)}`);
+    console.log(`[PROXY RESPONSE] Status: ${response.status}, Endpoint: ${endpoint}, Data Items Found: ${Array.isArray(data) ? data.length : (data.data ? data.data.length : 'N/A')}`);
+    
     return NextResponse.json(data);
   } catch (error: any) {
     console.error("[PROXY ERROR]:", error);
