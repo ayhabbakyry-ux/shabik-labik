@@ -15,6 +15,7 @@ type ServiceItem = {
 
 type Section = {
   title: string;
+  categoryId: number;
   icon: any;
   items: ServiceItem[];
   colorClass: string;
@@ -24,6 +25,7 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
   const sections: Section[] = [
     {
       title: "قسم شحن الخطوط",
+      categoryId: 6,
       icon: Phone,
       colorClass: "text-primary",
       items: [
@@ -39,6 +41,7 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
     },
     {
       title: "قسم الألعاب",
+      categoryId: 2,
       icon: Gamepad2,
       colorClass: "text-green-600",
       items: [
@@ -48,6 +51,7 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
     },
     {
       title: "تطبيقات الشحن",
+      categoryId: 1,
       icon: SmartphoneNfc,
       colorClass: "text-blue-600",
       items: [
@@ -57,6 +61,7 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
     },
     {
       title: "الدفع الإلكتروني",
+      categoryId: 4,
       icon: CreditCard,
       colorClass: "text-indigo-600",
       items: [
@@ -65,6 +70,7 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
     },
     {
       title: "المتاجر الرقمية",
+      categoryId: 5,
       icon: ShoppingBag,
       colorClass: "text-amber-600",
       items: [
@@ -73,6 +79,7 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
     },
     {
       title: "تطبيقات المشاهدة",
+      categoryId: 7,
       icon: Tv,
       colorClass: "text-rose-600",
       items: [
@@ -81,6 +88,7 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
     },
     {
       title: "قسم تفعيل الأرقام",
+      categoryId: 19,
       icon: Hash,
       colorClass: "text-cyan-600",
       items: [
@@ -89,12 +97,13 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
     }
   ];
 
-  const renderServiceCard = (service: ServiceItem) => {
+  const renderServiceCard = (service: ServiceItem, categoryId: number) => {
     const Icon = service.icon;
     return (
       <ProductSheet 
         key={service.id} 
         serviceName={service.name} 
+        categoryId={categoryId}
       >
         <Card className="hover:shadow-md transition-all cursor-pointer group active:scale-95 border-none bg-white overflow-hidden">
           <CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-3">
@@ -119,7 +128,7 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
             <section.icon className="h-5 w-5" />
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4" dir="rtl">
-            {section.items.map(renderServiceCard)}
+            {section.items.map((item) => renderServiceCard(item, section.categoryId))}
           </div>
         </div>
       ))}
