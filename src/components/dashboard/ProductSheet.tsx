@@ -39,11 +39,14 @@ export function ProductSheet({
   const [selectedVariations, setSelectedVariations] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
+  // 1. الفلترة المتقدمة وعزل الشبكات واستخراج الأسعار مع مربح 4%
   const filteredProducts = useMemo(() => {
     if (!allProducts || !Array.isArray(allProducts) || allProducts.length === 0) return [];
     
+    // الفلترة الأساسية حسب الـ categoryId
     let baseFilter = allProducts.filter(item => item && Number(item.parent_id) === Number(activeCategoryId));
 
+    // العزل القطعي لشبكات الاتصال (سيريتل، MTN، زين) إذا كان الـ ID هو 6
     if (Number(activeCategoryId) === 6 && serviceName) {
       const title = serviceName.toLowerCase();
       if (title.includes("إم تي إن") || title.includes("mtn")) {
@@ -61,10 +64,13 @@ export function ProductSheet({
       }
     }
     
+    // معالجة البيانات: حساب المربح 4% واستخراج الرصيد الواصل بأمان
     return baseFilter.map(item => {
+      // حساب المربح المخفي 4%
       const basePrice = Number(item.price || 0);
       const finalCustomerPrice = (basePrice * 1.04).toFixed(2);
       
+      // استخراج الرقم من الاسم بأمان (Regex) لمنع الكراش
       const nameMatch = item.name?.match(/[\d.]+/);
       const amountDelivered = item.amount || item.denomination || (nameMatch ? nameMatch[0] : "محدد");
 
@@ -76,6 +82,7 @@ export function ProductSheet({
     });
   }, [allProducts, activeCategoryId, serviceName]);
 
+  // 2. دالة جلب المنتجات من السيرفر
   const fetchProducts = useCallback(async () => {
     if (serviceId === 'admin') return;
     
@@ -83,12 +90,13 @@ export function ProductSheet({
     try {
       const response = await fetch(`/api/products`);
       const data = await response.json();
+      // استخراج المصفوفة الفعلية سواء كانت في data أو products أو هي الاستجابة نفسها
       const rawItems = Array.isArray(data) ? data : (data.data || data.products || []);
       setAllProducts(Array.isArray(rawItems) ? rawItems : []);
     } catch (error: any) {
       toast({
         title: "فشل المزامنة",
-        description: "تعذر استرداد قائمة المنتجات.",
+        description: "تعذر استرداد قائمة المنتجات من السيرفر.",
         variant: "destructive",
       });
     } finally {
@@ -103,6 +111,7 @@ export function ProductSheet({
     });
   };
 
+  // عرض لوحة التحكم إذا كان المستخدم أدمن
   if (serviceId === 'admin') {
     return (
       <Sheet>
@@ -150,10 +159,12 @@ export function ProductSheet({
               ) : (
                 <div className="grid gap-4" dir="rtl">
                   {filteredProducts.map((product) => {
+                    // معالجة الخيارات المندرجة (Variations) إن وجدت
                     const variations = product.params || product.variations || product.amounts || product.items || [];
                     const selectedVarId = selectedVariations[product.id];
                     const currentVariation = variations.find((v: any) => v && String(v.id) === selectedVarId);
                     
+                    // حساب السعر النهائي للمنتج أو الخيار المحدد مع مربح 4%
                     const displayPrice = currentVariation 
                       ? (Number(currentVariation.price || 0) * 1.04).toFixed(2)
                       : product.displayPrice;
