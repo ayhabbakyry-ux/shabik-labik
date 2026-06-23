@@ -13,10 +13,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get('categoryId');
     
-    // The strict target endpoint
     const targetEndpoint = `${AL_RAGHEB_BASE_URL}/client/api/products`;
 
-    // Strict, clean payload body
     const bodyData = {
       email: "ayhmbakyr213@gmail.com",
       username: "ayhmbakyr213@gmail.com",
@@ -25,9 +23,7 @@ export async function GET(request: Request) {
       category_id: categoryId ? Number(categoryId) : undefined
     };
 
-    console.log(`[PRODUCTION FETCH] Calling Al-Ragheb for Category: ${categoryId}`);
-
-    // SANITIZED REQUEST: No extra headers, no traces.
+    // Clean, isolated fetch to bypass data center signatures
     const response = await fetch(targetEndpoint, {
       method: 'POST', 
       headers: {
@@ -39,12 +35,11 @@ export async function GET(request: Request) {
     });
 
     if (!response.ok) {
-      throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+      throw new Error(`Server responded with ${response.status}`);
     }
 
     const data = await response.json();
     
-    // Return clean JSON with cache-busting headers
     return NextResponse.json(data, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',

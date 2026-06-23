@@ -41,7 +41,6 @@ export function ProductSheet({
   children: React.ReactNode; 
   serviceName: string; 
   categoryId?: number;
-  [key: string]: any; // To handle extra props from ServiceGrid like serviceId
 }) {
   const [allProducts, setAllProducts] = useState<ProductItem[]>([]);
   const [fetching, setFetching] = useState(false);
@@ -59,10 +58,9 @@ export function ProductSheet({
       const rawItems = Array.isArray(result) ? result : (result.data || result.products || []);
       setAllProducts(rawItems);
     } catch (error: any) {
-      console.error("Fetch Error:", error);
       toast({
         title: "خطأ في الاتصال",
-        description: "تعذر جلب البيانات من المزود.",
+        description: "تعذر جلب البيانات. يرجى المحاولة بعد النشر.",
         variant: "destructive",
       });
     } finally {
@@ -77,6 +75,7 @@ export function ProductSheet({
       (item) => Number(item.parent_id) === Number(activeCategoryId)
     );
 
+    // Filter by brand if necessary
     if (Number(activeCategoryId) === 6 && serviceName) {
       const title = serviceName.toLowerCase();
       if (title.includes("إم تي إن") || title.includes("mtn")) {
@@ -110,7 +109,7 @@ export function ProductSheet({
             id: sub.id || `${item.id}-${Math.random()}`,
             name: sub.name || item.name,
             extractedAmount: amount,
-            customerPrice: (basePrice * 1.04).toFixed(2),
+            customerPrice: (basePrice * 1.04).toFixed(0), // 4% profit
             price: basePrice
           });
         });
@@ -123,14 +122,10 @@ export function ProductSheet({
           id: item.id,
           name: item.name,
           extractedAmount: amount,
-          customerPrice: (basePrice * 1.04).toFixed(2),
+          customerPrice: (basePrice * 1.04).toFixed(0), // 4% profit
           price: basePrice
         });
       }
-    });
-
-    Object.values(groups).forEach(g => {
-      g.items.sort((a, b) => Number(a.price) - Number(b.price));
     });
 
     return Object.values(groups);
@@ -149,7 +144,7 @@ export function ProductSheet({
   const handleOrder = (variation: any) => {
     toast({
       title: "تم استلام الطلب",
-      description: `طلب ${serviceName} بقيمة ${variation.customerPrice} ل.س قيد التنفيذ.`,
+      description: `طلب ${serviceName} بقيمة ${Number(variation.customerPrice).toLocaleString()} ل.س قيد التنفيذ.`,
     });
   };
 
@@ -217,7 +212,7 @@ export function ProductSheet({
                             <div className="text-right">
                               <p className="text-[10px] text-muted-foreground font-bold">السعر للمستهلك (4%+)</p>
                               <p className="text-primary font-bold text-2xl">
-                                {currentItem ? currentItem.customerPrice : "0.00"} <span className="text-xs">ل.س</span>
+                                {currentItem ? Number(currentItem.customerPrice).toLocaleString() : "0"} <span className="text-xs">ل.س</span>
                               </p>
                             </div>
                             <Button 
