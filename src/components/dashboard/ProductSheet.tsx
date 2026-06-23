@@ -11,6 +11,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { Loader2, PackageX, RefreshCw } from "lucide-react";
