@@ -48,7 +48,7 @@ export function ProductSheet({
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
-  // الثوابت المطلوبة للاتصال المباشر من المتصفح
+  // ثوابت الاتصال المباشر
   const AL_RAGHEB_BASE_URL = "https://api.alragheb-store.com/client/api/products";
   const AL_RAGHEB_AUTH_TOKEN = "64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0";
 
@@ -62,7 +62,6 @@ export function ProductSheet({
         headers: {
           'api-token': AL_RAGHEB_AUTH_TOKEN,
           'Content-Type': 'application/json',
-          // ترويسات المحاكاة للظهور كمتصفح حقيقي
           'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
           'Accept': 'application/json, text/plain, */*',
         },
@@ -81,10 +80,10 @@ export function ProductSheet({
       const rawItems = Array.isArray(result) ? result : (result.data || result.products || []);
       setAllProducts(rawItems);
     } catch (error: any) {
-      console.error("Browser-Side Fetch Error:", error);
+      console.error("Direct Browser Fetch Error:", error);
       toast({
         title: "خطأ في الاتصال المباشر",
-        description: "قد يكون هناك حظر CORS في المتصفح. تأكد من فتح الرابط من بيئة تسمح بالطلبات الخارجية.",
+        description: "تعذر الجلب من المتصفح. قد يكون هناك حظر CORS أو مشكلة في الشبكة.",
         variant: "destructive",
       });
     } finally {
@@ -121,7 +120,7 @@ export function ProductSheet({
         groups[groupKey] = { id: groupKey, mainTitle: cleanTitle, items: [] };
       }
 
-      // البحث عن الخيارات المندرجة
+      // البحث عن الخيارات المندرجة (Nested Options/Variants)
       const subItems = item.options || item.variants || item.params || [];
       
       if (Array.isArray(subItems) && subItems.length > 0 && typeof subItems[0] === 'object') {
@@ -185,7 +184,7 @@ export function ProductSheet({
         <pre className="text-[10px] text-blue-600 bg-blue-50 p-2 max-h-32 overflow-auto font-mono border-b" dir="ltr">
           {allProducts && allProducts.length > 0 
             ? `DIRECT BROWSER FETCH SUCCESS:\n` + JSON.stringify(allProducts[0], null, 2) 
-            : "FETCHING DIRECTLY FROM YOUR BROWSER..."}
+            : fetching ? "FETCHING DIRECTLY FROM YOUR BROWSER..." : "NO DATA LOADED"}
         </pre>
 
         <div className="p-4 border-b bg-white">
