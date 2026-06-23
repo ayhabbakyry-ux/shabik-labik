@@ -29,8 +29,9 @@ interface ProductItem {
   parent_id: string | number;
   name: string;
   price: string | number;
-  options?: any;
-  variants?: any;
+  options?: any[];
+  variants?: any[];
+  params?: any[];
 }
 
 export function ProductSheet({ 
@@ -47,25 +48,24 @@ export function ProductSheet({
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
-  // جلب البيانات مباشرة من السيرفر داخل المكون لضمان التحديث التلقائي
   const fetchProducts = useCallback(async () => {
     if (!activeCategoryId) return;
     setFetching(true);
     try {
       const response = await fetch(`/api/products?categoryId=${activeCategoryId}`);
-      if (!response.ok) throw new Error("Server Error");
-      const data = await response.json();
+      const result = await response.json();
       
-      // طباعة البيانات للتأكد من هيكلية السيرفر (للديبيغ)
-      console.log("[API DEBUG] Raw response for category", activeCategoryId, data);
+      // طباعة البيانات الحقيقية للديبيغ
+      console.log("[LIVE API DATA]", result);
       
-      const rawItems = Array.isArray(data) ? data : (data.data || data.products || []);
+      // استخراج المصفوفة الصحيحة حسب هيكلية الراغب (غالباً تكون في data أو هي الاستجابة نفسها)
+      const rawItems = Array.isArray(result) ? result : (result.data || result.products || []);
       setAllProducts(rawItems);
     } catch (error: any) {
       console.error("Fetch Error:", error);
       toast({
-        title: "خطأ في المزامنة",
-        description: "تعذر تحديث البيانات من السيرفر.",
+        title: "خطأ في الاتصال",
+        description: "تعذر تحديث الأسعار من السيرفر.",
         variant: "destructive",
       });
     } finally {
@@ -73,15 +73,15 @@ export function ProductSheet({
     }
   }, [activeCategoryId, toast]);
 
-  // معالجة البيانات وتجميعها (المنطق البرمجي المطلوب)
   const groupedServices = useMemo(() => {
     if (!allProducts || !Array.isArray(allProducts)) return [];
 
+    // الفرز الأولي حسب الفئة
     let baseFilter = allProducts.filter(
       (item) => Number(item.parent_id) === Number(activeCategoryId)
     );
 
-    // عزل الشبكات لخدمات الاتصال (الفئة 6)
+    // عزل الشبكات (MTN / Syriatel)
     if (Number(activeCategoryId) === 6 && serviceName) {
       const title = serviceName.toLowerCase();
       if (title.includes("إم تي إن") || title.includes("mtn")) {
@@ -96,53 +96,47 @@ export function ProductSheet({
     const groups: Record<string, { id: string; mainTitle: string; items: any[] }> = {};
 
     baseFilter.forEach((item) => {
-      let groupKey = "عام";
-      if (item.name?.includes("وحدات")) groupKey = "وحدات";
-      else if (item.name?.includes("فاتورة")) groupKey = "فاتورة";
-
-      const cleanTitle = item.name ? item.name.split(/[\d.]+/)[0].trim() : (serviceName || "خدمة شحن");
+      let groupKey = item.name?.includes("وحدات") ? "وحدات" : (item.name?.includes("فاتورة") ? "فاتورة" : "عام");
+      const cleanTitle = item.name?.split(/[\d.]+/)[0].trim() || serviceName;
 
       if (!groups[groupKey]) {
         groups[groupKey] = { id: groupKey, mainTitle: cleanTitle, items: [] };
       }
 
-      // فحص الخيارات المندرجة (Nested Options/Variants) وهي النقطة التي كان فيها الخلل
-      const nestedOptions = item.options || item.variants || [];
-      if (Array.isArray(nestedOptions) && nestedOptions.length > 0) {
-        nestedOptions.forEach((opt: any) => {
-          const nameNumbers = opt.name?.match(/[\d.]+/);
-          const extractedAmount = nameNumbers ? nameNumbers[0] : (opt.amount || opt.denomination || "محدد");
+      // دمج الخيارات المندرجة (هنا تكمن البيانات الحقيقية في سيرفر الراغب)
+      const subItems = item.options || item.variants || item.params || [];
+      
+      if (Array.isArray(subItems) && subItems.length > 0) {
+        subItems.forEach((sub: any) => {
+          const nameNums = sub.name?.match(/[\d.]+/);
+          const amount = nameNums ? nameNums[0] : (sub.amount || sub.value || "محدد");
+          const basePrice = Number(sub.price || item.price || 0);
           
-          // تطبيق المربح المخفي 4%
-          const basePrice = Number(opt.price || item.price || 0);
-          const finalCustomerPrice = (basePrice * 1.04).toFixed(2);
-
           groups[groupKey].items.push({
-            id: opt.id || `${item.id}-${Math.random()}`,
-            name: item.name,
-            extractedAmount: extractedAmount,
-            customerPrice: finalCustomerPrice,
+            id: sub.id || `${item.id}-${Math.random()}`,
+            name: sub.name || item.name,
+            extractedAmount: amount,
+            customerPrice: (basePrice * 1.04).toFixed(2),
             price: basePrice
           });
         });
       } else {
-        // إذا لم يوجد خيارات مندرجة، نأخذ المنتج الأساسي نفسه
-        const nameNumbers = item.name?.match(/[\d.]+/);
-        const extractedAmount = nameNumbers ? nameNumbers[0] : (item.amount || "محدد");
+        // إذا لم توجد خيارات مندرجة، نأخذ المنتج الأساسي
+        const nameNums = item.name?.match(/[\d.]+/);
+        const amount = nameNums ? nameNums[0] : (item.amount || "محدد");
         const basePrice = Number(item.price || 0);
-        const finalCustomerPrice = (basePrice * 1.04).toFixed(2);
 
         groups[groupKey].items.push({
           id: item.id,
           name: item.name,
-          extractedAmount: extractedAmount,
-          customerPrice: finalCustomerPrice,
+          extractedAmount: amount,
+          customerPrice: (basePrice * 1.04).toFixed(2),
           price: basePrice
         });
       }
     });
 
-    // ترتيب المنتجات تصاعدياً حسب السعر داخل كل مجموعة
+    // ترتيب المجموعات تصاعدياً حسب السعر
     Object.values(groups).forEach(g => {
       g.items.sort((a, b) => Number(a.price) - Number(b.price));
     });
@@ -150,7 +144,6 @@ export function ProductSheet({
     return Object.values(groups);
   }, [allProducts, activeCategoryId, serviceName]);
 
-  // تعيين الخيار الأول تلقائياً عند تحميل المجموعات
   useEffect(() => {
     const initialSelections: Record<string, string> = {};
     groupedServices.forEach((group) => {
@@ -164,7 +157,7 @@ export function ProductSheet({
   const handleOrder = (variation: any) => {
     toast({
       title: "تم استلام الطلب",
-      description: `طلب شحن بقيمة ${variation.customerPrice} ل.س قيد المعالجة.`,
+      description: `طلب ${serviceName} بقيمة ${variation.customerPrice} ل.س قيد التنفيذ.`,
     });
   };
 
@@ -175,22 +168,20 @@ export function ProductSheet({
         <div className="p-4 border-b bg-white">
           <SheetHeader>
             <div className="flex items-center justify-between">
-              <SheetTitle className="text-xl font-bold font-headline text-right text-primary">{serviceName}</SheetTitle>
+              <SheetTitle className="text-xl font-bold font-headline text-primary">{serviceName}</SheetTitle>
               <Button variant="ghost" size="icon" onClick={fetchProducts} disabled={fetching}>
                 <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
               </Button>
             </div>
-            <SheetDescription className="text-right text-xs">
-              اختر الفئة المطلوبة وسيظهر لك السعر النهائي المشمول بالمربح.
-            </SheetDescription>
+            <SheetDescription className="text-right text-xs">مزامنة الأسعار المباشرة مع مربح 4% شامل الضرائب.</SheetDescription>
           </SheetHeader>
         </div>
 
         <div className="flex-1 overflow-hidden bg-muted/20">
           {fetching ? (
-            <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
+            <div className="h-full flex flex-col items-center justify-center gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-medium">جاري مزامنة الأسعار من السيرفر...</p>
+              <p className="text-sm font-bold text-muted-foreground">جاري مزامنة السيرفر...</p>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
@@ -204,17 +195,15 @@ export function ProductSheet({
                       <Card key={group.id} className="border-none shadow-md bg-white overflow-hidden">
                         <CardContent className="p-5 space-y-4">
                           <div className="flex items-center gap-3">
-                            <div className="p-3 bg-primary/10 rounded-xl">
-                              <Zap className="h-5 w-5 text-primary" />
-                            </div>
+                            <div className="p-3 bg-primary/10 rounded-xl"><Zap className="h-5 w-5 text-primary" /></div>
                             <div className="text-right flex-1">
-                              <h4 className="font-bold text-lg text-foreground leading-tight">{group.mainTitle}</h4>
-                              <p className="text-[11px] text-muted-foreground">الرصيد الواصل: {currentItem ? currentItem.extractedAmount : "محدد"}</p>
+                              <h4 className="font-bold text-lg text-foreground">{group.mainTitle}</h4>
+                              <p className="text-[11px] text-muted-foreground">الرصيد الواصل: {currentItem?.extractedAmount}</p>
                             </div>
                           </div>
 
                           <div className="space-y-2">
-                            <label className="text-[11px] font-bold text-muted-foreground pr-1">اختر القيمة / الكمية المطلوبة</label>
+                            <label className="text-[11px] font-bold text-muted-foreground pr-1">اختر الفئة المطلوبة</label>
                             <Select 
                               value={selectedId || (group.items[0]?.id.toString())} 
                               onValueChange={(val) => setSelectedOptions(prev => ({ ...prev, [group.id]: val }))}
@@ -225,7 +214,7 @@ export function ProductSheet({
                               <SelectContent dir="rtl">
                                 {group.items.map((item) => (
                                   <SelectItem key={item.id} value={item.id.toString()}>
-                                    رصيد {item.extractedAmount}
+                                    فئة {item.extractedAmount}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -234,17 +223,16 @@ export function ProductSheet({
 
                           <div className="flex items-center justify-between pt-4 border-t border-dashed">
                             <div className="text-right">
-                              <p className="text-[10px] text-muted-foreground mb-1 font-bold">السعر للمستهلك (4%+)</p>
-                              <p className="text-primary font-bold text-2xl leading-none">
-                                {currentItem ? currentItem.customerPrice : "0.00"} <span className="text-xs opacity-70">ل.س</span>
+                              <p className="text-[10px] text-muted-foreground font-bold">السعر للمستهلك (4%+)</p>
+                              <p className="text-primary font-bold text-2xl">
+                                {currentItem ? currentItem.customerPrice : "0.00"} <span className="text-xs">ل.س</span>
                               </p>
                             </div>
                             <Button 
                               onClick={() => handleOrder(currentItem)}
-                              className="rounded-full px-8 h-12 bg-primary text-white font-bold hover:scale-105 transition-transform shadow-lg"
+                              className="rounded-full px-8 h-12 bg-primary shadow-lg font-bold"
                             >
-                              <ShoppingCart className="ml-2 h-4 w-4" />
-                              اطلب الآن
+                              <ShoppingCart className="ml-2 h-4 w-4" /> اطلب الآن
                             </Button>
                           </div>
                         </CardContent>
@@ -253,9 +241,9 @@ export function ProductSheet({
                   })}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center text-muted-foreground gap-4 py-12">
-                  <PackageX className="h-10 w-10 opacity-40" />
-                  <p className="text-sm font-bold text-center">لا توجد بيانات متاحة لهذا القسم حالياً.</p>
+                <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4">
+                  <PackageX className="h-12 w-12 opacity-30" />
+                  <p className="text-sm font-bold">لا تتوفر فئات حالياً لهذا القسم.</p>
                 </div>
               )}
             </ScrollArea>

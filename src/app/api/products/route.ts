@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 /**
  * SERVER-SIDE PROXY: Al-Ragheb API
- * Robust debugging for Part 4/5 implementation.
+ * مرسل الطلبات لضمان عدم حدوث مشاكل CORS وتمرير البيانات الخام.
  */
 const AL_RAGHEB_BASE_URL = "https://api.alragheb-store.com";
 const AL_RAGHEB_AUTH_TOKEN = "64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0";
@@ -12,25 +12,13 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get('categoryId');
-    const type = searchParams.get('type');
-    const productId = searchParams.get('productId');
-    const orderUuid = searchParams.get('orderUuid');
+    
+    // بناء الرابط الصحيح لجلب المنتجات بناءً على الفئة
+    const endpoint = categoryId 
+      ? `${AL_RAGHEB_BASE_URL}/client/api/products?category_id=${categoryId}`
+      : `${AL_RAGHEB_BASE_URL}/client/api/products`;
 
-    let endpoint = "";
-
-    // Determine the correct endpoint based on params
-    if (type === 'order' && productId && orderUuid) {
-      endpoint = `${AL_RAGHEB_BASE_URL}/client/api/newOrder/${productId}/params?order_uuid=${orderUuid}`;
-    } else if (categoryId) {
-      // Primary: Category-specific
-      endpoint = `${AL_RAGHEB_BASE_URL}/client/api/products?category_id=${categoryId}`;
-    } else {
-      // Secondary: Global list
-      endpoint = `${AL_RAGHEB_BASE_URL}/client/api/products`;
-    }
-
-    console.log(`[PROXY REQUEST] Target: ${endpoint}`);
-    console.log(`[PROXY HEADERS] Sending api-token: ${AL_RAGHEB_AUTH_TOKEN.substring(0, 5)}...`);
+    console.log(`[AL-RAGHEB PROXY] Fetching from: ${endpoint}`);
 
     const response = await fetch(endpoint, {
       method: 'GET',
@@ -39,24 +27,23 @@ export async function GET(request: Request) {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      next: { revalidate: 0 }
+      cache: 'no-store'
     });
 
-    const status = response.status;
     const data = await response.json();
-
-    console.log(`[PROXY RESPONSE] Status: ${status}, Endpoint: ${endpoint}`);
     
-    // Check for Al-Ragheb specific error codes (Part 4 Error Dictionary)
-    if (data.status === "error" || data.code) {
-      console.warn(`[AL-RAGHEB ERROR] Code: ${data.code}, Message: ${data.message || 'Unknown'}`);
+    // التحقق من حالة الاستجابة من السيرفر
+    if (response.status !== 200) {
+      console.error("[AL-RAGHEB ERROR]", data);
+      return NextResponse.json({ error: data.message || "API Error" }, { status: response.status });
     }
 
-    return NextResponse.json(data, { status });
+    // إرجاع البيانات الخام كما هي تماماً
+    return NextResponse.json(data);
   } catch (error: any) {
     console.error("[PROXY SYSTEM ERROR]:", error);
     return NextResponse.json(
-      { error: "Failed to connect to Al-Ragheb server.", details: error.message },
+      { error: "تعذر الاتصال بسيرفر الراغب حالياً.", details: error.message },
       { status: 500 }
     );
   }
