@@ -25,17 +25,16 @@ import {
 } from "@/components/ui/select";
 
 /**
- * PRODUCTION-GRADE PRODUCT SHEET (REWRITTEN)
- * 1. Deep Sync: Pulls all nested data from Al-Ragheb.
- * 2. Invisible 4% Margin: Markup applied globally, base price purged.
- * 3. Strict Isolation: Double-filter (Parent ID + Brand Keyword) for total separation.
- * 4. Quantity Focus: Clearly displays "Delivered Balance" (الرصيد الواصل).
+ * PRODUCTION-GRADE PRODUCT SHEET
+ * 1. Robust Filtering: parent_id + Brand Keyword Isolation.
+ * 2. Hidden 4% Margin: Automated markup, original price purged.
+ * 3. Dynamic Amount Extraction: Regex-based extraction for (الرصيد الواصل).
  */
 export function ProductSheet({ 
   children, 
   serviceName, 
   serviceId,
-  categoryId
+  categoryId: activeCategoryId // Aliased to match robust snippet
 }: { 
   children: React.ReactNode; 
   serviceName: string; 
@@ -46,61 +45,55 @@ export function ProductSheet({
   const [fetching, setFetching] = useState(false);
   const [selectedVariations, setSelectedVariations] = useState<Record<string, string>>({});
   const { toast } = useToast();
+  
+  const sectionTitle = serviceName; // Aliased to match robust snippet
 
   /**
-   * RE-IMPLEMENTED FILTERING & MAPPING LOGIC
-   * 1. Filter by parent_id (Numeric group)
-   * 2. Brand Isolation for Telecom (Keyword match for shared Parent IDs)
-   * 3. Apply 4% Markup and extract Display Amount
+   * ROBUST FILTERING & MAPPING LOGIC
    */
   const filteredProducts = useMemo(() => {
     if (!allProducts || allProducts.length === 0) return [];
     
-    const activeCategoryId = Number(categoryId);
-    // Stage 1: Base Grouping by Parent ID
-    let baseFilter = allProducts.filter(item => Number(item.parent_id) === activeCategoryId);
+    // 1. Get base products matching the current category
+    let baseFilter = allProducts.filter(item => Number(item.parent_id) === Number(activeCategoryId));
 
-    // Stage 2: Brand Isolation for Telecom (Parent ID 6)
-    if (activeCategoryId === 6 && serviceName) {
-      const title = serviceName.toLowerCase();
+    // 2. Strict Grouping & Isolation for Telecom (Parent ID 6)
+    if (Number(activeCategoryId) === 6 && sectionTitle) {
+      const title = sectionTitle.toLowerCase();
       if (title.includes("إم تي إن") || title.includes("mtn")) {
-        baseFilter = baseFilter.filter(item => item.name.includes("إم تي إن") || item.name.toLowerCase().includes("mtn"));
+        baseFilter = baseFilter.filter(item => item.name.includes("إم تي إن") || item.name.toUpperCase().includes("MTN"));
       } else if (title.includes("سيريتل") || title.includes("syriatel")) {
         baseFilter = baseFilter.filter(item => item.name.includes("سيريتل"));
       } else if (title.includes("زين") || title.includes("zain")) {
-        baseFilter = baseFilter.filter(item => item.name.toLowerCase().includes("zain") || item.name.includes("زين"));
+        baseFilter = baseFilter.filter(item => item.name.toUpperCase().includes("ZAIN") || item.name.includes("زين"));
       }
     }
-
-    // Stage 3: Map with 4% Markup and Quantity Extraction
+    
+    // 3. Map over filtered results to inject 4% profit margin and extract exact dynamic amount
     return baseFilter.map(item => {
+      // Hidden 4% Margin math
       const basePrice = Number(item.price || 0);
-      // Add automatic 4% margin hidden from customer
-      const finalCustomerPrice = (basePrice * 1.04).toLocaleString(undefined, { 
-        minimumFractionDigits: 0, 
-        maximumFractionDigits: 0 
-      });
+      const finalCustomerPrice = (basePrice * 1.04).toFixed(2);
       
-      // Extract the denomination quantity (الكمية / الرصيد الواصل)
-      const amountDelivered = item.amount || item.denomination || item.value || item.name.match(/\d+/) || "محدد";
+      // Dynamic Regex to strip and extract only numbers/dots from item name for (الرصيد الواصل)
+      const nameNumbers = item.name.match(/[\d.]+/);
+      const amountDelivered = item.amount || item.denomination || (nameNumbers ? nameNumbers[0] : "محدد");
 
       return {
         ...item,
-        displayPrice: finalCustomerPrice, // Overwrite to show ONLY the marked-up price
-        displayAmount: amountDelivered
+        displayPrice: finalCustomerPrice, // Replaces original price completely
+        displayAmount: amountDelivered     // Replaces dynamic amount text
       };
     });
-  }, [allProducts, categoryId, serviceName]);
+  }, [allProducts, activeCategoryId, sectionTitle]);
 
   const fetchProducts = useCallback(async () => {
     if (serviceId === 'admin') return;
     
     setFetching(true);
     try {
-      // Global deep pull to ensure all nested data is loaded into memory
       const response = await fetch(`/api/products`);
       const data = await response.json();
-      
       const rawItems = Array.isArray(data) ? data : (data.data || data.products || []);
       setAllProducts(rawItems);
     } catch (error: any) {
@@ -175,15 +168,13 @@ export function ProductSheet({
               ) : (
                 <div className="grid gap-4" dir="rtl">
                   {filteredProducts.map((product) => {
-                    // Deep Scanning for nested purchasable denominations
                     const variations = product.params || product.variations || product.amounts || product.items || [];
                     const selectedVarId = selectedVariations[product.id];
                     
-                    // Markup for nested options
                     const currentVariation = variations.find((v: any) => String(v.id) === selectedVarId);
                     const varPrice = Number(currentVariation?.price || 0);
                     const finalVarPrice = varPrice > 0 
-                      ? Math.ceil(varPrice * 1.04).toLocaleString()
+                      ? (varPrice * 1.04).toFixed(2)
                       : null;
 
                     return (
@@ -217,7 +208,7 @@ export function ProductSheet({
                                 </SelectTrigger>
                                 <SelectContent className="font-body" dir="rtl">
                                   {variations.map((v: any) => {
-                                    const markedUpPrice = Math.ceil(Number(v.price || 0) * 1.04).toLocaleString();
+                                    const markedUpPrice = (Number(v.price || 0) * 1.04).toFixed(2);
                                     return (
                                       <SelectItem key={v.id} value={String(v.id)}>
                                         الرصيد: {v.name || v.value} - السعر: {markedUpPrice} ل.س
