@@ -15,27 +15,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { AdminPanel } from "@/components/admin/AdminPanel";
-import { Loader2, PackageX, RefreshCw, Key, AlertCircle } from "lucide-react";
+import { Loader2, PackageX, RefreshCw, Key, AlertCircle, Globe } from "lucide-react";
 
 type Product = {
   id: string | number;
   name: string;
   price: number;
-};
-
-const AL_RAGHEB_ERRORS: Record<number | string, string> = {
-  120: "API Token Required",
-  121: "Token Error",
-  122: "API Access Denied",
-  123: "IP Not Allowed",
-  130: "Under Maintenance",
-  100: "Insufficient Balance",
-  105: "Qty Not Available",
-  106: "Qty Not Allowed",
-  107: "Player ID Blocked",
-  109: "Product Not Found (ID Mismatch)",
-  110: "Product Unavailable",
-  500: "System Error",
 };
 
 export function ProductSheet({ 
@@ -52,70 +37,30 @@ export function ProductSheet({
   const [products, setProducts] = useState<Product[]>([]);
   const [fetching, setFetching] = useState(false);
   const [playerId, setPlayerId] = useState("");
+  const [debugInfo, setDebugInfo] = useState<{ url: string; status: number | null }>({ url: "", status: null });
   const { toast } = useToast();
 
   const fetchProducts = useCallback(async () => {
     if (serviceId === 'admin') return;
     
     setFetching(true);
-    console.log(`[DEBUG] Initializing fetch for: ${serviceName} (Hardcoded ID: ${categoryId})`);
+    const targetUrl = `/api/products?categoryId=${categoryId}`;
+    setDebugInfo({ url: targetUrl, status: null });
+
+    console.log(`[NETWORK REQUEST] Initiating: ${targetUrl}`);
 
     try {
-      // TIER 1: Attempt Category-Specific Fetch
-      const primaryUrl = `/api/products?categoryId=${categoryId}`;
-      console.log(`[DEBUG] Attempting Tier 1: ${primaryUrl}`);
-      
-      const response = await fetch(primaryUrl);
-      console.log(`[DEBUG] Response Status: ${response.status}`);
+      const response = await fetch(targetUrl);
+      setDebugInfo(prev => ({ ...prev, status: response.status }));
       
       const data = await response.json();
       
-      if (data.code && data.code !== 200) {
-        console.warn(`[AL-RAGHEB] Error Code ${data.code}: ${AL_RAGHEB_ERRORS[data.code] || 'Unknown error'}`);
-      }
-
-      let rawItems = Array.isArray(data) ? data : (data.data || []);
+      // Strict: Just use what the server returns for this specific ID
+      const rawItems = Array.isArray(data) ? data : (data.data || []);
       
-      // TIER 2: Fallback to Global Fetch if Tier 1 is empty or failed
-      if (rawItems.length === 0) {
-        console.log(`[DEBUG] Tier 1 returned no items. Attempting Tier 2 (Global Fetch).`);
-        const fallbackUrl = `/api/products`;
-        const fbResponse = await fetch(fallbackUrl);
-        const fbData = await fbResponse.json();
-        rawItems = Array.isArray(fbData) ? fbData : (fbData.data || []);
-      }
+      console.log(`[NETWORK RESPONSE] Status: ${response.status}, Items: ${rawItems.length}`);
 
-      console.log(`[DEBUG] Total raw items received for processing: ${rawItems.length}`);
-
-      // TIER 3: ROBUST CLIENT-SIDE FILTERING
-      const targetCatId = Number(categoryId);
-      const filteredItems = rawItems.filter((item: any) => {
-        // Handle various ID field names (Arabic and English)
-        const rawItemCatId = item.category_id ?? item.الفئة_id ?? item.cat_id;
-        const itemCatId = rawItemCatId !== undefined && rawItemCatId !== null ? Number(rawItemCatId) : null;
-        
-        const itemName = item.الاسم || item.name || "Unknown Product";
-        
-        console.log(`[FILTER DEBUG] Comparing: "${itemName}" | Item ID: ${itemCatId} (Type: ${typeof rawItemCatId}) vs Target: ${targetCatId}`);
-
-        // Match 1: Numeric ID Comparison (Hardcoded Map)
-        if (itemCatId !== null && itemCatId === targetCatId) return true;
-
-        // Match 2: Localized Name Comparison (as fallback for inconsistently tagged items)
-        const itemCatName = item.category_name || item.اسم_الفئة || "";
-        const nameMatch = itemCatName.trim() === serviceName.trim() || itemCatName.includes(serviceName);
-        
-        if (nameMatch && itemCatName !== "") {
-          console.log(`[FILTER MATCH] Found match via NAME: ${itemCatName} matches ${serviceName}`);
-          return true;
-        }
-
-        return false;
-      });
-
-      console.log(`[DEBUG] Products after strict filtering: ${filteredItems.length}`);
-
-      const mappedProducts = filteredItems.map((item: any) => ({
+      const mappedProducts = rawItems.map((item: any) => ({
         id: item.id,
         name: item.الاسم || item.name || "منتج غير معروف",
         price: Number(item.السعر || item.price || 0)
@@ -123,16 +68,17 @@ export function ProductSheet({
 
       setProducts(mappedProducts);
     } catch (error: any) {
-      console.error(`[DEBUG] Fetch process failed:`, error);
+      console.error(`[NETWORK ERROR]`, error);
+      setDebugInfo(prev => ({ ...prev, status: 500 }));
       toast({
-        title: "خطأ في الاتصال بالخادم",
+        title: "Network Failure",
         description: error.message,
         variant: "destructive",
       });
     } finally {
       setFetching(false);
     }
-  }, [categoryId, serviceId, serviceName, toast]);
+  }, [categoryId, serviceId, toast]);
 
   if (serviceId === 'admin') {
     return (
@@ -155,7 +101,7 @@ export function ProductSheet({
           <SheetHeader>
             <SheetTitle className="text-xl font-bold font-headline">{serviceName}</SheetTitle>
             <SheetDescription className="text-xs">
-              خدمة رقمية موثوقة عبر الربط المباشر (ID: {categoryId})
+              Direct API Mapping (ID: {categoryId})
             </SheetDescription>
           </SheetHeader>
           <Button variant="ghost" size="icon" onClick={fetchProducts} disabled={fetching}>
@@ -167,32 +113,54 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-60 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-medium animate-pulse">جاري فحص الخادم وتصفية النتائج...</p>
+              <p className="text-sm font-medium">Connecting to Al-Ragheb Server...</p>
             </div>
           ) : (
             <>
-              <div className="space-y-3 p-5 bg-accent/30 rounded-2xl border border-accent">
-                <Label htmlFor="playerId" className="text-xs font-bold uppercase flex items-center gap-2 text-primary">
-                  <Key className="h-3.5 w-3.5" /> رقم اللاعب / الهاتف
-                </Label>
-                <Input 
-                  id="playerId" 
-                  placeholder="أدخل المعرف الخاص بك هنا" 
-                  value={playerId}
-                  onChange={(e) => setPlayerId(e.target.value)}
-                  className="bg-white h-11 border-none shadow-sm focus-visible:ring-primary rounded-xl"
-                />
-              </div>
+              {products.length > 0 && (
+                <div className="space-y-3 p-5 bg-accent/30 rounded-2xl border border-accent">
+                  <Label htmlFor="playerId" className="text-xs font-bold uppercase flex items-center gap-2 text-primary">
+                    <Key className="h-3.5 w-3.5" /> رقم اللاعب / الهاتف
+                  </Label>
+                  <Input 
+                    id="playerId" 
+                    placeholder="أدخل المعرف الخاص بك هنا" 
+                    value={playerId}
+                    onChange={(e) => setPlayerId(e.target.value)}
+                    className="bg-white h-11 border-none shadow-sm focus-visible:ring-primary rounded-xl"
+                  />
+                </div>
+              )}
 
               {products.length === 0 ? (
-                <div className="h-60 flex flex-col items-center justify-center text-muted-foreground gap-4">
-                  <div className="p-4 bg-muted rounded-full">
-                    <PackageX className="h-10 w-10 opacity-40" />
+                <div className="space-y-6">
+                  <div className="flex flex-col items-center justify-center text-muted-foreground gap-4 py-12">
+                    <div className="p-4 bg-muted rounded-full">
+                      <PackageX className="h-10 w-10 opacity-40" />
+                    </div>
+                    <p className="text-sm font-medium text-center px-6 leading-relaxed">
+                      عذراً، لا توجد منتجات متاحة حالياً لهذا القسم.
+                    </p>
                   </div>
-                  <p className="text-sm font-medium text-center px-6 leading-relaxed">
-                    عذراً، لا توجد منتجات متاحة حالياً لهذا القسم.<br/>
-                    <span className="text-[10px] opacity-70">يتم تحديث المخزون تلقائياً من Al-Ragheb</span>
-                  </p>
+
+                  {/* RAW DEBUGGING UI */}
+                  <div className="bg-slate-900 rounded-xl p-4 text-[10px] font-mono text-slate-300 space-y-2 border border-slate-700">
+                    <div className="flex items-center gap-2 text-yellow-500 font-bold border-b border-slate-700 pb-2 mb-2 uppercase tracking-widest">
+                      <Globe className="h-3 w-3" /> Network Trace
+                    </div>
+                    <div className="flex justify-between">
+                      <span>HTTP STATUS:</span>
+                      <span className={debugInfo.status === 200 ? "text-green-400" : "text-red-400"}>
+                        {debugInfo.status || "WAITING"}
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      <span>REQUEST URL:</span>
+                      <div className="bg-slate-800 p-2 rounded break-all text-blue-300">
+                        {debugInfo.url}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
