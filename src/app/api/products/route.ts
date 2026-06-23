@@ -16,29 +16,30 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get('categoryId');
     
-    // بناء الرابط مع إضافة user_id الصارم لفك حظر المنتجات
-    let endpoint = `${AL_RAGHEB_BASE_URL}/client/api/products?user_id=${FIXED_USER_ID}`;
-    
-    if (categoryId) {
-      endpoint += `&category_id=${categoryId}`;
-    }
+    // بناء الرابط الأساسي
+    const endpoint = `${AL_RAGHEB_BASE_URL}/client/api/products`;
 
-    console.log(`[AL-RAGHEB LIVE FETCH] ${new Date().toISOString()} - Endpoint: ${endpoint}`);
+    // تجهيز البيانات المطلوبة في الـ Body كما يتوقعها السيرفر
+    const bodyData = {
+      user_id: FIXED_USER_ID,
+      category_id: categoryId || undefined
+    };
+
+    console.log(`[AL-RAGHEB LIVE POST FETCH] ${new Date().toISOString()} - Payload:`, bodyData);
 
     const response = await fetch(endpoint, {
-      method: 'GET',
+      method: 'POST', // تحويل الطلب لـ POST لفك حظر المنتجات
       headers: {
         'api-token': AL_RAGHEB_AUTH_TOKEN,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      // منع التخزين على مستوى الـ Fetch الخاص بـ Next.js
+      body: JSON.stringify(bodyData),
       cache: 'no-store'
     });
 
     const data = await response.json();
     
-    // إرجاع البيانات مع هيدرز تمنع التخزين في المتصفح أو أي CDN
     return NextResponse.json(data, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',

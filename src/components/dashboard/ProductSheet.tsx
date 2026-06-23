@@ -58,7 +58,7 @@ export function ProductSheet({
       });
       const result = await response.json();
       
-      // استخراج المصفوفة الصحيحة حسب هيكلية الراغب (دائماً نبحث عن data أو المصفوفة المباشرة)
+      // استخراج المصفوفة الصحيحة حسب هيكلية الراغب
       const rawItems = Array.isArray(result) ? result : (result.data || result.products || []);
       setAllProducts(rawItems);
     } catch (error: any) {
