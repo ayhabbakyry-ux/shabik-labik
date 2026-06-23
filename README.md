@@ -4,14 +4,12 @@ This project is optimized for deployment on Vercel to bypass Cloud IP restrictio
 
 ## Production Deployment
 To deploy this project to Vercel:
-1. `npm install -g vercel`
-2. `vercel login`
-3. `vercel` (for preview)
-4. `vercel --prod` (for production)
+1. `npm run deploy` 
+2. Follow the terminal prompts to log in and link the project.
 
 ## Tech Stack
 - Next.js 15 (App Router)
 - Tailwind CSS
 - Shadcn UI
 - Lucide Icons
-- Al-Ragheb API Integration
+- Al-Ragheb API Integration (Server-side Proxy)
