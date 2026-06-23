@@ -39,14 +39,14 @@ export function ProductSheet({
   const [selectedVariations, setSelectedVariations] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
-  // 1. منطق الفلترة والعزل وحساب المربح 4%
+  // 1. منطق الفلترة والعزل وحساب المربح 4% المستقر
   const filteredProducts = useMemo(() => {
     if (!allProducts || !Array.isArray(allProducts) || allProducts.length === 0) return [];
     
     // الفلترة الأساسية حسب الـ categoryId
     let baseFilter = allProducts.filter(item => item && Number(item.parent_id) === Number(activeCategoryId));
 
-    // العزل القطعي لشبكات الاتصال (سيريتل، MTN، زين) إذا كان الـ ID هو 6
+    // العزل القطعي لشبكات الاتصال (سيريتل، MTN، زين)
     if (Number(activeCategoryId) === 6 && serviceName) {
       const title = serviceName.toLowerCase();
       if (title.includes("إم تي إن") || title.includes("mtn")) {
@@ -90,6 +90,7 @@ export function ProductSheet({
     try {
       const response = await fetch(`/api/products`);
       const data = await response.json();
+      // استخراج البيانات مهما كان شكل الرد من السيرفر
       const rawItems = Array.isArray(data) ? data : (data.data || data.products || []);
       setAllProducts(Array.isArray(rawItems) ? rawItems : []);
     } catch (error: any) {
@@ -148,12 +149,7 @@ export function ProductSheet({
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
-              {filteredProducts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center text-muted-foreground gap-4 py-12">
-                  <PackageX className="h-10 w-10 opacity-40" />
-                  <p className="text-sm font-bold text-center">لا توجد منتجات متوفرة حالياً لهذه الفئة.</p>
-                </div>
-              ) : (
+              {Array.isArray(filteredProducts) && filteredProducts.length > 0 ? (
                 <div className="grid gap-4" dir="rtl">
                   {filteredProducts.map((product, pIdx) => {
                     const variations = product.params || product.variations || product.amounts || product.items || [];
@@ -226,6 +222,11 @@ export function ProductSheet({
                       </Card>
                     );
                   })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center text-muted-foreground gap-4 py-12">
+                  <PackageX className="h-10 w-10 opacity-40" />
+                  <p className="text-sm font-bold text-center">لا توجد منتجات متوفرة حالياً أو جاري التحميل...</p>
                 </div>
               )}
             </ScrollArea>
