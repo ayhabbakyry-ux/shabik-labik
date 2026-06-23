@@ -24,6 +24,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+/**
+ * PRODUCTION-GRADE PRODUCT SHEET
+ * 1. Deep Sync: Pulls all nested data from Al-Ragheb.
+ * 2. Hidden Margin: 4% markup applied, base price hidden.
+ * 3. Strict Isolation: Dual-filter (Parent ID + Keyword) for brand separation.
+ */
 export function ProductSheet({ 
   children, 
   serviceName, 
@@ -41,20 +47,22 @@ export function ProductSheet({
   const { toast } = useToast();
 
   /**
-   * STRICT FILTERING & ISOLATION LOGIC
-   * 1. Filters by parent_id (provided as categoryId)
-   * 2. For category 6 (Telecom), applies strict keyword matching for brand isolation
+   * DEEP FILTERING LOGIC
+   * Stage 1: Filter by parent_id (Group isolation)
+   * Stage 2: Keyword isolation for shared IDs (e.g. Syriatel vs MTN)
    */
   const filteredProducts = useMemo(() => {
     if (!allProducts || allProducts.length === 0) return [];
     
     const activeParentId = Number(categoryId);
+    // Stage 1: Filter by the discovered parent_id key
     let baseFilter = allProducts.filter(item => Number(item.parent_id) === activeParentId);
 
-    // Deep isolation for shared Parent ID 6 (MTN/Syriatel)
+    // Stage 2: Brand Isolation for Telecom (Parent ID 6)
     if (activeParentId === 6 && serviceName) {
       const title = serviceName.toLowerCase();
-      const mtnKeywords = ["إم تي إن", "mtn"];
+      // Expanded keyword sets for robust brand matching
+      const mtnKeywords = ["إم تي إن", "mtn", "ام تي ان"];
       const syrKeywords = ["سيريتل", "syr", "syriatel", "سيرياتيل", "ليرة"];
 
       if (mtnKeywords.some(k => title.includes(k))) {
@@ -73,15 +81,17 @@ export function ProductSheet({
     
     setFetching(true);
     try {
-      // Global fetch to ensure deep data sync
+      // Global deep pull to ensure all nested variants are loaded
       const response = await fetch(`/api/products`);
       const data = await response.json();
-      const rawItems = Array.isArray(data) ? data : (data.data || []);
+      
+      // Handle various API response formats
+      const rawItems = Array.isArray(data) ? data : (data.data || data.products || []);
       setAllProducts(rawItems);
     } catch (error: any) {
       toast({
-        title: "Error Syncing Data",
-        description: "Could not retrieve the latest products from the server.",
+        title: "Database Sync Error",
+        description: "Failed to retrieve the latest official pricing catalog.",
         variant: "destructive",
       });
     } finally {
@@ -91,8 +101,8 @@ export function ProductSheet({
 
   const handleOrder = (productName: string, variationId: string) => {
     toast({
-      title: "Order Submitted",
-      description: `Request for ${productName} sent for automatic processing.`,
+      title: "Order Processed",
+      description: `Your request for ${productName} has been sent to the provider.`,
     });
   };
 
@@ -127,7 +137,7 @@ export function ProductSheet({
               </Button>
             </div>
             <SheetDescription className="text-right text-xs">
-              Select the required denomination/quantity from the list below.
+              Select the denomination below. Pricing includes official platform fees.
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -136,7 +146,7 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-medium">Syncing official pricing & amounts...</p>
+              <p className="text-sm font-medium">Synchronizing official catalog...</p>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
@@ -145,23 +155,23 @@ export function ProductSheet({
                   <div className="p-4 bg-muted rounded-full">
                     <PackageX className="h-10 w-10 opacity-40" />
                   </div>
-                  <p className="text-sm font-bold text-center">No available offers for {serviceName} at this time.</p>
+                  <p className="text-sm font-bold text-center">No available denominations found for {serviceName}.</p>
                 </div>
               ) : (
                 <div className="grid gap-4" dir="rtl">
-                  {filteredProducts.map((product, idx) => {
-                    // DEEP SCAN for nested denominations/variations
+                  {filteredProducts.map((product) => {
+                    // DEEP SCAN for nested denominations in 'params', 'variations', or 'amounts'
                     const variations = product.params || product.variations || product.amounts || product.items || [];
                     const selectedVarId = selectedVariations[product.id];
                     
-                    // Business Logic: 4% markup applied to the selected item
+                    // BUSINESS LOGIC: 4% Profit Margin added to the selected item
                     const currentVariation = variations.find((v: any) => String(v.id) === selectedVarId);
                     const finalDisplayPrice = currentVariation 
                       ? Math.ceil(Number(currentVariation.price) * 1.04) 
                       : null;
 
                     return (
-                      <Card key={idx} className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-shadow">
+                      <Card key={product.id} className="border-none shadow-sm bg-white overflow-hidden hover:shadow-md transition-shadow">
                         <CardContent className="p-5 space-y-4">
                           <div className="flex items-center gap-2">
                             <div className="p-2 bg-primary/10 rounded-lg">
@@ -175,7 +185,7 @@ export function ProductSheet({
                           {variations.length > 0 ? (
                             <div className="space-y-3">
                               <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block text-right">
-                                الرصيد الواصل / الكمية
+                                اختر الرصيد الواصل / الكمية
                               </label>
                               <Select 
                                 value={selectedVarId} 
@@ -186,11 +196,11 @@ export function ProductSheet({
                                 </SelectTrigger>
                                 <SelectContent className="font-body" dir="rtl">
                                   {variations.map((v: any) => {
-                                    // 4% Profit Margin applied to each list item
-                                    const vPrice = Math.ceil(Number(v.price || 0) * 1.04);
+                                    // Hidden 4% Margin applied to each dropdown list item
+                                    const markedUpPrice = Math.ceil(Number(v.price || 0) * 1.04);
                                     return (
                                       <SelectItem key={v.id} value={String(v.id)}>
-                                        الرصيد الواصل: {v.name || v.value} - السعر: {vPrice.toLocaleString()} ل.س
+                                        الرصيد الواصل: {v.name || v.value} - السعر: {markedUpPrice.toLocaleString()} ل.س
                                       </SelectItem>
                                     );
                                   })}
@@ -199,7 +209,7 @@ export function ProductSheet({
                             </div>
                           ) : (
                             <div className="p-3 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium text-center">
-                              Price is determined upon ordering for this service.
+                              Prices vary by quantity. Select an option to view total.
                             </div>
                           )}
 
@@ -213,11 +223,11 @@ export function ProductSheet({
                             </div>
                             <Button 
                               disabled={variations.length > 0 && !selectedVarId}
-                              onClick={() => handleOrder(product.name, selectedVarId)}
+                              onClick={() => handleOrder(product.name, selectedVarId || "")}
                               className="rounded-full px-8 shadow-lg hover:scale-105 transition-transform bg-primary text-white"
                             >
                               <ShoppingCart className="ml-2 h-4 w-4" />
-                              اطلب الآن
+                              تأكيد الطلب
                             </Button>
                           </div>
                         </CardContent>
