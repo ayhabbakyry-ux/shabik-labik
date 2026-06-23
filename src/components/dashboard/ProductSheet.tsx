@@ -23,13 +23,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-/**
- * PRODUCTION-GRADE PRODUCT SHEET (COMPLETE & STABLE)
- * 1. Full Data Sync: Pulls all variations and products.
- * 2. 4% Margin: Automated hidden markup on all customer prices.
- * 3. Crash-Proof Extraction: Safe regex for Delivered Balance.
- * 4. Strict Isolation: Keeps MTN and Syriatel brand-separated.
- */
 export function ProductSheet({ 
   children, 
   serviceName, 
@@ -45,50 +38,43 @@ export function ProductSheet({
   const [fetching, setFetching] = useState(false);
   const [selectedVariations, setSelectedVariations] = useState<Record<string, string>>({});
   const { toast } = useToast();
-  
-  const sectionTitle = serviceName;
 
-  /**
-   * ROBUST FILTERING & MAPPING LOGIC
-   * 1. Filters by Parent ID.
-   * 2. Isolates by Keyword (MTN/Syriatel).
-   * 3. Injects 4% Margin and Extracts Amount.
-   */
   const filteredProducts = useMemo(() => {
     if (!allProducts || !Array.isArray(allProducts) || allProducts.length === 0) return [];
     
-    // 1. Get base products matching the current category
     let baseFilter = allProducts.filter(item => item && Number(item.parent_id) === Number(activeCategoryId));
 
-    // 2. Strict Grouping & Isolation for Telecom (Parent ID 6)
-    if (Number(activeCategoryId) === 6 && sectionTitle) {
-      const title = sectionTitle.toLowerCase();
+    if (Number(activeCategoryId) === 6 && serviceName) {
+      const title = serviceName.toLowerCase();
       if (title.includes("إم تي إن") || title.includes("mtn")) {
-        baseFilter = baseFilter.filter(item => item?.name && (item.name.includes("إم تي إن") || item.name.toUpperCase().includes("MTN")));
+        baseFilter = baseFilter.filter(item => 
+          item?.name && (item.name.includes("إم تي إن") || item.name.toUpperCase().includes("MTN"))
+        );
       } else if (title.includes("سيريتل") || title.includes("syriatel")) {
-        baseFilter = baseFilter.filter(item => item?.name && (item.name.includes("سيريتل") || item.name.toUpperCase().includes("SYRIATEL")));
+        baseFilter = baseFilter.filter(item => 
+          item?.name && (item.name.includes("سيريتل") || item.name.toUpperCase().includes("SYRIATEL"))
+        );
       } else if (title.includes("زين") || title.includes("zain")) {
-        baseFilter = baseFilter.filter(item => item?.name && (item.name.toUpperCase().includes("ZAIN") || item.name.includes("زين")));
+        baseFilter = baseFilter.filter(item => 
+          item?.name && (item.name.toUpperCase().includes("ZAIN") || item.name.includes("زين"))
+        );
       }
     }
     
-    // 3. Map over results to inject 4% profit margin and extract exact dynamic amount
     return baseFilter.map(item => {
-      // Hidden 4% Margin math
       const basePrice = Number(item.price || 0);
       const finalCustomerPrice = (basePrice * 1.04).toFixed(2);
       
-      // Dynamic Regex to strip and extract only numbers/dots from item name safely
-      const nameNumbers = item.name?.match(/[\d.]+/);
-      const amountDelivered = item.amount || item.denomination || (nameNumbers ? nameNumbers[0] : "محدد");
+      const nameMatch = item.name?.match(/[\d.]+/);
+      const amountDelivered = item.amount || item.denomination || (nameMatch ? nameMatch[0] : "محدد");
 
       return {
         ...item,
-        displayPrice: finalCustomerPrice, // ONLY this price will be shown
-        displayAmount: amountDelivered     // Extracted volume/balance
+        displayPrice: finalCustomerPrice,
+        displayAmount: amountDelivered
       };
     });
-  }, [allProducts, activeCategoryId, sectionTitle]);
+  }, [allProducts, activeCategoryId, serviceName]);
 
   const fetchProducts = useCallback(async () => {
     if (serviceId === 'admin') return;
@@ -113,7 +99,7 @@ export function ProductSheet({
   const handleOrder = (productName: string, variationId: string) => {
     toast({
       title: "تم استلام الطلب",
-      description: `تم إرسال طلب ${productName} للمعالجة.`,
+      description: `تم إرسال طلب ${productName} للمعالجة بنجاح.`,
     });
   };
 
@@ -143,7 +129,7 @@ export function ProductSheet({
               </Button>
             </div>
             <SheetDescription className="text-right text-xs">
-              جميع الأسعار تشمل رسوم الخدمة والضرائب.
+              الأسعار نهائية وشاملة لكافة الضرائب والرسوم.
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -152,14 +138,14 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-medium">جاري سحب كافة الفئات والأسعار...</p>
+              <p className="text-sm font-medium">جاري تحديث الأسعار المباشرة...</p>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
               {filteredProducts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center text-muted-foreground gap-4 py-12">
                   <PackageX className="h-10 w-10 opacity-40" />
-                  <p className="text-sm font-bold text-center">لا توجد منتجات متاحة حالياً.</p>
+                  <p className="text-sm font-bold text-center">لا توجد منتجات متوفرة حالياً لهذه الفئة.</p>
                 </div>
               ) : (
                 <div className="grid gap-4" dir="rtl">
@@ -168,7 +154,6 @@ export function ProductSheet({
                     const selectedVarId = selectedVariations[product.id];
                     const currentVariation = variations.find((v: any) => v && String(v.id) === selectedVarId);
                     
-                    // Final Customer Pricing (Always Hidden 4% markup)
                     const displayPrice = currentVariation 
                       ? (Number(currentVariation.price || 0) * 1.04).toFixed(2)
                       : product.displayPrice;
@@ -195,7 +180,7 @@ export function ProductSheet({
                                 onValueChange={(val) => setSelectedVariations(prev => ({ ...prev, [product.id]: val }))}
                               >
                                 <SelectTrigger className="w-full text-right bg-muted/30 border-none h-12 focus:ring-0">
-                                  <SelectValue placeholder="اختر القيمة..." />
+                                  <SelectValue placeholder="اختر القيمة المطلوبة..." />
                                 </SelectTrigger>
                                 <SelectContent className="font-body" dir="rtl">
                                   {variations.map((v: any) => {
@@ -216,7 +201,7 @@ export function ProductSheet({
 
                           <div className="flex items-center justify-between pt-4 border-t border-dashed">
                             <div className="text-right">
-                              <p className="text-xs text-muted-foreground mb-1">السعر النهائي</p>
+                              <p className="text-xs text-muted-foreground mb-1">السعر للمستهلك</p>
                               <p className="text-primary font-bold text-xl leading-none">
                                 {displayPrice} <span className="text-xs opacity-70">ل.س</span>
                               </p>
