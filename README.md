@@ -1,15 +1,18 @@
-# Shabik Labik Digital - Vercel Edition
+# Shabik Labik Digital - Vercel Production Ready
 
-This project is optimized for deployment on Vercel to bypass Cloud IP restrictions.
+هذا المشروع مجهز للنشر المباشر على Vercel لتجاوز قيود الـ IP.
 
-## Production Deployment
-To deploy this project to Vercel:
-1. `npm run deploy` 
-2. Follow the terminal prompts to log in and link the project.
+## خطوات النشر السريع (GitHub CI/CD)
+بما أن GitHub مرتبط بـ Vercel، نفذ الأوامر التالية في Terminal:
 
-## Tech Stack
-- Next.js 15 (App Router)
-- Tailwind CSS
-- Shadcn UI
-- Lucide Icons
-- Al-Ragheb API Integration (Server-side Proxy)
+1. `git add .`
+2. `git commit -m "Production ready"`
+3. `git push origin main`
+
+## المميزات المدمجة
+- **Direct Clean Proxy**: تجاوز جدران الحماية بطلبات نظيفة.
+- **Auto-Sync**: مزامنة حية من سيرفرات الراغب.
+- **Safe Margin**: تطبيق عمولة 4% آلياً.
+- **Mobile Optimized**: واجهة مستخدم متوافقة مع كافة الشاشات.
+
+© 2024 Shabik Labik Digital.

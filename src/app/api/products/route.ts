@@ -10,9 +10,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get('categoryId');
     
-    // استخدام الرابط المباشر للإنتاج
     const targetEndpoint = `${AL_RAGHEB_BASE_URL}/client/api/products`;
 
+    // بيانات الاعتماد المباشرة لضمان المصادقة الصحيحة
     const bodyData = {
       email: "ayhmbakyr213@gmail.com",
       username: "ayhmbakyr213@gmail.com",
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
       category_id: categoryId ? Number(categoryId) : undefined
     };
 
-    // إرسال طلب نظيف جداً لتجنب أي تعارض مع جدار الحماية في الإنتاج
+    // إرسال طلب "نظيف" للغاية لتجاوز جدران الحماية في بيئة الإنتاج
     const response = await fetch(targetEndpoint, {
       method: 'POST', 
       headers: {
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
       }
     });
   } catch (error: any) {
-    console.error("[PROXY ERROR]:", error);
+    console.error("[PRODUCTION PROXY ERROR]:", error);
     return NextResponse.json(
       { error: "Fetch failed.", details: error.message },
       { 
