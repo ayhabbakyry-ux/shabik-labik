@@ -60,8 +60,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const ADMIN_PHONE = "0939549573";
 
+  // تحميل البيانات الأولية عند بدء التطبيق
   useEffect(() => {
-    // تحميل بيانات الجلسة الحالية
     const savedAuth = localStorage.getItem('shabik_auth');
     if (savedAuth) {
       const data = JSON.parse(savedAuth);
@@ -71,43 +71,51 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setUserBalance(data.balance || 0);
     }
 
-    // تحميل قائمة كافة المستخدمين
     const savedUsers = localStorage.getItem('shabik_users');
     if (savedUsers) {
       setAllUsers(JSON.parse(savedUsers));
     }
 
-    // تحميل المعاملات
     const savedTxs = localStorage.getItem('shabik_txs');
     if (savedTxs) {
       setTransactions(JSON.parse(savedTxs));
     }
 
-    // تحميل طلبات كلمة السر
     const savedPassReqs = localStorage.getItem('shabik_pass_reqs');
     if (savedPassReqs) {
       setPasswordRequests(JSON.parse(savedPassReqs));
     }
   }, []);
 
+  // مزامنة المعاملات مع الذاكرة المحلية
   useEffect(() => {
-    localStorage.setItem('shabik_txs', JSON.stringify(transactions));
+    if (transactions.length > 0) {
+      localStorage.setItem('shabik_txs', JSON.stringify(transactions));
+    }
   }, [transactions]);
 
+  // مزامنة قائمة المستخدمين مع الذاكرة المحلية
   useEffect(() => {
     localStorage.setItem('shabik_users', JSON.stringify(allUsers));
   }, [allUsers]);
 
+  // مزامنة طلبات كلمة السر
   useEffect(() => {
     localStorage.setItem('shabik_pass_reqs', JSON.stringify(passwordRequests));
   }, [passwordRequests]);
 
+  // تحديث بيانات الجلسة الحالية عند تغير الرصيد أو الاسم
   useEffect(() => {
     if (isLoggedIn) {
       const currentAuth = JSON.parse(localStorage.getItem('shabik_auth') || '{}');
-      localStorage.setItem('shabik_auth', JSON.stringify({ ...currentAuth, balance: userBalance, phone: userPhone, name: userName }));
+      localStorage.setItem('shabik_auth', JSON.stringify({ 
+        ...currentAuth, 
+        balance: userBalance, 
+        phone: userPhone, 
+        name: userName 
+      }));
       
-      // تحديث رصيد المستخدم في القائمة الكلية أيضاً
+      // تحديث رصيد المستخدم في القائمة الكلية
       setAllUsers(prev => prev.map(u => u.phone === userPhone ? { ...u, balance: userBalance } : u));
     }
   }, [userBalance, isLoggedIn, userPhone, userName]);
@@ -117,14 +125,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setUserPhone(phone);
     setUserName(name);
     
-    // البحث عن المستخدم في القائمة
     const existingUser = allUsers.find(u => u.phone === phone);
     const initialBalance = existingUser ? existingUser.balance : 0;
     
     setUserBalance(initialBalance);
     localStorage.setItem('shabik_auth', JSON.stringify({ phone, name, balance: initialBalance }));
 
-    // إضافة للقائمة الكلية إذا كان جديداً
     if (!existingUser) {
       const newUser: AppUser = { phone, name, password: pass, balance: 0 };
       setAllUsers(prev => [...prev, newUser]);
@@ -162,12 +168,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (tx.id === transactionId) {
         if (action === 'approve') {
           if (tx.status !== 'Completed') {
-            // تحديث رصيد المستخدم في المصفوفة الكلية
             setAllUsers(prevUsers => prevUsers.map(u => 
               u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
             ));
             
-            // إذا كان الأدمن هو نفسه صاحب الطلب، نحدث حالته الحالية
             if (tx.userPhone === userPhone) {
               setUserBalance(current => current + tx.amount);
             }
@@ -181,7 +185,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteUser = (phone: string) => {
-    setAllUsers(prev => prev.filter(u => u.phone !== phone));
+    // حذف المستخدم من القائمة الكلية وتحديث الحالة فوراً
+    setAllUsers(prev => {
+      const updated = prev.filter(u => u.phone !== phone);
+      localStorage.setItem('shabik_users', JSON.stringify(updated));
+      return updated;
+    });
+    
+    // إذا كان هذا المستخدم يملك طلب استعادة كلمة سر، نحذفه أيضاً
+    setPasswordRequests(prev => prev.filter(r => r.phone !== phone));
   };
 
   const requestPasswordReset = (phone: string) => {

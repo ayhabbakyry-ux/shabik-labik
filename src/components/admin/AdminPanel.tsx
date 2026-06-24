@@ -20,11 +20,12 @@ export function AdminPanel() {
   const pendingTxs = transactions.filter(t => t.status === 'Pending');
 
   const handleDeleteUser = (phone: string) => {
-    if (confirm("هل أنت متأكد من حذف هذا الحساب نهائياً؟ لن يتمكن هذا المستخدم من تسجيل الدخول مرة أخرى.")) {
+    // تأكيد الحذف من المدير قبل التنفيذ
+    if (window.confirm(`هل أنت متأكد من حذف حساب الرقم (${phone}) نهائياً؟`)) {
       deleteUser(phone);
       toast({
-        title: "تم الحذف",
-        description: `تم مسح حساب الرقم ${phone} من النظام بنجاح.`,
+        title: "تم الحذف بنجاح",
+        description: `تم إزالة حساب الرقم ${phone} من قاعدة البيانات.`,
         variant: "destructive"
       });
     }
