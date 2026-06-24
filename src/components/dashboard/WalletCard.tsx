@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { PlusCircle, Wallet, Send, Landmark } from "lucide-react";
+import { Send, Landmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/store";
 import {
@@ -49,11 +49,15 @@ export function WalletCard() {
       
       {/* الأزرار */}
       <div className="flex gap-3 w-full">
-        <button className="flex-1 bg-[#475569] py-2 rounded-lg text-white font-medium hover:bg-[#58687e] transition-colors">Details</button>
+        <button className="flex-1 bg-[#475569] py-2 rounded-lg text-white font-medium hover:bg-[#58687e] transition-colors">
+          Details
+        </button>
         
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <button className="flex-1 bg-[#2563eb] py-2 rounded-lg text-white font-bold hover:bg-[#3b82f6] transition-colors">Deposit</button>
+            <button className="flex-1 bg-[#2563eb] py-2 rounded-lg text-white font-bold hover:bg-[#3b82f6] transition-colors">
+              Deposit
+            </button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]" dir="rtl">
             <DialogHeader>
