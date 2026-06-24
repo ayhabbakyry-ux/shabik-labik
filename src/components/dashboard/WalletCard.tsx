@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import genieLogo from '@/public/1000189207.png';
 
 export function WalletCard() {
   const { userBalance, requestDeposit } = useUser();
@@ -38,7 +39,7 @@ export function WalletCard() {
     <div className="bg-[#2d3a5a] p-6 rounded-2xl shadow-xl flex flex-col items-center text-center">
       {/* لوجو التطبيق */}
       <img 
-        src="/1000189207.png" 
+        src={genieLogo.src} 
         alt="Logo" 
         className="w-16 h-16 mb-4 object-contain" 
       />
@@ -83,7 +84,7 @@ export function WalletCard() {
                   id="amount" 
                   type="number" 
                   placeholder="مثال: 50000" 
-                  className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-right text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-right text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                 />
