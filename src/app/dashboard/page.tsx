@@ -7,8 +7,9 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { useUser } from "@/lib/store";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Search, Menu } from "lucide-react";
+import { Bell, Search, Menu, ShieldAlert } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
   const { isLoggedIn, userPhone, isAdmin } = useUser();
@@ -51,6 +52,28 @@ export default function DashboardPage() {
           </button>
         </div>
 
+        {isAdmin && (
+          <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-2xl flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-destructive p-2 rounded-lg">
+                <ShieldAlert className="h-5 w-5 text-white" />
+              </div>
+              <div className="text-right">
+                <p className="font-bold text-sm text-destructive">لوحة الإدارة نشطة</p>
+                <p className="text-[10px] text-muted-foreground">لديك طلبات إيداع بانتظار المراجعة</p>
+              </div>
+            </div>
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              onClick={() => router.push('/admin')}
+              className="font-bold text-xs"
+            >
+              فتح اللوحة
+            </Button>
+          </div>
+        )}
+
         <WalletCard />
 
         <div className="space-y-4">
@@ -65,20 +88,6 @@ export default function DashboardPage() {
           </div>
 
           <ServiceGrid isAdmin={isAdmin} />
-        </div>
-
-        {/* Featured Section */}
-        <div className="rounded-2xl bg-gradient-to-br from-secondary to-blue-700 p-6 text-white shadow-lg relative overflow-hidden">
-          <div className="relative z-10 text-right">
-            <h4 className="font-bold text-xl mb-2 font-headline">تحديث ببجي موبايل 3.5</h4>
-            <p className="text-sm opacity-90 mb-4 max-w-md">تمت مزامنة عناصر الموسم الجديدة من الراغب. احصل على حزم UC الحصرية الآن بأفضل الأسعار!</p>
-            <button className="px-8 py-2.5 bg-white text-secondary rounded-full font-bold text-sm shadow-md hover:scale-105 transition-transform active:scale-95">
-              تصفح الحزم
-            </button>
-          </div>
-          <div className="absolute left-[-20px] bottom-[-20px] opacity-20 transform -rotate-12">
-            <Search className="h-40 w-40" />
-          </div>
         </div>
       </main>
 

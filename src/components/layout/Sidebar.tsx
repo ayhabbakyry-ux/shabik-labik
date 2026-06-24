@@ -1,9 +1,8 @@
-
 "use client";
 
 import React from 'react';
 import { useUser } from "@/lib/store";
-import { LogOut, User, Heart, Home, CreditCard, Receipt, Wallet, ShoppingCart, MapPin, MessageCircle, Gift } from "lucide-react";
+import { LogOut, User, Heart, Home, CreditCard, Receipt, Wallet, ShoppingCart, MapPin, MessageCircle, Gift, ShieldAlert } from "lucide-react";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
@@ -14,7 +13,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
-  const { userPhone, userName, userBalance, logout, currency } = useUser();
+  const { userPhone, userName, userBalance, logout, currency, isAdmin } = useUser();
   const pathname = usePathname();
   const { toast } = useToast();
 
@@ -84,6 +83,18 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         <div className="flex flex-col p-4 gap-2">
+          {isAdmin && (
+            <Link href="/admin" onClick={onClose}>
+              <div className={cn(
+                "flex items-center gap-4 px-4 py-3 rounded-xl w-full transition-all mb-2",
+                pathname === "/admin" ? "bg-destructive/20 text-destructive" : "bg-destructive/10 text-destructive hover:bg-destructive/20"
+              )}>
+                <span className="text-xl"><ShieldAlert className="h-5 w-5" /></span>
+                <span className="font-bold text-base font-headline">لوحة الإدارة</span>
+              </div>
+            </Link>
+          )}
+
           {menuItems.map((item) => (
             <Link key={item.title} href={item.href} onClick={onClose}>
               <div
