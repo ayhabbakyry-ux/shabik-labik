@@ -1,25 +1,28 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, Phone, Lock, User, ArrowRight } from "lucide-react";
+import { ShieldCheck, Phone, Lock, User, ArrowRight, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { useUser } from "@/lib/store";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AuthPage() {
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const { login, isLoggedIn } = useUser();
+  const { login, isLoggedIn, requestPasswordReset } = useUser();
   const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const { toast } = useToast();
 
-  // إذا كان المستخدم مسجل الدخول بالفعل، وجهه للوحة التحكم
   useEffect(() => {
     if (isLoggedIn) {
       router.push("/dashboard");
@@ -40,7 +43,6 @@ export default function AuthPage() {
       return;
     }
 
-    // التحقق من بيانات الأدمن
     const adminPhone = "0939549573";
     const adminPass = "872003";
 
@@ -51,10 +53,54 @@ export default function AuthPage() {
       }
     }
 
-    // تنفيذ عملية الدخول
-    login(phone, name || (phone === adminPhone ? "المدير أيهم" : "مستخدم"));
+    login(phone, name || (phone === adminPhone ? "المدير أيهم" : "مستخدم"), password);
     router.push("/dashboard");
   };
+
+  const handleForgotPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!phone) {
+      setError("الرجاء إدخال رقم الهاتف أولاً");
+      return;
+    }
+    requestPasswordReset(phone);
+    toast({
+      title: "تم إرسال الطلب",
+      description: "تم إبلاغ الإدارة بطلبك لاستعادة كلمة السر، يرجى التواصل مع الدعم.",
+    });
+    setIsForgotPassword(false);
+  };
+
+  if (isForgotPassword) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6" dir="rtl">
+        <Card className="w-full max-w-md shadow-2xl border-none">
+          <CardHeader>
+            <CardTitle className="text-xl text-right flex items-center gap-2">
+              <HelpCircle className="h-5 w-5 text-primary" /> استعادة الحساب
+            </CardTitle>
+            <CardDescription className="text-right">أدخل رقم هاتفك المسجل لنرسل طلباً للإدارة.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              {error && <p className="text-destructive text-sm font-bold text-right">{error}</p>}
+              <div className="space-y-2">
+                <Label className="text-right block">رقم الهاتف</Label>
+                <Input 
+                  placeholder="09xxxxxxxx" 
+                  className="pr-10 h-11 text-right" 
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+              </div>
+              <Button type="submit" className="w-full h-11">إرسال طلب استعادة</Button>
+              <Button variant="ghost" className="w-full" onClick={() => setIsForgotPassword(false)}>العودة</Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6" dir="rtl">
@@ -129,16 +175,21 @@ export default function AuthPage() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full h-11 text-base font-semibold">
+              {isLogin && (
+                <button 
+                  type="button" 
+                  onClick={() => setIsForgotPassword(true)}
+                  className="text-xs text-primary font-bold hover:underline block w-full text-right"
+                >
+                  هل نسيت كلمة المرور؟
+                </button>
+              )}
+
+              <Button type="submit" className="w-full h-11 text-base font-semibold mt-2">
                 {isLogin ? "دخول للمنصة" : "تسجيل الحساب"} <ArrowRight className="mr-2 h-4 w-4 rotate-180" />
               </Button>
             </form>
           </CardContent>
-          <CardFooter className="flex flex-col gap-2">
-            <p className="text-xs text-center text-muted-foreground">
-              بتسجيل دخولك، أنت توافق على شروط الخدمة الرقمية الخاصة بنا.
-            </p>
-          </CardFooter>
         </Tabs>
       </Card>
       

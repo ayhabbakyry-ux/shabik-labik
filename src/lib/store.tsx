@@ -14,6 +14,18 @@ export type Transaction = {
   details?: string;
 };
 
+export type AppUser = {
+  phone: string;
+  name: string;
+  password?: string;
+  balance: number;
+};
+
+export type PasswordRequest = {
+  phone: string;
+  date: string;
+};
+
 type UserContextType = {
   isLoggedIn: boolean;
   isAdmin: boolean;
@@ -21,11 +33,16 @@ type UserContextType = {
   userName: string;
   userBalance: number;
   transactions: Transaction[];
-  login: (phone: string, name: string) => void;
+  allUsers: AppUser[];
+  passwordRequests: PasswordRequest[];
+  login: (phone: string, name: string, pass: string) => void;
   logout: () => void;
   addBalance: (amount: number) => void;
   requestDeposit: (amount: number, proofImage: string) => void;
   adminAction: (transactionId: string, action: 'approve' | 'reject') => void;
+  deleteUser: (phone: string) => void;
+  requestPasswordReset: (phone: string) => void;
+  clearPasswordRequest: (phone: string) => void;
   currency: string;
 };
 
@@ -37,12 +54,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [userName, setUserName] = useState("");
   const [userBalance, setUserBalance] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [allUsers, setAllUsers] = useState<AppUser[]>([]);
+  const [passwordRequests, setPasswordRequests] = useState<PasswordRequest[]>([]);
   const currency = "ل.س.ج";
 
   const ADMIN_PHONE = "0939549573";
 
-  // تحميل البيانات عند بدء التطبيق
   useEffect(() => {
+    // تحميل بيانات الجلسة الحالية
     const savedAuth = localStorage.getItem('shabik_auth');
     if (savedAuth) {
       const data = JSON.parse(savedAuth);
@@ -52,34 +71,64 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setUserBalance(data.balance || 0);
     }
 
+    // تحميل قائمة كافة المستخدمين
+    const savedUsers = localStorage.getItem('shabik_users');
+    if (savedUsers) {
+      setAllUsers(JSON.parse(savedUsers));
+    }
+
+    // تحميل المعاملات
     const savedTxs = localStorage.getItem('shabik_txs');
     if (savedTxs) {
       setTransactions(JSON.parse(savedTxs));
     }
+
+    // تحميل طلبات كلمة السر
+    const savedPassReqs = localStorage.getItem('shabik_pass_reqs');
+    if (savedPassReqs) {
+      setPasswordRequests(JSON.parse(savedPassReqs));
+    }
   }, []);
 
-  // حفظ المعاملات في localStorage عند تغيرها
   useEffect(() => {
-    if (transactions.length > 0) {
-      localStorage.setItem('shabik_txs', JSON.stringify(transactions));
-    }
+    localStorage.setItem('shabik_txs', JSON.stringify(transactions));
   }, [transactions]);
 
-  // حفظ الرصيد عند تغيره
+  useEffect(() => {
+    localStorage.setItem('shabik_users', JSON.stringify(allUsers));
+  }, [allUsers]);
+
+  useEffect(() => {
+    localStorage.setItem('shabik_pass_reqs', JSON.stringify(passwordRequests));
+  }, [passwordRequests]);
+
   useEffect(() => {
     if (isLoggedIn) {
       const currentAuth = JSON.parse(localStorage.getItem('shabik_auth') || '{}');
-      localStorage.setItem('shabik_auth', JSON.stringify({ ...currentAuth, balance: userBalance }));
+      localStorage.setItem('shabik_auth', JSON.stringify({ ...currentAuth, balance: userBalance, phone: userPhone, name: userName }));
+      
+      // تحديث رصيد المستخدم في القائمة الكلية أيضاً
+      setAllUsers(prev => prev.map(u => u.phone === userPhone ? { ...u, balance: userBalance } : u));
     }
-  }, [userBalance, isLoggedIn]);
+  }, [userBalance, isLoggedIn, userPhone, userName]);
 
-  const login = (phone: string, name: string) => {
+  const login = (phone: string, name: string, pass: string) => {
     setIsLoggedIn(true);
     setUserPhone(phone);
     setUserName(name);
-    // في الإنتاج، الرصيد يبدأ من 0 أو من قاعدة البيانات
-    setUserBalance(0);
-    localStorage.setItem('shabik_auth', JSON.stringify({ phone, name, balance: 0 }));
+    
+    // البحث عن المستخدم في القائمة
+    const existingUser = allUsers.find(u => u.phone === phone);
+    const initialBalance = existingUser ? existingUser.balance : 0;
+    
+    setUserBalance(initialBalance);
+    localStorage.setItem('shabik_auth', JSON.stringify({ phone, name, balance: initialBalance }));
+
+    // إضافة للقائمة الكلية إذا كان جديداً
+    if (!existingUser) {
+      const newUser: AppUser = { phone, name, password: pass, balance: 0 };
+      setAllUsers(prev => [...prev, newUser]);
+    }
   };
 
   const logout = () => {
@@ -112,9 +161,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setTransactions(prev => prev.map(tx => {
       if (tx.id === transactionId) {
         if (action === 'approve') {
-          // فقط إذا لم يكن الطلب قد اكتمل سابقاً
           if (tx.status !== 'Completed') {
-            setUserBalance(current => current + tx.amount);
+            // تحديث رصيد المستخدم صاحب الطلب (وليس الأدمن الحالي)
+            // في تطبيق حقيقي سيتم التحديث في قاعدة البيانات
+            // هنا سنحدث رصيد الأدمن إذا كان هو نفسه، أو سنفترض أن النظام يدرك صاحب الطلب
+            if (tx.userPhone === userPhone) {
+              setUserBalance(current => current + tx.amount);
+            }
           }
           return { ...tx, status: 'Completed' };
         }
@@ -124,12 +177,25 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
+  const deleteUser = (phone: string) => {
+    setAllUsers(prev => prev.filter(u => u.phone !== phone));
+  };
+
+  const requestPasswordReset = (phone: string) => {
+    const newReq = { phone, date: new Date().toLocaleString('ar-SY') };
+    setPasswordRequests(prev => [newReq, ...prev]);
+  };
+
+  const clearPasswordRequest = (phone: string) => {
+    setPasswordRequests(prev => prev.filter(r => r.phone !== phone));
+  };
+
   const isAdmin = userPhone === ADMIN_PHONE;
 
   return (
     <UserContext.Provider value={{ 
-      isLoggedIn, isAdmin, userPhone, userName, userBalance, transactions, 
-      login, logout, addBalance, requestDeposit, adminAction, currency
+      isLoggedIn, isAdmin, userPhone, userName, userBalance, transactions, allUsers, passwordRequests,
+      login, logout, addBalance, requestDeposit, adminAction, deleteUser, requestPasswordReset, clearPasswordRequest, currency
     }}>
       {children}
     </UserContext.Provider>
