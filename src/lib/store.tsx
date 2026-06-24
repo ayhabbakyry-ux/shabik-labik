@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
@@ -16,6 +15,7 @@ export type Transaction = {
 
 type UserContextType = {
   isLoggedIn: boolean;
+  isAdmin: boolean;
   userPhone: string;
   userName: string;
   userBalance: number;
@@ -34,9 +34,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userPhone, setUserPhone] = useState("");
   const [userName, setUserName] = useState("");
-  const [userBalance, setUserBalance] = useState(0); // تصفير الرصيد الافتراضي
+  const [userBalance, setUserBalance] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const currency = "ل.س.ج";
+
+  const ADMIN_PHONE = "0939549573";
 
   useEffect(() => {
     const saved = localStorage.getItem('shabik_auth');
@@ -53,7 +55,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setIsLoggedIn(true);
     setUserPhone(phone);
     setUserName(name);
-    const initialBalance = 0; // الرصيد يبدأ من الصفر للجميع
+    const initialBalance = 0;
     setUserBalance(initialBalance);
     localStorage.setItem('shabik_auth', JSON.stringify({ phone, name, balance: initialBalance }));
   };
@@ -97,9 +99,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
+  const isAdmin = userPhone === ADMIN_PHONE;
+
   return (
     <UserContext.Provider value={{ 
-      isLoggedIn, userPhone, userName, userBalance, transactions, 
+      isLoggedIn, isAdmin, userPhone, userName, userBalance, transactions, 
       login, logout, addBalance, requestDeposit, adminAction, currency
     }}>
       {children}

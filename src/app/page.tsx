@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, Phone, Lock, User, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,28 +15,46 @@ export default function AuthPage() {
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const { login } = useUser();
+  const { login, isLoggedIn } = useUser();
   const router = useRouter();
+  const [isLogin, setIsLogin] = useState(true);
+
+  // إذا كان المستخدم مسجل الدخول بالفعل، وجهه للوحة التحكم
+  useEffect(() => {
+    if (isLoggedIn) {
+      router.push("/dashboard");
+    }
+  }, [isLoggedIn, router]);
 
   const handleAuth = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     
-    if (!phone || !password || (name === "" && !isLogin)) {
+    if (!phone || !password) {
       setError("عذراً، جميع الحقول مطلوبة");
       return;
     }
 
-    if (phone.length < 10) {
-      setError("عذراً، رقم الهاتف يجب أن يكون 10 أرقام على الأقل");
+    if (!isLogin && !name) {
+      setError("عذراً، يجب إدخال الاسم لإنشاء حساب");
       return;
     }
 
-    login(phone, name || "مستخدم");
+    // التحقق من بيانات الأدمن
+    const adminPhone = "0939549573";
+    const adminPass = "872003";
+
+    if (phone === adminPhone) {
+      if (password !== adminPass) {
+        setError("عذراً، كلمة السر الخاصة بالمدير غير صحيحة");
+        return;
+      }
+    }
+
+    // تنفيذ عملية الدخول
+    login(phone, name || (phone === adminPhone ? "المدير أيهم" : "مستخدم"));
     router.push("/dashboard");
   };
-
-  const [isLogin, setIsLogin] = useState(true);
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6" dir="rtl">
@@ -61,7 +78,11 @@ export default function AuthPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleAuth} className="space-y-4">
-              {error && <p className="text-destructive text-sm font-bold text-right">{error}</p>}
+              {error && (
+                <div className="bg-destructive/10 p-3 rounded-lg border border-destructive/20 mb-4">
+                  <p className="text-destructive text-sm font-bold text-right">{error}</p>
+                </div>
+              )}
               
               {!isLogin && (
                 <div className="space-y-2">

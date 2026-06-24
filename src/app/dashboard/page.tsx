@@ -1,4 +1,3 @@
-
 "use client";
 
 import { WalletCard } from "@/components/dashboard/WalletCard";
@@ -12,7 +11,7 @@ import { Bell, Search, Menu } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 export default function DashboardPage() {
-  const { isLoggedIn, userPhone } = useUser();
+  const { isLoggedIn, userPhone, isAdmin } = useUser();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const router = useRouter();
 
@@ -43,7 +42,7 @@ export default function DashboardPage() {
               <Menu className="h-6 w-6 text-primary" />
             </button>
             <div className="text-right">
-              <h1 className="text-lg font-bold font-headline">أهلاً، <span className="text-primary">{userPhone === "0939549573" ? "أيهم" : userPhone}</span></h1>
+              <h1 className="text-lg font-bold font-headline">أهلاً، <span className="text-primary">{isAdmin ? "المدير أيهم" : userPhone}</span></h1>
               <p className="text-[10px] text-muted-foreground">وصول سريع للخدمات الرقمية</p>
             </div>
           </div>
@@ -65,7 +64,7 @@ export default function DashboardPage() {
             <Input className="pr-10 bg-white border-none shadow-sm h-11 text-right" placeholder="ابحث عن ألعاب، بطاقات شحن..." />
           </div>
 
-          <ServiceGrid isAdmin={userPhone === "0939549573"} />
+          <ServiceGrid isAdmin={isAdmin} />
         </div>
 
         {/* Featured Section */}
