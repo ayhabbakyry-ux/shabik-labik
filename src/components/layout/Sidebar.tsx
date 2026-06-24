@@ -6,6 +6,7 @@ import { LogOut, User, Heart, Home, CreditCard, Receipt, Wallet, ShoppingCart, M
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -98,11 +99,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           {menuItems.map((item) => (
             <Link key={item.title} href={item.href} onClick={onClose}>
               <div
-                className={`flex items-center gap-4 px-4 py-3 rounded-xl w-full transition-all active:scale-[0.98] cursor-pointer ${
+                className={cn(
+                  "flex items-center gap-4 px-4 py-3 rounded-xl w-full transition-all active:scale-[0.98] cursor-pointer",
                   pathname === item.href 
                     ? 'bg-[#1e3329] text-[#22c55e]' 
                     : 'hover:bg-[#1f242f] text-gray-300'
-                }`}
+                )}
               >
                 <span className="text-xl">{item.icon}</span>
                 <span className="font-medium text-base font-headline">{item.title}</span>
