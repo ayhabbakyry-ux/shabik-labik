@@ -4,6 +4,7 @@
 import React from 'react';
 import { useUser } from "@/lib/store";
 import { LogOut, User, Heart, Home, CreditCard, Receipt, Wallet, ShoppingCart, MapPin, MessageCircle } from "lucide-react";
+import Link from 'next/link';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -76,12 +77,18 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         {/* 3. قائمة التنقل (الروابط) */}
         <div className="flex flex-col p-4 gap-2">
-          <NavItem title="الرئيسية" icon={<Home className="h-5 w-5" />} isActive={true} />
+          <Link href="/dashboard" onClick={onClose}>
+            <NavItem title="الرئيسية" icon={<Home className="h-5 w-5" />} />
+          </Link>
           <NavItem title="منتجاتي المفضلة" icon={<Heart className="h-5 w-5" />} />
           <NavItem title="اضافة رصيد لحسابي" icon={<CreditCard className="h-5 w-5" />} />
           <NavItem title="دفعاتي المالية" icon={<Receipt className="h-5 w-5" />} />
-          <NavItem title="محفظتي" icon={<Wallet className="h-5 w-5" />} />
-          <NavItem title="مشترياتي" icon={<ShoppingCart className="h-5 w-5" />} />
+          <Link href="/wallet" onClick={onClose}>
+            <NavItem title="محفظتي" icon={<Wallet className="h-5 w-5" />} />
+          </Link>
+          <Link href="/history" onClick={onClose}>
+            <NavItem title="مشترياتي" icon={<ShoppingCart className="h-5 w-5" />} />
+          </Link>
           <NavItem title="المراكز المعتمدة" icon={<MapPin className="h-5 w-5" />} />
           <NavItem title="واتساب" icon={<MessageCircle className="h-5 w-5" />} />
         </div>
@@ -92,8 +99,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
 function NavItem({ title, icon, isActive }: { title: string; icon: React.ReactNode; isActive?: boolean }) {
   return (
-    <button
-      className={`flex items-center gap-4 px-4 py-3 rounded-xl w-full transition-all active:scale-[0.98] ${
+    <div
+      className={`flex items-center gap-4 px-4 py-3 rounded-xl w-full transition-all active:scale-[0.98] cursor-pointer ${
         isActive 
           ? 'bg-[#1e3329] text-[#22c55e]' 
           : 'hover:bg-[#1f242f] text-gray-300'
@@ -101,6 +108,6 @@ function NavItem({ title, icon, isActive }: { title: string; icon: React.ReactNo
     >
       <span className="text-xl">{icon}</span>
       <span className="font-medium text-base font-headline">{title}</span>
-    </button>
+    </div>
   );
 }
