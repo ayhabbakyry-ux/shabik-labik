@@ -10,11 +10,11 @@ import {
   ShieldCheck, 
   Menu, 
   Search, 
-  Wallet as WalletIcon, 
   ShoppingBag, 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 export default function WalletPage() {
   const router = useRouter();
@@ -22,6 +22,8 @@ export default function WalletPage() {
   const [fromDate, setFromDate] = useState('2026-06-24');
   const [toDate, setToDate] = useState('2026-06-24');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const logoImage = PlaceHolderImages.find(img => img.id === 'app-logo');
 
   return (
     <div className="min-h-screen bg-[#11151d] text-white flex flex-col pb-20" dir="rtl">
@@ -53,18 +55,21 @@ export default function WalletPage() {
         
         {/* Card Row */}
         <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 snap-x snap-mandatory">
-          <div className="min-w-[85%] sm:min-w-[300px] bg-[#00c853] p-6 rounded-2xl flex flex-col justify-between h-36 snap-center shadow-xl relative overflow-hidden group">
-            <span className="text-[10px] font-bold self-start bg-black/20 px-2 py-0.5 rounded backdrop-blur-sm z-10">SYP</span>
-            <div className="text-right z-10">
-              <h3 className="text-3xl font-black tracking-wide leading-none">
-                {userBalance.toLocaleString()}
-              </h3>
-              <p className="text-sm opacity-90 font-medium mt-2">رصيدك الحالي</p>
-            </div>
-            <WalletIcon className="absolute left-[-10px] bottom-[-10px] h-24 w-24 opacity-10 -rotate-12 group-hover:scale-110 transition-transform" />
+          {/* New Balance Card Design */}
+          <div className="min-w-[85%] sm:min-w-[300px] flex flex-col items-center justify-center bg-green-500 p-6 rounded-2xl snap-center shadow-xl transition-transform active:scale-95 group">
+            <img 
+              src={logoImage?.imageUrl} 
+              alt="رصيد" 
+              className="w-16 h-16 mb-2 object-contain group-hover:scale-110 transition-transform" 
+              data-ai-hint={logoImage?.imageHint}
+            />
+            <span className="text-white font-bold text-lg font-headline">رصيدك الحالي</span>
+            <span className="text-white font-black text-2xl mt-1">
+              SYP {userBalance.toLocaleString()}
+            </span>
           </div>
 
-          <div className="min-w-[85%] sm:min-w-[300px] bg-[#ff5252] p-6 rounded-2xl flex flex-col justify-between h-36 snap-center shadow-xl relative overflow-hidden group">
+          <div className="min-w-[85%] sm:min-w-[300px] bg-[#ff5252] p-6 rounded-2xl flex flex-col justify-between h-40 snap-center shadow-xl relative overflow-hidden group">
             <span className="text-[10px] font-bold self-start bg-black/20 px-2 py-0.5 rounded backdrop-blur-sm z-10">SYP</span>
             <div className="text-right z-10">
               <h3 className="text-3xl font-black tracking-wide leading-none">178,909</h3>
@@ -73,7 +78,7 @@ export default function WalletPage() {
             <ShoppingBag className="absolute left-[-10px] bottom-[-10px] h-24 w-24 opacity-10 -rotate-12 group-hover:scale-110 transition-transform" />
           </div>
 
-          <div className="min-w-[85%] sm:min-w-[300px] bg-[#7c4dff] p-6 rounded-2xl flex flex-col justify-between h-36 snap-center shadow-xl relative overflow-hidden group">
+          <div className="min-w-[85%] sm:min-w-[300px] bg-[#7c4dff] p-6 rounded-2xl flex flex-col justify-between h-40 snap-center shadow-xl relative overflow-hidden group">
             <span className="text-[10px] font-bold self-start bg-black/20 px-2 py-0.5 rounded backdrop-blur-sm z-10">SYP</span>
             <div className="text-right z-10">
               <h3 className="text-3xl font-black tracking-wide leading-none">316,178</h3>

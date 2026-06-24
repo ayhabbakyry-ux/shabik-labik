@@ -24,6 +24,12 @@
       "description": "MTN logo abstract",
       "imageUrl": "https://picsum.photos/seed/telecom2/400/300",
       "imageHint": "network abstract"
+    },
+    {
+      "id": "app-logo",
+      "description": "Shabik Labik Genie Lamp Logo",
+      "imageUrl": "https://picsum.photos/seed/genie/200/200",
+      "imageHint": "magic lamp"
     }
   ]
 }
