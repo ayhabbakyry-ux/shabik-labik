@@ -29,16 +29,24 @@ export function WalletCard() {
 
   const handleDeposit = () => {
     setError("");
-    if (!amount || isNaN(Number(amount))) {
+    const numAmount = Number(amount);
+
+    if (!amount || isNaN(numAmount)) {
       setError("عذراً، هذا الحقل مطلوب (المبلغ)");
       return;
     }
+
+    if (numAmount < 120) {
+      setError("عذراً، أقل مبلغ للإيداع هو 120 ل.س.ج");
+      return;
+    }
+
     if (!imageProof) {
       setError("عذراً، يجب رفع صورة الإشعار لإتمام العملية");
       return;
     }
 
-    requestDeposit(Number(amount), imageProof);
+    requestDeposit(numAmount, imageProof);
     setOpen(false);
     setAmount("");
     setImageProof(null);
@@ -50,7 +58,8 @@ export function WalletCard() {
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setImageProof("proof_image_uploaded_sim"); // محاكاة الرفع
+      // محاكاة رفع صورة ناجحة
+      setImageProof("proof_image_uploaded_sim"); 
     }
   };
 
@@ -123,7 +132,7 @@ export function WalletCard() {
               </div>
 
               {error && (
-                <div className="flex items-center gap-2 text-destructive bg-destructive/10 p-2 rounded text-xs">
+                <div className="flex items-center gap-2 text-destructive bg-destructive/10 p-3 rounded-lg border border-destructive/20 text-xs font-bold">
                   <AlertCircle className="h-4 w-4" />
                   {error}
                 </div>
@@ -139,6 +148,7 @@ export function WalletCard() {
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                 />
+                <p className="text-[10px] text-muted-foreground">أقل مبلغ للإيداع هو 120 ل.س.ج</p>
               </div>
 
               <div className="grid gap-2 text-right">
@@ -159,7 +169,7 @@ export function WalletCard() {
               </div>
             </div>
             <DialogFooter>
-              <Button onClick={handleDeposit} className="w-full h-12 text-lg font-bold">تأكيد وإرسال الإشعار</Button>
+              <Button onClick={handleDeposit} className="w-full h-12 text-lg font-bold shadow-lg">إرسال طلب الإيداع</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

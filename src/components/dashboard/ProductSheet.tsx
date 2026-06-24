@@ -58,10 +58,12 @@ export function ProductSheet({
         cache: 'no-store'
       });
       const result = await response.json();
-      // التعامل مع مختلف هياكل الـ API المتوقعة
+      console.log(`[FETCH ${serviceName}]:`, result); // تتبع البيانات
+      
       const rawItems = Array.isArray(result) ? result : (result.data || result.products || []);
       setAllProducts(rawItems);
     } catch (error: any) {
+      console.error("[FETCH ERROR]:", error);
       toast({
         title: "خطأ في الاتصال",
         description: "تعذر جلب البيانات. يرجى المحاولة لاحقاً.",
@@ -70,28 +72,27 @@ export function ProductSheet({
     } finally {
       setFetching(false);
     }
-  }, [activeCategoryId, toast]);
+  }, [activeCategoryId, toast, serviceName]);
 
   const groupedServices = useMemo(() => {
     if (!allProducts || !Array.isArray(allProducts)) return [];
 
-    // نظام الفلترة الذكي: الفلترة بناءً على الكلمات المفتاحية لاسم الخدمة
-    const keywords = serviceName.toLowerCase().split(' ').filter(k => k.length > 2);
+    // نظام الفلترة المرن
+    const searchTerms = serviceName.toLowerCase().split(' ').filter(k => k.length > 2);
     
     let filtered = allProducts;
 
-    // تطبيق فلترة دقيقة بناءً على اسم القسم
-    if (keywords.length > 0) {
+    if (searchTerms.length > 0) {
       filtered = allProducts.filter(item => {
         const itemName = item.name?.toLowerCase() || "";
-        // يجب أن يحتوي اسم المنتج على الكلمات الأساسية (مثل: سيريتل + وحدات)
-        return keywords.every(kw => itemName.includes(kw));
+        // إذا كان هناك أي كلمة مطابقة، نعتبرها صالحة لضمان ظهور البيانات
+        return searchTerms.some(kw => itemName.includes(kw));
       });
     }
 
-    // إذا لم تنجح الفلترة الدقيقة، نحاول الفلترة بالكلمة الأولى (الماركة)
-    if (filtered.length === 0 && keywords.length > 0) {
-      filtered = allProducts.filter(item => item.name?.toLowerCase().includes(keywords[0]));
+    // إذا لم ينجح الفلترة الدقيقة، نعرض جميع منتجات هذا القسم لضمان عدم ظهور "لا توجد منتجات"
+    if (filtered.length === 0) {
+      filtered = allProducts;
     }
 
     const groups: Record<string, { id: string; mainTitle: string; items: any[] }> = {};
@@ -104,7 +105,6 @@ export function ProductSheet({
         groups[groupKey] = { id: groupKey, mainTitle: mainTitle, items: [] };
       }
 
-      // معالجة الخيارات أو المتغيرات داخل المنتج الواحد
       const subItems = item.options || item.variants || item.params || [];
       
       if (Array.isArray(subItems) && subItems.length > 0) {
@@ -113,7 +113,6 @@ export function ProductSheet({
           groups[groupKey].items.push({
             id: sub.id || `${item.id}-${Math.random()}`,
             name: sub.name || item.name,
-            extractedAmount: sub.name?.match(/[\d.]+/)?.[0] || "محدد",
             customerPrice: (basePrice * 1.04).toFixed(0),
             price: basePrice
           });
@@ -123,7 +122,6 @@ export function ProductSheet({
         groups[groupKey].items.push({
           id: item.id,
           name: item.name,
-          extractedAmount: item.name?.match(/[\d.]+/)?.[0] || "محدد",
           customerPrice: (basePrice * 1.04).toFixed(0),
           price: basePrice
         });

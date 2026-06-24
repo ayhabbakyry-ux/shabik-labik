@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
@@ -40,24 +41,45 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const ADMIN_PHONE = "0939549573";
 
+  // تحميل البيانات عند بدء التطبيق
   useEffect(() => {
-    const saved = localStorage.getItem('shabik_auth');
-    if (saved) {
-      const data = JSON.parse(saved);
+    const savedAuth = localStorage.getItem('shabik_auth');
+    if (savedAuth) {
+      const data = JSON.parse(savedAuth);
       setIsLoggedIn(true);
       setUserPhone(data.phone);
       setUserName(data.name || "مستخدم");
       setUserBalance(data.balance || 0);
     }
+
+    const savedTxs = localStorage.getItem('shabik_txs');
+    if (savedTxs) {
+      setTransactions(JSON.parse(savedTxs));
+    }
   }, []);
+
+  // حفظ المعاملات في localStorage عند تغيرها
+  useEffect(() => {
+    if (transactions.length > 0) {
+      localStorage.setItem('shabik_txs', JSON.stringify(transactions));
+    }
+  }, [transactions]);
+
+  // حفظ الرصيد عند تغيره
+  useEffect(() => {
+    if (isLoggedIn) {
+      const currentAuth = JSON.parse(localStorage.getItem('shabik_auth') || '{}');
+      localStorage.setItem('shabik_auth', JSON.stringify({ ...currentAuth, balance: userBalance }));
+    }
+  }, [userBalance, isLoggedIn]);
 
   const login = (phone: string, name: string) => {
     setIsLoggedIn(true);
     setUserPhone(phone);
     setUserName(name);
-    const initialBalance = 0;
-    setUserBalance(initialBalance);
-    localStorage.setItem('shabik_auth', JSON.stringify({ phone, name, balance: initialBalance }));
+    // في الإنتاج، الرصيد يبدأ من 0 أو من قاعدة البيانات
+    setUserBalance(0);
+    localStorage.setItem('shabik_auth', JSON.stringify({ phone, name, balance: 0 }));
   };
 
   const logout = () => {
@@ -78,7 +100,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       type: 'إيداع محفظة',
       amount,
       status: 'Pending',
-      date: new Date().toLocaleDateString('ar-SY'),
+      date: new Date().toLocaleString('ar-SY'),
       userName: userName,
       userPhone: userPhone,
       details: "إثبات الدفع مرفق"
@@ -90,7 +112,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setTransactions(prev => prev.map(tx => {
       if (tx.id === transactionId) {
         if (action === 'approve') {
-          addBalance(tx.amount);
+          // فقط إذا لم يكن الطلب قد اكتمل سابقاً
+          if (tx.status !== 'Completed') {
+            setUserBalance(current => current + tx.amount);
+          }
           return { ...tx, status: 'Completed' };
         }
         return { ...tx, status: 'Rejected' };

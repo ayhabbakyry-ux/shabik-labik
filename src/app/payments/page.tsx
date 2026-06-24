@@ -8,54 +8,32 @@ import {
   ShieldCheck, 
   Menu, 
   ChevronDown, 
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Hash
 } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Navbar } from '@/components/layout/Navbar';
-
-interface PaymentItem {
-  id: number;
-  method: string;
-  amount: string;
-  status: 'accepted' | 'rejected';
-  statusText: string;
-  transactionId: string;
-  total: string;
-  value: string;
-  date: string;
-}
+import { useUser } from '@/lib/store';
+import { Badge } from '@/components/ui/badge';
 
 export default function PaymentsPage() {
   const router = useRouter();
+  const { transactions, currency } = useUser();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [expandedId, setExpandedId] = useState<number | null>(52006);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const paymentsData: PaymentItem[] = [
-    {
-      id: 52006,
-      method: 'شام كاش',
-      amount: '680.00 SYP',
-      status: 'accepted',
-      statusText: 'مقبول',
-      transactionId: '52006',
-      total: '680 SYP',
-      value: 'SYP 680.00',
-      date: '2026-06-20 23:09:17',
-    },
-    {
-      id: 52007,
-      method: 'سيريتل كاش',
-      amount: '1,500.00 SYP',
-      status: 'rejected',
-      statusText: 'مرفوض',
-      transactionId: '52007',
-      total: '1500 SYP',
-      value: 'SYP 1,500.00',
-      date: '2026-06-21 11:45:12',
-    }
-  ];
-
-  const toggleExpand = (id: number) => {
+  const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
+  };
+
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case 'Completed': return { color: 'bg-green-600', text: 'مقبول', icon: <CheckCircle2 className="h-4 w-4" /> };
+      case 'Rejected': return { color: 'bg-red-600', text: 'مرفوض', icon: <XCircle className="h-4 w-4" /> };
+      default: return { color: 'bg-orange-500', text: 'قيد الانتظار', icon: <Clock className="h-4 w-4" /> };
+    }
   };
 
   return (
@@ -69,7 +47,7 @@ export default function PaymentsPage() {
         >
           <ArrowRight className="h-6 w-6" />
         </button>
-        <h1 className="text-xl font-bold font-headline">دفعاتي</h1>
+        <h1 className="text-xl font-bold font-headline">دفعاتي المالية</h1>
         <div className="flex items-center gap-3">
           <ShieldCheck className="h-6 w-6 text-yellow-500" />
           <button 
@@ -86,70 +64,76 @@ export default function PaymentsPage() {
       {/* Main Content */}
       <main className="flex-1 p-4 space-y-4 overflow-y-auto">
         
-        {paymentsData.map((item) => {
-          const isOpen = expandedId === item.id;
-          const isAccepted = item.status === 'accepted';
-          const statusBgColor = isAccepted ? 'bg-[#4caf50]' : 'bg-[#e53935]';
+        {transactions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+            <Clock className="h-12 w-12 opacity-20 mb-4" />
+            <p className="text-sm font-bold">لا يوجد أي عمليات مالية حالياً.</p>
+          </div>
+        ) : (
+          transactions.map((item) => {
+            const isOpen = expandedId === item.id;
+            const config = getStatusConfig(item.status);
 
-          return (
-            <div key={item.id} className="flex flex-col">
-              
-              <button
-                onClick={() => toggleExpand(item.id)}
-                className={`flex items-center justify-between p-4 ${statusBgColor} rounded-xl text-white font-bold shadow-md transition-all active:scale-[0.98]`}
-              >
-                <div className="flex items-center gap-3">
-                  <ChevronDown className={`h-5 w-5 transition-transform duration-200 ${isOpen ? 'rotate-180' : 'rotate-0'}`} />
-                  <span className="text-lg">{item.method} - {item.amount}</span>
-                </div>
-
-                <div className="text-sm bg-black/20 px-4 py-1 rounded-lg">
-                  {item.statusText}
-                </div>
-              </button>
-
-              {isOpen && (
-                <div className="bg-[#1c232d] border border-gray-800 rounded-b-xl p-5 -mt-2 pt-6 space-y-4 shadow-inner animate-in slide-in-from-top-2">
-                  <div className="flex justify-between items-center border-b border-gray-800 pb-2">
-                    <span className="text-gray-400 font-medium">رقم العملية :</span>
-                    <span className="font-mono text-lg">{item.transactionId}</span>
+            return (
+              <div key={item.id} className="flex flex-col">
+                <button
+                  onClick={() => toggleExpand(item.id)}
+                  className={`flex items-center justify-between p-4 ${config.color} rounded-xl text-white font-bold shadow-md transition-all active:scale-[0.98]`}
+                >
+                  <div className="flex items-center gap-3">
+                    <ChevronDown className={`h-5 w-5 transition-transform duration-200 ${isOpen ? 'rotate-180' : 'rotate-0'}`} />
+                    <span className="text-lg">{item.type} - {item.amount.toLocaleString()} {currency}</span>
                   </div>
 
-                  <div className="flex justify-between items-center border-b border-gray-800 pb-2">
-                    <span className="text-gray-400 font-medium">الجمالي :</span>
-                    <span className="text-lg">{item.total}</span>
+                  <div className="text-xs bg-black/20 px-3 py-1 rounded-full flex items-center gap-1">
+                    {config.icon} {config.text}
                   </div>
+                </button>
 
-                  <div className="flex justify-between items-center border-b border-gray-800 pb-2">
-                    <span className="text-gray-400 font-medium">القيمة :</span>
-                    <span className="font-mono text-lg">{item.value}</span>
-                  </div>
+                {isOpen && (
+                  <div className="bg-[#1c232d] border border-gray-800 rounded-b-xl p-5 -mt-2 pt-6 space-y-4 shadow-inner animate-in slide-in-from-top-2">
+                    <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+                      <span className="text-gray-400 font-medium">رقم العملية :</span>
+                      <span className="font-mono text-lg flex items-center gap-1 text-primary">
+                        <Hash className="h-4 w-4" /> {item.id}
+                      </span>
+                    </div>
 
-                  <div className="flex justify-between items-center border-b border-gray-800 pb-2">
-                    <span className="text-gray-400 font-medium">التاريخ :</span>
-                    <span className="font-mono text-md text-gray-300">{item.date}</span>
-                  </div>
+                    <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+                      <span className="text-gray-400 font-medium">المبلغ :</span>
+                      <span className="text-lg font-bold">{item.amount.toLocaleString()} {currency}</span>
+                    </div>
 
-                  {/* Receipt Preview */}
-                  <div className="bg-[#11151d] p-3 rounded-xl border border-gray-800 flex justify-center items-center mt-4">
-                    <div className="bg-white text-black p-4 rounded shadow-md w-full max-w-xs text-center text-[10px] font-sans space-y-2">
-                      <div className="font-bold border-b pb-1 flex justify-between text-gray-700">
-                        <span>{item.method}</span>
-                        <span className={isAccepted ? "text-green-600" : "text-red-600"}>
-                          {isAccepted ? "✓ ناجحة" : "✕ مرفوضة"}
-                        </span>
+                    <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+                      <span className="text-gray-400 font-medium">التاريخ :</span>
+                      <span className="font-mono text-sm text-gray-300">{item.date}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+                      <span className="text-gray-400 font-medium">الحالة :</span>
+                      <Badge className={config.color}>{config.text}</Badge>
+                    </div>
+
+                    {/* Simple Receipt Preview */}
+                    <div className="bg-[#11151d] p-4 rounded-xl border border-gray-800 flex justify-center items-center mt-2">
+                      <div className="bg-white text-black p-4 rounded shadow-md w-full max-w-xs text-center text-[10px] space-y-2">
+                        <div className="font-bold border-b pb-1 flex justify-between">
+                          <span>إشعار إيداع</span>
+                          <span className={item.status === 'Completed' ? "text-green-600" : item.status === 'Rejected' ? "text-red-600" : "text-orange-500"}>
+                            {config.text}
+                          </span>
+                        </div>
+                        <p className="text-right">المبلغ: {item.amount.toLocaleString()} ل.س.ج</p>
+                        <p className="text-center font-mono text-[8px] text-gray-400">{item.id}</p>
+                        <p className="text-center font-mono text-[8px] text-gray-400">{item.date}</p>
                       </div>
-                      <p className="text-right text-gray-600">اسم المرسل: أيهم محمد باكير</p>
-                      <p className="text-right text-gray-600">المبلغ: {item.total}</p>
-                      <p className="text-gray-400 font-mono pt-1">{item.date}</p>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-
+                )}
+              </div>
+            );
+          })
+        )}
       </main>
 
       <Navbar />
