@@ -58,6 +58,7 @@ export function ProductSheet({
         cache: 'no-store'
       });
       const result = await response.json();
+      // التعامل مع مختلف هياكل الـ API المتوقعة
       const rawItems = Array.isArray(result) ? result : (result.data || result.products || []);
       setAllProducts(rawItems);
     } catch (error: any) {
@@ -74,56 +75,55 @@ export function ProductSheet({
   const groupedServices = useMemo(() => {
     if (!allProducts || !Array.isArray(allProducts)) return [];
 
-    let baseFilter = allProducts.filter(
-      (item) => Number(item.parent_id) === Number(activeCategoryId)
-    );
+    // نظام الفلترة الذكي: الفلترة بناءً على الكلمات المفتاحية لاسم الخدمة
+    const keywords = serviceName.toLowerCase().split(' ').filter(k => k.length > 2);
+    
+    let filtered = allProducts;
 
-    if (Number(activeCategoryId) === 6 && serviceName) {
-      const title = serviceName.toLowerCase();
-      if (title.includes("إم تي إن") || title.includes("mtn")) {
-        baseFilter = baseFilter.filter(
-          (item) => item.name?.includes("إم تي إن") || item.name?.toUpperCase().includes("MTN")
-        );
-      } else if (title.includes("سيريتل") || title.includes("syriatel")) {
-        baseFilter = baseFilter.filter((item) => item.name?.includes("سيريتل"));
-      }
+    // تطبيق فلترة دقيقة بناءً على اسم القسم
+    if (keywords.length > 0) {
+      filtered = allProducts.filter(item => {
+        const itemName = item.name?.toLowerCase() || "";
+        // يجب أن يحتوي اسم المنتج على الكلمات الأساسية (مثل: سيريتل + وحدات)
+        return keywords.every(kw => itemName.includes(kw));
+      });
+    }
+
+    // إذا لم تنجح الفلترة الدقيقة، نحاول الفلترة بالكلمة الأولى (الماركة)
+    if (filtered.length === 0 && keywords.length > 0) {
+      filtered = allProducts.filter(item => item.name?.toLowerCase().includes(keywords[0]));
     }
 
     const groups: Record<string, { id: string; mainTitle: string; items: any[] }> = {};
 
-    baseFilter.forEach((item) => {
-      let groupKey = item.name?.includes("وحدات") ? "وحدات" : (item.name?.includes("فاتورة") ? "فاتورة" : "عام");
-      const cleanTitle = item.name?.split(/[\d.]+/)[0].trim() || serviceName;
+    filtered.forEach((item) => {
+      const groupKey = item.id.toString();
+      const mainTitle = item.name || serviceName;
 
       if (!groups[groupKey]) {
-        groups[groupKey] = { id: groupKey, mainTitle: cleanTitle, items: [] };
+        groups[groupKey] = { id: groupKey, mainTitle: mainTitle, items: [] };
       }
 
+      // معالجة الخيارات أو المتغيرات داخل المنتج الواحد
       const subItems = item.options || item.variants || item.params || [];
       
-      if (Array.isArray(subItems) && subItems.length > 0 && typeof subItems[0] === 'object') {
+      if (Array.isArray(subItems) && subItems.length > 0) {
         subItems.forEach((sub: any) => {
-          const nameNums = sub.name?.match(/[\d.]+/);
-          const amount = nameNums ? nameNums[0] : (sub.amount || sub.value || "محدد");
           const basePrice = Number(sub.price || item.price || 0);
-          
           groups[groupKey].items.push({
             id: sub.id || `${item.id}-${Math.random()}`,
             name: sub.name || item.name,
-            extractedAmount: amount,
+            extractedAmount: sub.name?.match(/[\d.]+/)?.[0] || "محدد",
             customerPrice: (basePrice * 1.04).toFixed(0),
             price: basePrice
           });
         });
       } else {
-        const nameNums = item.name?.match(/[\d.]+/);
-        const amount = nameNums ? nameNums[0] : (item.amount || "محدد");
         const basePrice = Number(item.price || 0);
-
         groups[groupKey].items.push({
           id: item.id,
           name: item.name,
-          extractedAmount: amount,
+          extractedAmount: item.name?.match(/[\d.]+/)?.[0] || "محدد",
           customerPrice: (basePrice * 1.04).toFixed(0),
           price: basePrice
         });
@@ -131,7 +131,7 @@ export function ProductSheet({
     });
 
     return Object.values(groups);
-  }, [allProducts, activeCategoryId, serviceName]);
+  }, [allProducts, serviceName]);
 
   useEffect(() => {
     const initialSelections: Record<string, string> = {};
@@ -162,7 +162,7 @@ export function ProductSheet({
                 <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
               </Button>
             </div>
-            <SheetDescription className="text-right text-xs">مزامنة البيانات الحية من المزود.</SheetDescription>
+            <SheetDescription className="text-right text-xs">مزامنة البيانات الحية من مزود الخدمة.</SheetDescription>
           </SheetHeader>
         </div>
 
@@ -170,7 +170,7 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-bold text-muted-foreground">جاري جلب البيانات...</p>
+              <p className="text-sm font-bold text-muted-foreground">جاري جلب الفئات المخصصة...</p>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
@@ -187,32 +187,34 @@ export function ProductSheet({
                             <div className="p-3 bg-primary/10 rounded-xl"><Zap className="h-5 w-5 text-primary" /></div>
                             <div className="text-right flex-1">
                               <h4 className="font-bold text-lg text-foreground">{group.mainTitle}</h4>
-                              <p className="text-[11px] text-muted-foreground">الرصيد الواصل: {currentItem?.extractedAmount}</p>
+                              <p className="text-[11px] text-muted-foreground">اختر الكمية المطلوبة بالأسفل</p>
                             </div>
                           </div>
 
-                          <div className="space-y-2">
-                            <label className="text-[11px] font-bold text-muted-foreground pr-1">اختر الفئة المطلوبة</label>
-                            <Select 
-                              value={selectedId || (group.items[0]?.id.toString())} 
-                              onValueChange={(val) => setSelectedOptions(prev => ({ ...prev, [group.id]: val }))}
-                            >
-                              <SelectTrigger className="w-full text-right bg-muted/30 border-none h-12 text-sm font-medium">
-                                <SelectValue placeholder="اختر الفئة..." />
-                              </SelectTrigger>
-                              <SelectContent dir="rtl">
-                                {group.items.map((item) => (
-                                  <SelectItem key={item.id} value={item.id.toString()}>
-                                    الرصيد الواصل: {item.extractedAmount}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          {group.items.length > 1 && (
+                            <div className="space-y-2">
+                              <label className="text-[11px] font-bold text-muted-foreground pr-1">الفئات المتوفرة</label>
+                              <Select 
+                                value={selectedId} 
+                                onValueChange={(val) => setSelectedOptions(prev => ({ ...prev, [group.id]: val }))}
+                              >
+                                <SelectTrigger className="w-full text-right bg-muted/30 border-none h-12 text-sm font-medium">
+                                  <SelectValue placeholder="اختر الفئة..." />
+                                </SelectTrigger>
+                                <SelectContent dir="rtl">
+                                  {group.items.map((item) => (
+                                    <SelectItem key={item.id} value={item.id.toString()}>
+                                      {item.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
 
                           <div className="flex items-center justify-between pt-4 border-t border-dashed">
                             <div className="text-right">
-                              <p className="text-[10px] text-muted-foreground font-bold">السعر للمستهلك (4%+)</p>
+                              <p className="text-[10px] text-muted-foreground font-bold">السعر (مع عمولة 4%)</p>
                               <p className="text-primary font-bold text-2xl">
                                 {currentItem ? Number(currentItem.customerPrice).toLocaleString() : "0"} <span className="text-xs">{currency}</span>
                               </p>
@@ -232,7 +234,7 @@ export function ProductSheet({
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4">
                   <PackageX className="h-12 w-12 opacity-30" />
-                  <p className="text-sm font-bold text-center px-4">لا تتوفر فئات حالياً. يرجى المحاولة لاحقاً.</p>
+                  <p className="text-sm font-bold text-center px-4">عذراً، لم يتم العثور على منتجات مطابقة لهذا القسم حالياً.</p>
                 </div>
               )}
             </ScrollArea>
