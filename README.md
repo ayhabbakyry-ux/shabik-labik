@@ -31,3 +31,5 @@
 - **Vercel Optimized**: إعدادات جاهزة للنشر المجاني الفوري.
 
 © 2024 Shabik Labik Digital.
+git remote add origin https://github.com/ayhabbakry-ux/shabik-labik.git
+git push -u origin main
