@@ -1,7 +1,8 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Navbar, DesktopHeader } from "@/components/layout/Navbar";
 import { useUser } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -10,9 +11,18 @@ import { Share2, Copy, Users, Gift, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ReferralPage() {
-  const { userPhone, currency } = useUser();
+  const { userPhone, currency, isLoggedIn } = useUser();
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      router.push("/");
+    }
+  }, [isLoggedIn, router]);
+
+  if (!isLoggedIn) return null;
 
   const referralLink = `https://shabik-labik.com/register?ref=${userPhone}`;
 

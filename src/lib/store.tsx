@@ -162,9 +162,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (tx.id === transactionId) {
         if (action === 'approve') {
           if (tx.status !== 'Completed') {
-            // تحديث رصيد المستخدم صاحب الطلب (وليس الأدمن الحالي)
-            // في تطبيق حقيقي سيتم التحديث في قاعدة البيانات
-            // هنا سنحدث رصيد الأدمن إذا كان هو نفسه، أو سنفترض أن النظام يدرك صاحب الطلب
+            // تحديث رصيد المستخدم في المصفوفة الكلية
+            setAllUsers(prevUsers => prevUsers.map(u => 
+              u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
+            ));
+            
+            // إذا كان الأدمن هو نفسه صاحب الطلب، نحدث حالته الحالية
             if (tx.userPhone === userPhone) {
               setUserBalance(current => current + tx.amount);
             }

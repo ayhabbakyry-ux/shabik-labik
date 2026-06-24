@@ -20,11 +20,11 @@ export function AdminPanel() {
   const pendingTxs = transactions.filter(t => t.status === 'Pending');
 
   const handleDeleteUser = (phone: string) => {
-    if (confirm("هل أنت متأكد من حذف هذا الحساب نهائياً؟")) {
+    if (confirm("هل أنت متأكد من حذف هذا الحساب نهائياً؟ لن يتمكن هذا المستخدم من تسجيل الدخول مرة أخرى.")) {
       deleteUser(phone);
       toast({
         title: "تم الحذف",
-        description: `تم مسح حساب الرقم ${phone} من النظام.`,
+        description: `تم مسح حساب الرقم ${phone} من النظام بنجاح.`,
         variant: "destructive"
       });
     }
@@ -117,7 +117,12 @@ export function AdminPanel() {
                       <TableCell className="text-right"><Badge variant="outline">{user.password || "••••"}</Badge></TableCell>
                       <TableCell className="text-right font-bold text-primary">{user.balance.toLocaleString()} {currency}</TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={() => handleDeleteUser(user.phone)}>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="text-destructive hover:bg-destructive/10" 
+                          onClick={() => handleDeleteUser(user.phone)}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </TableCell>
