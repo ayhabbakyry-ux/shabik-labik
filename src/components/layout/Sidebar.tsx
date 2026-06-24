@@ -87,7 +87,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         {/* Navigation Menu */}
         <div className="flex flex-col p-4 gap-2">
           {menuItems.map((item) => (
-            <Link key={item.href} href={item.href} onClick={onClose}>
+            <Link key={item.title} href={item.href} onClick={onClose}>
               <div
                 className={`flex items-center gap-4 px-4 py-3 rounded-xl w-full transition-all active:scale-[0.98] cursor-pointer ${
                   pathname === item.href 
