@@ -16,7 +16,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   return (
     <>
-      {/* خلفية داكنة شفافة ورا القائمة بتسكرها لما تضغط عليها */}
+      {/* خلفية داكنة شفافة */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black/60 z-[60] transition-opacity backdrop-blur-sm"
@@ -33,7 +33,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         {/* 1. قسم البروفايل */}
         <div className="flex flex-col items-center pt-10 pb-6 border-b border-gray-800/50">
-          {/* صورة المستخدم */}
           <div className="w-24 h-24 rounded-full bg-white mb-4 overflow-hidden border-2 border-transparent outline outline-2 outline-gray-600 shadow-xl">
             <img 
               src={`https://picsum.photos/seed/${userPhone}/200`} 
@@ -42,13 +41,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             />
           </div>
           
-          {/* الاسم وعلامة التوثيق */}
           <div className="flex items-center gap-2 mb-2">
             <h2 className="text-xl font-bold font-headline">{userPhone === "0939549573" ? "أيهم باكير" : userPhone}</h2>
             <span className="bg-blue-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px]">✔</span>
           </div>
 
-          {/* الـ VIP والـ ID */}
           <div className="flex items-center gap-3 text-sm font-medium mb-3">
             <span className="bg-[#2a2f3a] px-3 py-1 rounded-full text-gray-300 flex items-center gap-1 text-xs">
               <span className="text-yellow-500">⭐</span> VIP-00
@@ -56,7 +53,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             <span className="text-gray-400 text-xs">#2225</span>
           </div>
 
-          {/* الرصيد */}
           <div className="text-blue-500 font-bold text-2xl mt-1">
             SYP {userBalance.toLocaleString()}
           </div>
@@ -75,14 +71,16 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
            <button onClick={logout} className="hover:text-destructive transition-colors p-2"><LogOut className="h-6 w-6" /></button>
         </div>
 
-        {/* 3. قائمة التنقل (الروابط) */}
+        {/* 3. قائمة التنقل */}
         <div className="flex flex-col p-4 gap-2">
           <Link href="/dashboard" onClick={onClose}>
             <NavItem title="الرئيسية" icon={<Home className="h-5 w-5" />} />
           </Link>
           <NavItem title="منتجاتي المفضلة" icon={<Heart className="h-5 w-5" />} />
           <NavItem title="اضافة رصيد لحسابي" icon={<CreditCard className="h-5 w-5" />} />
-          <NavItem title="دفعاتي المالية" icon={<Receipt className="h-5 w-5" />} />
+          <Link href="/payments" onClick={onClose}>
+            <NavItem title="دفعاتي المالية" icon={<Receipt className="h-5 w-5" />} />
+          </Link>
           <Link href="/wallet" onClick={onClose}>
             <NavItem title="محفظتي" icon={<Wallet className="h-5 w-5" />} />
           </Link>

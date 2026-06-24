@@ -3,14 +3,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, History, MessageSquare, Wallet, Bell, ShoppingBag, Inbox } from "lucide-react";
+import { Home, Wallet, Bell, ShoppingBag, Inbox, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function Navbar() {
   const pathname = usePathname();
 
   const navItems = [
-    { label: "Inbox", icon: Inbox, href: "/inbox" },
+    { label: "Inbox", icon: Inbox, href: "/payments" },
     { label: "Wallet", icon: Wallet, href: "/wallet" },
     { label: "Home", icon: Home, href: "/dashboard", center: true },
     { label: "Cart", icon: ShoppingBag, href: "/history" },
@@ -47,6 +47,7 @@ export function DesktopHeader() {
         <nav className="flex items-center gap-6">
           <Link href="/dashboard" className="text-sm font-medium hover:text-primary">Dashboard</Link>
           <Link href="/wallet" className="text-sm font-medium hover:text-primary">Wallet</Link>
+          <Link href="/payments" className="text-sm font-medium hover:text-primary">Payments</Link>
           <Link href="/history" className="text-sm font-medium hover:text-primary">Transactions</Link>
           <Link href="/support" className="text-sm font-medium hover:text-primary">Smart Support</Link>
         </nav>
