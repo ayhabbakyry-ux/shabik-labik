@@ -12,13 +12,7 @@ import {
   Search, 
   Wallet as WalletIcon, 
   ShoppingBag, 
-  Bell, 
-  Home, 
-  ChevronLeft,
-  Calendar,
-  ClipboardList
 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Sidebar } from '@/components/layout/Sidebar';
 
@@ -32,10 +26,10 @@ export default function WalletPage() {
   return (
     <div className="min-h-screen bg-[#11151d] text-white flex flex-col pb-20" dir="rtl">
       
-      {/* 1. الشريط العلوي (Header) */}
+      {/* Header */}
       <header className="flex items-center justify-between p-4 bg-[#161a23] border-b border-gray-800 sticky top-0 z-40">
         <button 
-          onClick={() => router.back()}
+          onClick={() => router.push('/dashboard')}
           className="p-2 hover:bg-gray-800 rounded-full transition active:scale-90"
         >
           <ArrowRight className="h-6 w-6" />
@@ -54,13 +48,11 @@ export default function WalletPage() {
 
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-      {/* 2. المحتوى الأساسي */}
+      {/* Main Content */}
       <main className="flex-1 p-4 space-y-6 overflow-y-auto">
         
-        {/* صف الكروت القابل للتمرير الأفقي */}
+        {/* Card Row */}
         <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 snap-x snap-mandatory">
-          
-          {/* الكرت الأخضر - الرصيد الحالي */}
           <div className="min-w-[85%] sm:min-w-[300px] bg-[#00c853] p-6 rounded-2xl flex flex-col justify-between h-36 snap-center shadow-xl relative overflow-hidden group">
             <span className="text-[10px] font-bold self-start bg-black/20 px-2 py-0.5 rounded backdrop-blur-sm z-10">SYP</span>
             <div className="text-right z-10">
@@ -72,7 +64,6 @@ export default function WalletPage() {
             <WalletIcon className="absolute left-[-10px] bottom-[-10px] h-24 w-24 opacity-10 -rotate-12 group-hover:scale-110 transition-transform" />
           </div>
 
-          {/* الكرت الأحمر - إجمالي المشتريات */}
           <div className="min-w-[85%] sm:min-w-[300px] bg-[#ff5252] p-6 rounded-2xl flex flex-col justify-between h-36 snap-center shadow-xl relative overflow-hidden group">
             <span className="text-[10px] font-bold self-start bg-black/20 px-2 py-0.5 rounded backdrop-blur-sm z-10">SYP</span>
             <div className="text-right z-10">
@@ -82,7 +73,6 @@ export default function WalletPage() {
             <ShoppingBag className="absolute left-[-10px] bottom-[-10px] h-24 w-24 opacity-10 -rotate-12 group-hover:scale-110 transition-transform" />
           </div>
 
-          {/* الكرت البنفسجي - الوارد */}
           <div className="min-w-[85%] sm:min-w-[300px] bg-[#7c4dff] p-6 rounded-2xl flex flex-col justify-between h-36 snap-center shadow-xl relative overflow-hidden group">
             <span className="text-[10px] font-bold self-start bg-black/20 px-2 py-0.5 rounded backdrop-blur-sm z-10">SYP</span>
             <div className="text-right z-10">
@@ -91,12 +81,10 @@ export default function WalletPage() {
             </div>
             <ArrowRight className="absolute left-[-10px] bottom-[-10px] h-24 w-24 opacity-10 rotate-[135deg] group-hover:scale-110 transition-transform" />
           </div>
-
         </div>
 
-        {/* فلاتر التواريخ */}
+        {/* Filters */}
         <div className="grid grid-cols-2 gap-4">
-          {/* تاريخ من */}
           <div className="relative">
             <label className="absolute -top-2.5 right-4 bg-[#11151d] px-2 text-[10px] text-gray-400 z-10 font-bold">من</label>
             <div className="bg-[#161a23] border border-gray-800 rounded-full px-4 py-3 flex items-center justify-center">
@@ -109,7 +97,6 @@ export default function WalletPage() {
             </div>
           </div>
 
-          {/* تاريخ إلى */}
           <div className="relative">
             <label className="absolute -top-2.5 right-4 bg-[#11151d] px-2 text-[10px] text-gray-400 z-10 font-bold">إلى</label>
             <div className="bg-[#161a23] border border-gray-800 rounded-full px-4 py-3 flex items-center justify-center">
@@ -123,14 +110,12 @@ export default function WalletPage() {
           </div>
         </div>
 
-        {/* زر البحث الأزرق */}
         <div className="flex justify-end">
           <Button size="icon" className="bg-[#0091ea] hover:bg-blue-600 h-14 w-14 rounded-full shadow-lg shadow-blue-900/20 active:scale-95 transition-all">
             <Search className="h-6 w-6 text-white stroke-[3px]" />
           </Button>
         </div>
 
-        {/* حالة القائمة الفارغة (Empty State) */}
         <div className="flex flex-col items-center justify-center pt-10 space-y-4">
           <div className="relative w-28 h-28 opacity-60">
             <div className="absolute inset-0 bg-gray-700 rounded-xl transform -rotate-6 border border-gray-600"></div>
@@ -142,11 +127,10 @@ export default function WalletPage() {
             </div>
           </div>
           <div className="text-center">
-            <p className="text-gray-400 font-bold text-lg">لا توجد عناصر</p>
-            <p className="text-gray-500 text-xs mt-1">لم يتم العثور على أي عمليات مالية في هذه الفترة.</p>
+            <p className="text-gray-400 font-bold text-lg font-headline">لا توجد عناصر</p>
+            <p className="text-gray-500 text-xs mt-1 font-body">لم يتم العثور على أي عمليات مالية في هذه الفترة.</p>
           </div>
         </div>
-
       </main>
 
       <Navbar />

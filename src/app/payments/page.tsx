@@ -8,13 +8,6 @@ import {
   ShieldCheck, 
   Menu, 
   ChevronDown, 
-  CheckCircle2, 
-  XCircle,
-  Inbox,
-  Wallet,
-  Home,
-  ShoppingBag,
-  Bell
 } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Navbar } from '@/components/layout/Navbar';
@@ -71,7 +64,7 @@ export default function PaymentsPage() {
       {/* Header */}
       <header className="flex items-center justify-between p-4 bg-[#161a23] border-b border-gray-800 sticky top-0 z-40">
         <button 
-          onClick={() => router.back()}
+          onClick={() => router.push('/dashboard')}
           className="p-2 hover:bg-gray-800 rounded-full transition active:scale-90"
         >
           <ArrowRight className="h-6 w-6" />
@@ -117,7 +110,6 @@ export default function PaymentsPage() {
 
               {isOpen && (
                 <div className="bg-[#1c232d] border border-gray-800 rounded-b-xl p-5 -mt-2 pt-6 space-y-4 shadow-inner animate-in slide-in-from-top-2">
-                  
                   <div className="flex justify-between items-center border-b border-gray-800 pb-2">
                     <span className="text-gray-400 font-medium">رقم العملية :</span>
                     <span className="font-mono text-lg">{item.transactionId}</span>
@@ -152,7 +144,6 @@ export default function PaymentsPage() {
                       <p className="text-gray-400 font-mono pt-1">{item.date}</p>
                     </div>
                   </div>
-
                 </div>
               )}
             </div>

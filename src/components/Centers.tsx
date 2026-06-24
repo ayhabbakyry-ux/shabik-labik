@@ -20,10 +20,10 @@ export default function Centers() {
   return (
     <div className="min-h-screen bg-[#11151d] text-white flex flex-col pb-20" dir="rtl">
       
-      {/* 1. الشريط العلوي (Header) */}
+      {/* Header */}
       <header className="flex items-center justify-between p-4 bg-[#161a23] border-b border-gray-800 sticky top-0 z-40">
         <button 
-          onClick={() => router.back()}
+          onClick={() => router.push('/dashboard')}
           className="p-2 hover:bg-gray-800 rounded-full transition active:scale-90"
         >
           <ArrowRight className="h-6 w-6" />
@@ -42,15 +42,12 @@ export default function Centers() {
 
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-      {/* 2. المحتوى الأساسي - رسالة الانضمام */}
+      {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-6">
-        
-        {/* أيقونة الموقع الجغرافي المتحركة بشكل خفيف */}
         <div className="w-24 h-24 bg-[#1c232d] border border-gray-800 rounded-full flex items-center justify-center shadow-lg animate-pulse">
           <MapPin className="h-12 w-12 text-primary" />
         </div>
 
-        {/* نصوص الرسالة بالتنسيق والعبارات المطلوبة */}
         <div className="space-y-3 max-w-sm">
           <h2 className="text-xl font-bold text-gray-300 font-headline">لا يوجد حالياً</h2>
           
@@ -63,7 +60,6 @@ export default function Centers() {
           </p>
         </div>
 
-        {/* زر التواصل السريع عبر الواتساب */}
         <a 
           href="https://wa.me/963939549573" 
           target="_blank"
@@ -76,7 +72,6 @@ export default function Centers() {
 
       </main>
 
-      {/* 3. شريط التنقل السفلي */}
       <Navbar />
 
     </div>

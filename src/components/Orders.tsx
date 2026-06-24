@@ -7,16 +7,12 @@ import {
   ArrowRight, 
   ShieldCheck, 
   Search, 
-  History,
   Bell,
-  Home,
-  Wallet,
-  ShoppingBag,
-  Inbox,
   Menu
 } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Button } from '@/components/ui/button';
+import { Navbar } from '@/components/layout/Navbar';
 import { cn } from '@/lib/utils';
 
 interface OrdersProps {
@@ -30,10 +26,8 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
   const [toDate] = useState('2026-06-24');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
-  // حالة التبديل بين الطلبات والإشعارات
   const [currentTab, setCurrentTab] = useState<'orders' | 'notifications'>(initialTab);
 
-  // تحديث التاب إذا تغير الـ prop (مفيد عند التنقل بين الروابط)
   useEffect(() => {
     setCurrentTab(initialTab);
   }, [initialTab]);
@@ -41,7 +35,7 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
   return (
     <div className="min-h-screen bg-[#11151d] text-white flex flex-col" dir="rtl">
       
-      {/* 1. شريط العنوان العلوي (Header) */}
+      {/* Header */}
       <header className="flex items-center justify-between p-4 bg-[#161a23] border-b border-gray-800 sticky top-0 z-40">
         <button 
           onClick={() => router.push('/dashboard')}
@@ -65,13 +59,11 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
 
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-      {/* 2. محتوى الصفحة الأساسي */}
+      {/* Main Content */}
       <main className="flex-1 p-4 space-y-5 overflow-y-auto pb-24">
         
         {currentTab === 'orders' ? (
-          /* واجهة الطلبات */
           <>
-            {/* فلاتر التواريخ */}
             <div className="grid grid-cols-2 gap-4">
               <div className="relative">
                 <label className="absolute -top-2.5 right-4 bg-[#11151d] px-2 text-[10px] text-gray-400 z-10 font-bold">من</label>
@@ -88,7 +80,6 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
               </div>
             </div>
 
-            {/* زر البحث الأزرق العلوي */}
             <div className="flex justify-end">
               <Button 
                 size="icon" 
@@ -98,7 +89,6 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
               </Button>
             </div>
 
-            {/* حقل البحث الرئيسي */}
             <div className="flex items-center gap-3 bg-[#161a23] border border-gray-800 rounded-full px-4 py-1 shadow-inner group focus-within:border-blue-500/50 transition-colors">
               <input
                 type="text"
@@ -112,7 +102,6 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
               </button>
             </div>
 
-            {/* حالة لا توجد عناصر */}
             <div className="flex flex-col items-center justify-center pt-16 space-y-4">
               <div className="relative w-28 h-28 opacity-60">
                 <div className="absolute inset-0 bg-gray-700 rounded-xl transform -rotate-6 border border-gray-600"></div>
@@ -130,7 +119,6 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
             </div>
           </>
         ) : (
-          /* واجهة الإشعارات */
           <div className="flex flex-col items-center justify-center pt-24 space-y-6">
             <div className="relative">
               <div className="bg-gray-800/30 p-8 rounded-full animate-pulse">
@@ -146,54 +134,8 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
 
       </main>
 
-      {/* 3. شريط التنقل السفلي (Bottom Navigation) */}
-      <footer className="fixed bottom-0 left-0 right-0 z-50 bg-[#161a23] border-t border-gray-800 h-20 flex items-center justify-around px-4 shadow-2xl">
-        {/* زر الوارد/الدفعات */}
-        <button 
-          onClick={() => router.push('/payments')}
-          className="p-3 text-gray-400 hover:text-white transition-all"
-        >
-          <Inbox className="h-6 w-6" />
-        </button>
-        
-        {/* زر المحفظة */}
-        <button 
-          onClick={() => router.push('/wallet')}
-          className="p-3 text-gray-400 hover:text-white transition-all"
-        >
-          <Wallet className="h-6 w-6" />
-        </button>
-        
-        {/* الزر الرئيسي (الرئيسية) */}
-        <button 
-          onClick={() => router.push('/dashboard')}
-          className="bg-[#1b222c] p-4 rounded-full border border-gray-700 shadow-xl -mt-10 text-gray-400 hover:text-white transition-all active:scale-95"
-        >
-          <Home className="h-7 w-7" />
-        </button>
-        
-        {/* زر المشتريات/الطلبات */}
-        <button 
-          onClick={() => setCurrentTab('orders')}
-          className={cn(
-            "p-3 rounded-xl transition-all duration-300",
-            currentTab === 'orders' ? "bg-[#242b35] text-white shadow-inner" : "text-gray-400 hover:text-white"
-          )}
-        >
-          <ShoppingBag className="h-6 w-6" />
-        </button>
-        
-        {/* زر الإشعارات (الجرس) */}
-        <button 
-          onClick={() => setCurrentTab('notifications')}
-          className={cn(
-            "p-3 rounded-xl transition-all duration-300",
-            currentTab === 'notifications' ? "bg-[#242b35] text-white shadow-inner" : "text-gray-400 hover:text-white"
-          )}
-        >
-          <Bell className="h-6 w-6" />
-        </button>
-      </footer>
+      {/* Shared Bottom Navigation */}
+      <Navbar />
 
     </div>
   );
