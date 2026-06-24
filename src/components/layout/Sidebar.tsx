@@ -87,7 +87,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <Link href="/history" onClick={onClose}>
             <NavItem title="مشترياتي" icon={<ShoppingCart className="h-5 w-5" />} />
           </Link>
-          <NavItem title="المراكز المعتمدة" icon={<MapPin className="h-5 w-5" />} />
+          <Link href="/centers" onClick={onClose}>
+            <NavItem title="المراكز المعتمدة" icon={<MapPin className="h-5 w-5" />} />
+          </Link>
           <NavItem title="واتساب" icon={<MessageCircle className="h-5 w-5" />} />
         </div>
       </div>
