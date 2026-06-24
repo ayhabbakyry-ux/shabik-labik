@@ -13,9 +13,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PackageX, RefreshCw, ShoppingCart, Zap } from "lucide-react";
+import { Loader2, PackageX, RefreshCw, ShoppingCart, Zap, User } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useUser } from "@/lib/store";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -47,6 +48,7 @@ export function ProductSheet({
   const [allProducts, setAllProducts] = useState<ProductItem[]>([]);
   const [fetching, setFetching] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
+  const [targetIds, setTargetIds] = useState<Record<string, string>>({});
   const { toast } = useToast();
   const { currency } = useUser();
 
@@ -58,12 +60,10 @@ export function ProductSheet({
         cache: 'no-store'
       });
       const result = await response.json();
-      console.log(`[FETCH ${serviceName}]:`, result); // تتبع البيانات
       
       const rawItems = Array.isArray(result) ? result : (result.data || result.products || []);
       setAllProducts(rawItems);
     } catch (error: any) {
-      console.error("[FETCH ERROR]:", error);
       toast({
         title: "خطأ في الاتصال",
         description: "تعذر جلب البيانات. يرجى المحاولة لاحقاً.",
@@ -72,25 +72,21 @@ export function ProductSheet({
     } finally {
       setFetching(false);
     }
-  }, [activeCategoryId, toast, serviceName]);
+  }, [activeCategoryId, toast]);
 
   const groupedServices = useMemo(() => {
     if (!allProducts || !Array.isArray(allProducts)) return [];
 
-    // نظام الفلترة المرن
     const searchTerms = serviceName.toLowerCase().split(' ').filter(k => k.length > 2);
-    
     let filtered = allProducts;
 
     if (searchTerms.length > 0) {
       filtered = allProducts.filter(item => {
         const itemName = item.name?.toLowerCase() || "";
-        // إذا كان هناك أي كلمة مطابقة، نعتبرها صالحة لضمان ظهور البيانات
         return searchTerms.some(kw => itemName.includes(kw));
       });
     }
 
-    // إذا لم ينجح الفلترة الدقيقة، نعرض جميع منتجات هذا القسم لضمان عدم ظهور "لا توجد منتجات"
     if (filtered.length === 0) {
       filtered = allProducts;
     }
@@ -141,10 +137,21 @@ export function ProductSheet({
     setSelectedOptions(initialSelections);
   }, [groupedServices]);
 
-  const handleOrder = (variation: any) => {
+  const handleOrder = (groupId: string, variation: any) => {
+    const targetId = targetIds[groupId];
+
+    if (!targetId || !targetId.trim()) {
+      toast({
+        title: "عذراً، هذا الحقل مطلوب",
+        description: "يرجى إدخال الآي دي أو رقم الهاتف المطلوب شحنه.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     toast({
       title: "تم استلام الطلب",
-      description: `طلب ${serviceName} بقيمة ${Number(variation.customerPrice).toLocaleString()} ${currency} قيد التنفيذ.`,
+      description: `طلب ${variation.name} للحساب (${targetId}) بقيمة ${Number(variation.customerPrice).toLocaleString()} ${currency} قيد التنفيذ.`,
     });
   };
 
@@ -185,7 +192,7 @@ export function ProductSheet({
                             <div className="p-3 bg-primary/10 rounded-xl"><Zap className="h-5 w-5 text-primary" /></div>
                             <div className="text-right flex-1">
                               <h4 className="font-bold text-lg text-foreground">{group.mainTitle}</h4>
-                              <p className="text-[11px] text-muted-foreground">اختر الكمية المطلوبة بالأسفل</p>
+                              <p className="text-[11px] text-muted-foreground">اختر الفئة وأدخل البيانات بالأسفل</p>
                             </div>
                           </div>
 
@@ -210,6 +217,18 @@ export function ProductSheet({
                             </div>
                           )}
 
+                          <div className="space-y-2 pt-2">
+                            <label className="text-[11px] font-bold text-muted-foreground pr-1 flex items-center gap-1">
+                              <User className="h-3 w-3" /> الآي دي أو الرقم المطلوب
+                            </label>
+                            <Input 
+                              placeholder="أدخل الـ ID أو رقم الهاتف هنا..." 
+                              className="text-right h-12 bg-muted/30 border-none focus:ring-1 focus:ring-primary"
+                              value={targetIds[group.id] || ""}
+                              onChange={(e) => setTargetIds(prev => ({ ...prev, [group.id]: e.target.value }))}
+                            />
+                          </div>
+
                           <div className="flex items-center justify-between pt-4 border-t border-dashed">
                             <div className="text-right">
                               <p className="text-[10px] text-muted-foreground font-bold">السعر (مع عمولة 4%)</p>
@@ -218,7 +237,7 @@ export function ProductSheet({
                               </p>
                             </div>
                             <Button 
-                              onClick={() => handleOrder(currentItem)}
+                              onClick={() => handleOrder(group.id, currentItem)}
                               className="rounded-full px-8 h-12 bg-primary shadow-lg font-bold"
                             >
                               <ShoppingCart className="ml-2 h-4 w-4" /> اطلب الآن

@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   ArrowRight, 
@@ -20,9 +20,17 @@ import { Badge } from '@/components/ui/badge';
 
 export default function PaymentsPage() {
   const router = useRouter();
-  const { transactions, currency } = useUser();
+  const { transactions, currency, isLoggedIn } = useUser();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      router.push("/");
+    }
+  }, [isLoggedIn, router]);
+
+  if (!isLoggedIn) return null;
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
