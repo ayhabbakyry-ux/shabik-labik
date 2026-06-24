@@ -3,24 +3,29 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-type Transaction = {
+export type Transaction = {
   id: string;
   type: string;
   amount: number;
   status: 'Pending' | 'Completed' | 'Rejected';
   date: string;
+  userName?: string;
+  userPhone?: string;
+  details?: string;
 };
 
 type UserContextType = {
   isLoggedIn: boolean;
   userPhone: string;
+  userName: string;
   userBalance: number;
   transactions: Transaction[];
-  login: (phone: string) => void;
+  login: (phone: string, name: string) => void;
   logout: () => void;
   addBalance: (amount: number) => void;
-  requestDeposit: (amount: number) => void;
+  requestDeposit: (amount: number, proofImage: string) => void;
   adminAction: (transactionId: string, action: 'approve' | 'reject') => void;
+  currency: string;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -28,31 +33,35 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userPhone, setUserPhone] = useState("");
-  const [userBalance, setUserBalance] = useState(0);
+  const [userName, setUserName] = useState("");
+  const [userBalance, setUserBalance] = useState(0); // تصفير الرصيد الافتراضي
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const currency = "ل.س.ج";
 
-  // Simulation of persistence or initial data
   useEffect(() => {
     const saved = localStorage.getItem('shabik_auth');
     if (saved) {
       const data = JSON.parse(saved);
       setIsLoggedIn(true);
       setUserPhone(data.phone);
+      setUserName(data.name || "مستخدم");
       setUserBalance(data.balance || 0);
     }
   }, []);
 
-  const login = (phone: string) => {
+  const login = (phone: string, name: string) => {
     setIsLoggedIn(true);
     setUserPhone(phone);
-    const initialBalance = phone === "0939549573" ? 1000000 : 0;
+    setUserName(name);
+    const initialBalance = 0; // الرصيد يبدأ من الصفر للجميع
     setUserBalance(initialBalance);
-    localStorage.setItem('shabik_auth', JSON.stringify({ phone, balance: initialBalance }));
+    localStorage.setItem('shabik_auth', JSON.stringify({ phone, name, balance: initialBalance }));
   };
 
   const logout = () => {
     setIsLoggedIn(false);
     setUserPhone("");
+    setUserName("");
     setUserBalance(0);
     localStorage.removeItem('shabik_auth');
   };
@@ -61,13 +70,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setUserBalance(prev => prev + amount);
   };
 
-  const requestDeposit = (amount: number) => {
+  const requestDeposit = (amount: number, proofImage: string) => {
     const newTx: Transaction = {
       id: `TX-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-      type: 'Wallet Deposit',
+      type: 'إيداع محفظة',
       amount,
       status: 'Pending',
-      date: new Date().toISOString().split('T')[0],
+      date: new Date().toLocaleDateString('ar-SY'),
+      userName: userName,
+      userPhone: userPhone,
+      details: "إثبات الدفع مرفق"
     };
     setTransactions(prev => [newTx, ...prev]);
   };
@@ -87,8 +99,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <UserContext.Provider value={{ 
-      isLoggedIn, userPhone, userBalance, transactions, 
-      login, logout, addBalance, requestDeposit, adminAction 
+      isLoggedIn, userPhone, userName, userBalance, transactions, 
+      login, logout, addBalance, requestDeposit, adminAction, currency
     }}>
       {children}
     </UserContext.Provider>

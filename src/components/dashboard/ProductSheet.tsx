@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
@@ -14,6 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, PackageX, RefreshCw, ShoppingCart, Zap } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useUser } from "@/lib/store";
 import {
   Select,
   SelectContent,
@@ -46,6 +48,7 @@ export function ProductSheet({
   const [fetching, setFetching] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const { toast } = useToast();
+  const { currency } = useUser();
 
   const fetchProducts = useCallback(async () => {
     if (!activeCategoryId) return;
@@ -75,7 +78,6 @@ export function ProductSheet({
       (item) => Number(item.parent_id) === Number(activeCategoryId)
     );
 
-    // منطق التصفية الخاص بشركات الاتصال
     if (Number(activeCategoryId) === 6 && serviceName) {
       const title = serviceName.toLowerCase();
       if (title.includes("إم تي إن") || title.includes("mtn")) {
@@ -144,7 +146,7 @@ export function ProductSheet({
   const handleOrder = (variation: any) => {
     toast({
       title: "تم استلام الطلب",
-      description: `طلب ${serviceName} بقيمة ${Number(variation.customerPrice).toLocaleString()} ل.س قيد التنفيذ.`,
+      description: `طلب ${serviceName} بقيمة ${Number(variation.customerPrice).toLocaleString()} ${currency} قيد التنفيذ.`,
     });
   };
 
@@ -212,7 +214,7 @@ export function ProductSheet({
                             <div className="text-right">
                               <p className="text-[10px] text-muted-foreground font-bold">السعر للمستهلك (4%+)</p>
                               <p className="text-primary font-bold text-2xl">
-                                {currentItem ? Number(currentItem.customerPrice).toLocaleString() : "0"} <span className="text-xs">ل.س</span>
+                                {currentItem ? Number(currentItem.customerPrice).toLocaleString() : "0"} <span className="text-xs">{currency}</span>
                               </p>
                             </div>
                             <Button 
