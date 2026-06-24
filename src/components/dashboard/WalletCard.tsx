@@ -36,9 +36,9 @@ export function WalletCard() {
 
   return (
     <div className="bg-[#2d3a5a] p-6 rounded-2xl shadow-xl flex flex-col items-center text-center">
-      {/* لوجو التطبيق */}
+      {/* لوجو التطبيق - رابط خارجي للتجربة */}
       <img 
-        src="/1000189207.png" 
+        src='https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/Icon-pictures.svg/1200px-Icon-pictures.svg.png' 
         alt="Logo" 
         className="w-16 h-16 mb-4 object-contain" 
       />
