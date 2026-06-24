@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import genieLogo from '@/public/1000189207.png';
 
 export function WalletCard() {
   const { userBalance, requestDeposit } = useUser();
@@ -39,7 +38,7 @@ export function WalletCard() {
     <div className="bg-[#2d3a5a] p-6 rounded-2xl shadow-xl flex flex-col items-center text-center">
       {/* لوجو التطبيق */}
       <img 
-        src={genieLogo.src} 
+        src="/1000189207.png" 
         alt="Logo" 
         className="w-16 h-16 mb-4 object-contain" 
       />
