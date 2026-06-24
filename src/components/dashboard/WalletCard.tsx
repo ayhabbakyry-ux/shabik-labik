@@ -3,7 +3,6 @@
 
 import { useState } from "react";
 import { PlusCircle, Wallet, Send, Landmark } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/store";
 import {
@@ -15,10 +14,8 @@ import {
   DialogTrigger,
   DialogFooter
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { PlaceHolderImages } from "@/lib/placeholder-images";
 
 export function WalletCard() {
   const { userBalance, requestDeposit } = useUser();
@@ -26,89 +23,74 @@ export function WalletCard() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
-  const logoImage = PlaceHolderImages.find(img => img.id === 'app-logo');
-
   const handleDeposit = () => {
     if (!amount || isNaN(Number(amount))) return;
     requestDeposit(Number(amount));
     setOpen(false);
     setAmount("");
     toast({
-      title: "Deposit Submitted",
-      description: "Admin will verify your payment notification shortly.",
+      title: "تم إرسال الطلب",
+      description: "سيقوم المسؤول بمراجعة إشعار الدفع الخاص بك قريباً.",
     });
   };
 
   return (
-    <Card className="bg-primary text-white border-none shadow-xl overflow-hidden relative">
-      <div className="absolute top-[-20px] right-[-20px] opacity-10">
-        <Wallet className="h-40 w-40" />
-      </div>
-      <CardContent className="p-6 relative z-10 flex flex-col items-center text-center">
-        {logoImage && (
-          <img 
-            src={logoImage.imageUrl} 
-            alt="Genie Logo" 
-            className="w-16 h-16 mb-4 object-contain brightness-0 invert" 
-            data-ai-hint={logoImage.imageHint}
-          />
-        )}
+    <div className="bg-[#2d3a5a] p-6 rounded-2xl shadow-xl flex flex-col items-center text-center">
+      {/* لوجو التطبيق */}
+      <img 
+        src="/1000189207.png" 
+        alt="Logo" 
+        className="w-16 h-16 mb-4 object-contain" 
+      />
+      
+      {/* نصوص الرصيد */}
+      <div className="text-white text-lg opacity-90 mb-1">Available Balance</div>
+      <div className="text-white text-4xl font-bold mb-4">SYR {userBalance.toLocaleString()}</div>
+      
+      {/* الأزرار */}
+      <div className="flex gap-3 w-full">
+        <button className="flex-1 bg-[#475569] py-2 rounded-lg text-white font-medium hover:bg-[#58687e] transition-colors">Details</button>
         
-        <div className="space-y-1">
-          <p className="text-primary-foreground/70 text-sm font-medium">Available Balance</p>
-          <h2 className="text-4xl font-bold tracking-tight">
-            {userBalance.toLocaleString()} <span className="text-xl font-normal opacity-70">SYP</span>
-          </h2>
-        </div>
-
-        <div className="flex gap-3 mt-8 w-full">
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button variant="secondary" className="w-full shadow-lg h-11 font-bold">
-                <PlusCircle className="mr-2 h-4 w-4" /> Deposit
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]" dir="rtl">
-              <DialogHeader>
-                <DialogTitle className="text-right font-headline">شحن المحفظة</DialogTitle>
-                <DialogDescription className="text-right">
-                  قم بتحويل المبلغ إلى أحد حساباتنا وارفاق إشعار التحويل.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="bg-muted p-4 rounded-xl text-sm space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2 font-medium"><Landmark className="h-4 w-4 text-primary" /> شام كاش</span>
-                    <span className="font-bold text-lg font-mono">57394</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2 font-medium"><Send className="h-4 w-4 text-primary" /> سيريتل كاش</span>
-                    <span className="font-bold text-lg font-mono">0964659123</span>
-                  </div>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <button className="flex-1 bg-[#2563eb] py-2 rounded-lg text-white font-bold hover:bg-[#3b82f6] transition-colors">Deposit</button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="text-right font-headline">شحن المحفظة</DialogTitle>
+              <DialogDescription className="text-right">
+                قم بتحويل المبلغ إلى أحد حساباتنا وارفاق إشعار التحويل.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="bg-muted p-4 rounded-xl text-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 font-medium"><Landmark className="h-4 w-4 text-primary" /> شام كاش</span>
+                  <span className="font-bold text-lg font-mono">57394</span>
                 </div>
-                <div className="grid gap-2 text-right">
-                  <Label htmlFor="amount" className="font-bold">المبلغ المطلوب شحنه (SYP)</Label>
-                  <Input 
-                    id="amount" 
-                    type="number" 
-                    placeholder="مثال: 50000" 
-                    className="text-right h-12"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                  />
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 font-medium"><Send className="h-4 w-4 text-primary" /> سيريتل كاش</span>
+                  <span className="font-bold text-lg font-mono">0964659123</span>
                 </div>
               </div>
-              <DialogFooter>
-                <Button onClick={handleDeposit} className="w-full h-12 text-lg font-bold">إرسال إشعار التحويل</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          
-          <Button variant="outline" className="w-full bg-white/10 border-white/20 text-white hover:bg-white/20 h-11 font-bold">
-            Details
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+              <div className="grid gap-2 text-right">
+                <Label htmlFor="amount" className="font-bold">المبلغ المطلوب شحنه (SYP)</Label>
+                <input 
+                  id="amount" 
+                  type="number" 
+                  placeholder="مثال: 50000" 
+                  className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-right text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={handleDeposit} className="w-full h-12 text-lg font-bold">إرسال إشعار التحويل</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </div>
   );
 }
