@@ -90,7 +90,17 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <Link href="/centers" onClick={onClose}>
             <NavItem title="المراكز المعتمدة" icon={<MapPin className="h-5 w-5" />} />
           </Link>
-          <NavItem title="واتساب" icon={<MessageCircle className="h-5 w-5" />} />
+          
+          {/* رابط واتساب المباشر */}
+          <a
+            href="https://wa.me/963939549573"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-4 px-4 py-3 rounded-xl w-full transition-all active:scale-[0.98] hover:bg-[#1f242f] text-gray-300"
+          >
+            <span className="text-xl"><MessageCircle className="h-5 w-5" /></span>
+            <span className="font-medium text-base font-headline">واتساب</span>
+          </a>
         </div>
       </div>
     </>
