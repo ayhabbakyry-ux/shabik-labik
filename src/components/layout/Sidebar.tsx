@@ -6,6 +6,7 @@ import { useUser } from "@/lib/store";
 import { LogOut, User, Heart, Home, CreditCard, Receipt, Wallet, ShoppingCart, MapPin, MessageCircle, Gift } from "lucide-react";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useToast } from "@/hooks/use-toast";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { userPhone, userName, userBalance, logout, currency } = useUser();
   const pathname = usePathname();
+  const { toast } = useToast();
 
   const menuItems = [
     { title: "الرئيسية", icon: <Home className="h-5 w-5" />, href: "/dashboard" },
@@ -25,6 +27,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { title: "مشترياتي", icon: <ShoppingCart className="h-5 w-5" />, href: "/history" },
     { title: "المراكز المعتمدة", icon: <MapPin className="h-5 w-5" />, href: "/centers" },
   ];
+
+  const handleLevelClick = () => {
+    toast({
+      description: "لزيادة مستواك كل ما عليك هو زيادة مشترياتك بالتوفيق إن شاء الله ❤️",
+    });
+  };
 
   return (
     <>
@@ -52,12 +60,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           
           <div className="flex items-center gap-2 mb-2">
             <h2 className="text-xl font-bold font-headline">{userName}</h2>
-            <span className="bg-blue-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px]">✔</span>
           </div>
 
           <div className="flex items-center gap-3 text-sm font-medium mb-3">
-            <span className="bg-[#2a2f3a] px-3 py-1 rounded-full text-gray-300 flex items-center gap-1 text-xs">
-              <span className="text-yellow-500">⭐</span> VIP-01
+            <span 
+              onClick={handleLevelClick}
+              className="bg-[#2a2f3a] px-4 py-1.5 rounded-full text-gray-300 flex items-center gap-2 text-xs cursor-pointer hover:bg-[#343a4a] transition-colors shadow-inner"
+            >
+              <span className="text-yellow-500">⭐</span> مميز
             </span>
             <span className="text-gray-400 text-xs">#ID:{userPhone.slice(-4)}</span>
           </div>

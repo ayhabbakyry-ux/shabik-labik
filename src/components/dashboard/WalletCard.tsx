@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { Send, Landmark, Image as ImageIcon, AlertCircle } from "lucide-react";
+import { Send, Landmark, Image as ImageIcon, AlertCircle, Copy, CheckCircle2, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/store";
 import {
@@ -24,6 +24,7 @@ export function WalletCard() {
   const [imageProof, setImageProof] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleDeposit = () => {
@@ -53,6 +54,21 @@ export function WalletCard() {
     }
   };
 
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    toast({
+      description: "تم نسخ الرقم بنجاح",
+    });
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const accounts = [
+    { id: 'syriatel', label: 'سيريتل كاش', value: '0939549573', icon: <Send className="h-4 w-4" /> },
+    { id: 'mtn', label: 'إم تي إن كاش', value: '0943899403', icon: <Smartphone className="h-4 w-4" /> },
+    { id: 'sham', label: 'شام كاش (المعرف)', value: '5d093f196b8cd72873f06d5dbbfb2d43', icon: <Landmark className="h-4 w-4" />, isMono: true },
+  ];
+
   return (
     <div className="bg-[#2d3a5a] p-6 rounded-2xl shadow-xl flex flex-col items-center text-center">
       <img 
@@ -75,7 +91,7 @@ export function WalletCard() {
               إيداع رصيد
             </button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]" dir="rtl">
+          <DialogContent className="sm:max-w-[425px] overflow-hidden" dir="rtl">
             <DialogHeader>
               <DialogTitle className="text-right font-headline">شحن المحفظة</DialogTitle>
               <DialogDescription className="text-right">
@@ -83,15 +99,27 @@ export function WalletCard() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="bg-muted p-4 rounded-xl text-sm space-y-3">
-                <div className="flex flex-col gap-1">
-                  <span className="flex items-center gap-2 font-bold text-primary"><Landmark className="h-4 w-4" /> شام كاش (المعرف)</span>
-                  <span className="font-mono text-xs bg-white p-2 rounded break-all select-all">5d093f196b8cd72873f06d5dbbfb2d43</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 font-bold text-primary"><Send className="h-4 w-4" /> سيريتل كاش</span>
-                  <span className="font-bold text-lg font-mono">0964659123</span>
-                </div>
+              <div className="bg-muted p-4 rounded-xl text-sm space-y-4">
+                {accounts.map((acc) => (
+                  <div key={acc.id} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 font-bold text-primary">{acc.icon} {acc.label}</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-gray-100 shadow-sm group">
+                      <span className={`flex-1 text-right font-bold truncate ${acc.isMono ? 'font-mono text-[10px]' : 'text-lg'}`}>
+                        {acc.value}
+                      </span>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="h-8 w-8 hover:bg-primary/10"
+                        onClick={() => copyToClipboard(acc.value, acc.id)}
+                      >
+                        {copiedId === acc.id ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4 text-muted-foreground" />}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               {error && (
@@ -121,6 +149,7 @@ export function WalletCard() {
                     accept="image/*"
                     onChange={handleImageChange}
                     className="cursor-pointer opacity-0 absolute inset-0 z-10"
+                    required
                   />
                   <div className={`h-20 border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-1 transition-colors ${imageProof ? 'bg-green-50 border-green-500' : 'bg-muted/50 border-muted'}`}>
                     <ImageIcon className={`h-6 w-6 ${imageProof ? 'text-green-500' : 'text-muted-foreground'}`} />
