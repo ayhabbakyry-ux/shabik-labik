@@ -105,11 +105,11 @@ export function ProductSheet({
       const result = await response.json();
 
       if (result.success) {
-          // خصم الرصيد المحلي فقط عند نجاح العملية من سيرفر الراغب
+          // خصم الرصيد المحلي عند نجاح العملية أو وضعها في حالة الانتظار
           deductBalance(price, `${product.name} - ID: ${targetId}`);
           toast({ 
-            title: "تم الشحن بنجاح", 
-            description: `تم تنفيذ طلبك بنجاح للآي دي ${targetId}.`,
+            title: "نجاح العملية", 
+            description: result.message || `تم تنفيذ طلبك بنجاح للآي دي ${targetId}.`,
             className: "bg-green-600 text-white border-none"
           });
           setTargetIds(prev => ({ ...prev, [product.id]: "" }));

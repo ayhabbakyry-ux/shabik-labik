@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار تنفيذ طلبات الشحن الحقيقي المحدث لمعالجة الردود العربية من سيرفر الراغب.
+ * @fileOverview مسار تنفيذ طلبات الشحن الحقيقي المحدث لمعالجة الردود العربية من سيرفر الراغب بما يشمل حالة "انتظار".
  */
 export async function POST(request: Request) {
     const API_TOKEN = '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0';
@@ -36,7 +36,8 @@ export async function POST(request: Request) {
          * التحقق من النجاح بناءً على توثيق الراغب المحدث:
          * 1. الحالة: "موافق"
          * 2. الحالة: "القبول"
-         * 3. status: 1
+         * 3. الحالة: "انتظار" (تمت إضافتها)
+         * 4. status: 1 أو 200
          */
         const isSuccess = 
             data.status === 1 || 
@@ -44,6 +45,7 @@ export async function POST(request: Request) {
             data.success === true || 
             data["الحالة"] === "موافق" || 
             data["الحالة"] === "القبول" ||
+            data["الحالة"] === "انتظار" ||
             data["status"] === "success";
 
         if (!isSuccess) {
@@ -61,10 +63,16 @@ export async function POST(request: Request) {
             });
         }
 
+        // تحديد رسالة النجاح بناءً على حالة الرد
+        let successMessage = 'تم الشحن بنجاح!';
+        if (data["الحالة"] === "انتظار") {
+            successMessage = 'تم إرسال الطلب بنجاح وهو قيد التنفيذ';
+        }
+
         // إرجاع نجاح حقيقي للواجهة الأمامية
         return NextResponse.json({ 
             success: true, 
-            message: 'تم الشحن بنجاح!', 
+            message: successMessage, 
             order_id: data.order_id || data.id || order_uuid,
             raw_data: data
         });
