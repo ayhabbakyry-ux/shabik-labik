@@ -17,7 +17,7 @@ export default function AuthPage() {
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
-  const { login, register, isLoggedIn, requestPasswordReset, userBalance, currency, userName } = useUser();
+  const { login, register, isLoggedIn, requestPasswordReset, userBalance, currency } = useUser();
   const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
@@ -90,8 +90,8 @@ export default function AuthPage() {
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       
       <div className="w-full max-w-md flex justify-between items-center mb-10">
-        <div className="bg-primary text-white px-4 py-2 rounded-2xl font-black text-sm shadow-md">
-          {isLoggedIn ? `${userBalance.toLocaleString()} ${currency}` : "مرحباً بك"}
+        <div className="bg-primary text-white px-4 py-2 rounded-2xl font-black text-sm shadow-md min-w-[100px] text-center">
+          {isLoggedIn ? `${userBalance.toLocaleString()} ${currency}` : "0 ل.س.ج"}
         </div>
         <button 
           onClick={() => setIsSidebarOpen(true)}

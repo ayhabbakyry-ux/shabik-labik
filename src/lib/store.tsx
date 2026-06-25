@@ -79,8 +79,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     let parsedUsers = savedUsers ? JSON.parse(savedUsers) : [];
     
-    // تصحيح فوري لأي رصيد وهمي قديم موجود في المتصفح وتصفيره قسرياً
-    parsedUsers = parsedUsers.map((u: any) => (u.balance >= 1000000 || isNaN(u.balance)) ? { ...u, balance: 0 } : u);
+    // تصفير فوري وقسري لأي مبالغ وهمية قديمة (مثل المليون)
+    parsedUsers = parsedUsers.map((u: any) => (u.balance >= 999999 || isNaN(u.balance)) ? { ...u, balance: 0 } : u);
     setAllUsers(parsedUsers);
     localStorage.setItem('shabik_users', JSON.stringify(parsedUsers));
 
@@ -129,7 +129,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const exists = allUsers.some(u => u.phone === phone);
     if (exists || phone === ADMIN_PHONE) return { success: false, message: "هذا الرقم مسجل مسبقاً" };
     
-    // تأكيد تصفير الرصيد الافتراضي 100%
+    // تأكيد الرصيد الافتراضي 0 ل.س.ج للجميع
     const newUser: AppUser = { phone, name, password: pass, balance: 0 };
     setAllUsers(prev => {
       const updated = [...prev, newUser];

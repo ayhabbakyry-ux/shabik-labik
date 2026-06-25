@@ -6,17 +6,15 @@ export const revalidate = 0;
 
 /**
  * @fileOverview مسار الربط المطور بناءً على التوثيق الرسمي لمتجر الراغب.
- * - يتم إرسال التوكن في حقل api-token.
- * - يتم إرجاع حالة 200 دائماً لتجنب 502 والسماح بقراءة أخطاء المزود (120، 121، إلخ).
+ * - التوثيق يشترط إرسال التوكن في حقل: api-token
+ * - الرابط الرسمي: https://api.alragheb-store.com/client/api/products
  */
 
 export async function GET() {
-    // ==========================================
-    // ⚠️ تنبيه: ضع التوكن الخاص بك في المتغير أدناه ⚠️
-    // ==========================================
+    // التوكن الخاص بمتجر الراغب
     const API_TOKEN = process.env.ALRAGHEB_TOKEN || '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0';
     
-    // الرابط الرسمي من التوثيق
+    // الرابط المعتمد من التوثيق الرسمي
     const ENDPOINT = 'https://api.alragheb-store.com/client/api/products';
 
     try {
@@ -25,25 +23,25 @@ export async function GET() {
         const response = await fetch(ENDPOINT, {
             method: 'GET',
             headers: {
-                'api-token': API_TOKEN, // الترويسة المطلوبة في التوثيق
+                'api-token': API_TOKEN, // الترويسة المطلوبة في التوثيق حصراً
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },
             cache: 'no-store'
         });
 
-        // إذا كان هناك خطأ من السيرفر (مثل 401 أو 403)
+        // إذا كان السيرفر أرجع خطأ (مثل 401، 403، 422)
         if (!response.ok) {
             let errorData;
             try {
                 errorData = await response.json();
             } catch (e) {
-                errorData = { message: "فشل السيرفر في إرجاع JSON صالح" };
+                errorData = { message: "فشل السيرفر في إرجاع استجابة JSON" };
             }
             
-            console.error(`API Error from Provider: ${response.status}`, errorData);
+            console.error(`API Provider Error (${response.status}):`, errorData);
             
-            // نرجع 200 لتجنب انهيار التطبيق (502) ولنتمكن من عرض رمز الخطأ في الواجهة
+            // نرجع 200 لتجنب انهيار التطبيق (502) ولنتمكن من عرض رمز الخطأ في الواجهة الأمامية
             return NextResponse.json({ 
                 success: false, 
                 error: errorData,
@@ -51,14 +49,12 @@ export async function GET() {
             }, { status: 200 });
         }
 
-        // معالجة البيانات الناجحة
         const data = await response.json();
-        console.log("API Response received successfully.");
-
-        // استخراج المنتجات (نتوقع مصفوفة بناءً على التوثيق)
+        
+        // استخراج المصفوفة (التوثيق يرجع مصفوفة مباشرة أو كائن يحتوي على products)
         const productsArray = Array.isArray(data) ? data : (data.products || data.data || []);
         
-        // تنظيف وتنسيق الحقول لتناسب الواجهة العربية
+        // تنظيف وتنسيق البيانات للواجهة العربية
         const formattedProducts = productsArray.map((prod: any) => ({
             id: prod.id,
             name: prod.الاسم || prod.name || prod.title || 'منتج غير مسمى',
@@ -71,11 +67,11 @@ export async function GET() {
         return NextResponse.json(formattedProducts);
 
     } catch (error: any) {
-        console.error('Fatal API Route Crash:', error.message);
+        console.error('Fatal API Crash:', error.message);
         return NextResponse.json({ 
             success: false, 
-            error: "حدث انهيار داخلي في الاتصال بالسيرفر.",
+            error: "حدث خطأ في الاتصال الداخلي بسيرفر النشر.",
             details: error.message
-        }, { status: 200 }); // نرجع 200 حتى في الانهيار الداخلي لسهولة التصحيح
+        }, { status: 200 });
     }
 }
