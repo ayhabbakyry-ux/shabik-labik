@@ -23,7 +23,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const menuItems = [
     { title: "الرئيسية", icon: <Home className="h-5 w-5" />, href: "/dashboard", activeBg: "bg-[#1e3329]", activeText: "text-[#22c55e]" },
     { title: "دعوة الأصدقاء والربح", icon: <Gift className="h-5 w-5" />, href: "/referral" },
-    { title: "اضافة رصيد لحسابي", icon: <CreditCard className="h-5 w-5" />, href: "/wallet" },
+    { title: "إضافة رصيد لحسابي", icon: <CreditCard className="h-5 w-5" />, href: "/wallet" },
     { title: "دفعاتي المالية", icon: <Receipt className="h-5 w-5" />, href: "/payments" },
     { title: "محفظتي", icon: <Wallet className="h-5 w-5" />, href: "/wallet" },
     { title: "مشترياتي", icon: <ShoppingCart className="h-5 w-5" />, href: "/history" },
