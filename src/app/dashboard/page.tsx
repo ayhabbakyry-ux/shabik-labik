@@ -17,13 +17,14 @@ export default function DashboardPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const router = useRouter();
 
+  // Strict Auth Guard
   useEffect(() => {
-    if (!isLoggedIn) {
-      router.push("/");
+    if (!isLoggedIn || !userPhone) {
+      router.replace("/");
     }
-  }, [isLoggedIn, router]);
+  }, [isLoggedIn, userPhone, router]);
 
-  if (!isLoggedIn) return null;
+  if (!isLoggedIn || !userPhone) return null;
 
   return (
     <div className="min-h-screen w-full bg-background" dir="rtl">

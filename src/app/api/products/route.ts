@@ -12,6 +12,7 @@ export async function GET() {
     const API_TOKEN = process.env.ALRAGHEB_TOKEN || '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0';
 
     try {
+        console.log("Initiating fetch to Al-Ragheb Store API...");
         const response = await fetch('https://alragheb-store.com', {
             method: 'GET',
             headers: {
@@ -24,44 +25,37 @@ export async function GET() {
         });
 
         const textData = await response.text();
-
-        // فحص الرد للتأكد من أنه JSON وليس صفحة حظر HTML
+        
+        // فحص الرد للتأكد من أنه JSON وليس صفحة HTML
         if (!textData || textData.trim().startsWith('<!doctype') || textData.trim().startsWith('<html')) {
-            console.error("CORS or Firewall blockage detected. Returning Fallback.");
-            return NextResponse.json(getFallbackData());
+            console.error("Critical: Received HTML instead of JSON. Check Token or Firewall.");
+            return NextResponse.json({ error: "تعذر الحصول على البيانات البرمجية من المزود (HTML Response)" }, { status: 502 });
         }
 
-        try {
-            const data = JSON.parse(textData);
-            const productsArray = Array.isArray(data) ? data : (data.products || data.data || []);
-            
-            if (productsArray.length === 0) return NextResponse.json(getFallbackData());
-
-            // ترجمة الحقول العربية من السيرفر لضمان عمل الواجهة
-            const formattedProducts = productsArray.map((prod: any) => ({
-                id: prod.id,
-                name: prod.الاسم || prod.name || 'منتج غير مسمى',
-                price: prod.السعر || prod.price || 0,
-                category_name: prod.اسم_الفئة || prod.category_name || '',
-                category_id: prod.parent_id !== undefined ? prod.parent_id : prod.category_id,
-                image: prod.category_img || prod.image || ''
-            }));
-
-            return NextResponse.json(formattedProducts);
-        } catch (parseError) {
-            console.error("JSON Parsing failed. Returning Fallback.");
-            return NextResponse.json(getFallbackData());
+        const data = JSON.parse(textData);
+        // استخراج مصفوفة المنتجات بناءً على هيكلية الراغب المتغيرة
+        const productsArray = Array.isArray(data) ? data : (data.products || data.data || []);
+        
+        if (productsArray.length === 0) {
+            console.warn("API connected but returned empty products array.");
+            return NextResponse.json([]);
         }
 
-    } catch (error) {
-        console.error('Connection failed:', error);
-        return NextResponse.json(getFallbackData());
+        // ترجمة الحقول العربية من السيرفر لضمان عمل الواجهة
+        const formattedProducts = productsArray.map((prod: any) => ({
+            id: prod.id,
+            name: prod.الاسم || prod.name || 'منتج غير مسمى',
+            price: prod.السعر || prod.price || 0,
+            category_name: prod.اسم_الفئة || prod.category_name || '',
+            category_id: prod.parent_id !== undefined ? prod.parent_id : prod.category_id,
+            image: prod.category_img || prod.image || ''
+        }));
+
+        console.log(`Successfully parsed ${formattedProducts.length} products.`);
+        return NextResponse.json(formattedProducts);
+
+    } catch (error: any) {
+        console.error('API Connection failure:', error.message);
+        return NextResponse.json({ error: "فشل الاتصال بسيرفر المنتجات، يرجى التحقق من التوكن." }, { status: 500 });
     }
-}
-
-function getFallbackData() {
-    return [
-        { "id": 365, "name": "UC 60 ببجي العالمية", "price": 1.10, "category_name": "PUBG", "category_id": "PUBG", "image": "https://picsum.photos/seed/pubg/200/200" },
-        { "id": 99, "name": "100 جوهرة فري فاير", "price": 0.95, "category_name": "Free Fire", "category_id": "Free Fire", "image": "https://picsum.photos/seed/ff/200/200" }
-    ];
 }
