@@ -6,11 +6,11 @@ export const revalidate = 0;
 const ALRAGHEB_API_URL = "https://alragheb-store.com/client/api/products";
 
 export async function GET() {
-  // التوكن الصلب لتجاوز مشاكل ملفات البيئة
+  // التوكن الصلب لضمان العمل الفوري وتجاوز مشاكل ملفات البيئة
   const HARDCODED_TOKEN = "64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0";
 
   try {
-    console.log("[ALRAGHEB API]: Initiating request with token...");
+    console.log("[ALRAGHEB API]: Initiating request to " + ALRAGHEB_API_URL);
 
     const response = await fetch(ALRAGHEB_API_URL, {
       method: 'GET',
@@ -25,7 +25,6 @@ export async function GET() {
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[ALRAGHEB API ERROR]: Status ${response.status}`, errorText);
-      // إرجاع تفاصيل الخطأ الفعلية القادمة من السيرفر
       return NextResponse.json(
         { error: `فشل الاتصال: ${response.status}`, details: errorText }, 
         { status: response.status }
@@ -33,9 +32,9 @@ export async function GET() {
     }
 
     const data = await response.json();
-    console.log("[ALRAGHEB API SUCCESS]: Data received");
+    console.log("[ALRAGHEB API SUCCESS]: Data received successfully");
     
-    // استخراج مصفوفة المنتجات بناءً على هيكلية الراغب
+    // استخراج مصفوفة المنتجات بناءً على هيكلية الراغب (data.data)
     const products = data.data || data.products || (Array.isArray(data) ? data : []);
 
     return NextResponse.json(products);

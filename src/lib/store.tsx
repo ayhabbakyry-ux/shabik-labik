@@ -124,16 +124,22 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return { success: true, message: "تم إنشاء الحساب بنجاح" };
   };
 
-  // دالة الحذف القسرية
   const deleteUser = useCallback((phone: string) => {
+    // 1. تحديث الذاكرة المحلية أولاً لضمان عدم العودة
+    const savedUsers = localStorage.getItem('shabik_users');
+    if (savedUsers) {
+      const users = JSON.parse(savedUsers);
+      const filtered = users.filter((u: any) => u.phone !== phone);
+      localStorage.setItem('shabik_users', JSON.stringify(filtered));
+    }
+
+    // 2. تحديث الحالة (State) فوراً وبشكل قسري
     setAllUsers(current => {
       const updated = current.filter(u => u.phone !== phone);
-      // تحديث مباشر للذاكرة لضمان الشفافية
-      localStorage.setItem('shabik_users', JSON.stringify(updated));
       return [...updated];
     });
 
-    // إذا كان المستخدم المحذوف هو المسجل حالياً، سجل خروجه
+    // 3. إذا كان المستخدم المحذوف هو المسجل حالياً، سجل خروجه
     if (userPhone === phone) {
       logout();
     }

@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PackageX, RefreshCw, ShoppingCart, User as UserIcon } from "lucide-react";
+import { Loader2, PackageX, RefreshCw, ShoppingCart, User as UserIcon, AlertCircle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useUser } from "@/lib/store";
 import { Input } from "@/components/ui/input";
@@ -36,27 +36,30 @@ export function ProductSheet({
 }) {
   const [allProducts, setAllProducts] = useState<ProductItem[]>([]);
   const [fetching, setFetching] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [targetIds, setTargetIds] = useState<Record<string, string>>({});
   const { toast } = useToast();
   const { currency, userBalance } = useUser();
 
   const fetchProducts = useCallback(async () => {
     setFetching(true);
+    setErrorMsg(null);
     try {
       const response = await fetch(`/api/products`, { cache: 'no-store' });
-      if (!response.ok) throw new Error("API Error");
       const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || data.message || "فشل جلب المنتجات من السيرفر");
+      }
+      
       setAllProducts(Array.isArray(data) ? data : []);
     } catch (error: any) {
-      toast({
-        title: "خطأ في الاتصال",
-        description: "تأكد من الـ ALRAGHEB_TOKEN في ملف .env ومن اتصال الإنترنت.",
-        variant: "destructive",
-      });
+      console.error("Fetch error:", error);
+      setErrorMsg(error.message);
     } finally {
       setFetching(false);
     }
-  }, [toast]);
+  }, []);
 
   const filteredProducts = useMemo(() => {
     if (!allProducts.length) return [];
@@ -128,6 +131,17 @@ export function ProductSheet({
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
               <p className="text-sm font-bold text-muted-foreground">جاري جلب البيانات من السيرفر...</p>
             </div>
+          ) : errorMsg ? (
+            <div className="p-8 h-full flex flex-col items-center justify-center text-center gap-4">
+               <div className="bg-destructive/10 p-4 rounded-full">
+                  <AlertCircle className="h-12 w-12 text-destructive" />
+               </div>
+               <div className="space-y-2">
+                  <h3 className="font-bold text-lg text-destructive">خطأ في الاتصال</h3>
+                  <p className="text-sm text-muted-foreground max-w-[250px]">{errorMsg}</p>
+               </div>
+               <Button onClick={fetchProducts} variant="outline" className="mt-2">إعادة المحاولة</Button>
+            </div>
           ) : (
             <ScrollArea className="h-full p-4">
               {filteredProducts.length > 0 ? (
@@ -183,7 +197,7 @@ export function ProductSheet({
                   </div>
                   <div className="text-center px-6">
                     <p className="text-sm font-bold text-foreground">عذراً، لا توجد منتجات حالياً لهذا القسم</p>
-                    <p className="text-[10px] mt-1 opacity-70">تأكد من وضع التوكن الصحيح في ملف .env.</p>
+                    <p className="text-[10px] mt-1 opacity-70">تأكد من تفعيل المنتجات في حسابك بالراغب.</p>
                   </div>
                 </div>
               )}
