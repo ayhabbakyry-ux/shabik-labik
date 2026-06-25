@@ -13,23 +13,24 @@ import { useToast } from "@/hooks/use-toast";
 export function AdminPanel() {
   const { 
     transactions, adminAction, currency, allUsers, deleteUser, 
-    passwordRequests, clearPasswordRequest, userPhone: adminCurrentPhone
+    passwordRequests, clearPasswordRequest
   } = useUser();
   const { toast } = useToast();
 
   const pendingTxs = transactions.filter(t => t.status === 'Pending');
 
-  const handleDeleteClick = (e: React.MouseEvent, phone: string) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleDelete = (phone: string) => {
+    // تأكيد الحذف
+    const isConfirmed = window.confirm(`هل أنت متأكد من حذف الحساب (${phone}) نهائياً؟`);
     
-    const confirmDelete = window.confirm(`هل أنت متأكد من حذف هذا الحساب (${phone}) نهائياً من النظام؟`);
-    
-    if (confirmDelete) {
+    if (isConfirmed) {
+      // تنفيذ الحذف فوراً
       deleteUser(phone);
+      
+      // إشعار بالنجاح
       toast({
-        title: "تم الحذف بنجاح",
-        description: `تم إزالة المستخدم ذو الرقم (${phone}) من قائمة البيانات.`,
+        title: "تم الحذف",
+        description: `تم إزالة الرقم ${phone} من النظام بنجاح.`,
       });
     }
   };
@@ -110,7 +111,7 @@ export function AdminPanel() {
                     <TableHead className="text-right">رقم الهاتف</TableHead>
                     <TableHead className="text-right">كلمة السر</TableHead>
                     <TableHead className="text-right">الرصيد</TableHead>
-                    <TableHead className="text-right">الإجراء</TableHead>
+                    <TableHead className="text-right">إجراء الحذف</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -121,15 +122,12 @@ export function AdminPanel() {
                       <TableCell className="text-right"><Badge variant="outline">{user.password || "••••"}</Badge></TableCell>
                       <TableCell className="text-right font-bold text-primary">{user.balance.toLocaleString()} {currency}</TableCell>
                       <TableCell className="text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="text-destructive hover:bg-destructive/10" 
-                          onClick={(e) => handleDeleteClick(e, user.phone)}
-                          type="button"
+                        <button 
+                          onClick={() => handleDelete(user.phone)}
+                          className="p-2 text-destructive hover:bg-destructive/10 rounded-full transition-colors"
                         >
                           <Trash2 className="h-5 w-5" />
-                        </Button>
+                        </button>
                       </TableCell>
                     </TableRow>
                   ))}

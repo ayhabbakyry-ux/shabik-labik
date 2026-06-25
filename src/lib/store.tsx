@@ -131,7 +131,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (exists || phone === ADMIN_PHONE) return { success: false, message: "هذا الرقم مسجل مسبقاً" };
 
     const newUser: AppUser = { phone, name, password: pass, balance: 0 };
-    setAllUsers(prev => [...prev, newUser]);
+    setAllUsers(prev => {
+      const updated = [...prev, newUser];
+      localStorage.setItem('shabik_users', JSON.stringify(updated));
+      return updated;
+    });
     return { success: true, message: "تم إنشاء الحساب بنجاح" };
   };
 
@@ -166,9 +170,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (tx.id === transactionId && tx.status === 'Pending') {
           if (action === 'approve') {
             setAllUsers(prevUsers => {
-              return prevUsers.map(u => 
+              const updatedUsers = prevUsers.map(u => 
                 u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
               );
+              localStorage.setItem('shabik_users', JSON.stringify(updatedUsers));
+              return updatedUsers;
             });
             if (tx.userPhone === userPhone) setUserBalance(prev => prev + tx.amount);
             return { ...tx, status: 'Completed' as const };
@@ -182,15 +188,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteUser = (phone: string) => {
-    // إزالة كافة القيود لضمان أن الزر يحذف أي سطر يتم اختياره في الجدول
+    // حذف قسري ومباشر
     setAllUsers(prev => {
       const filtered = prev.filter(u => u.phone !== phone);
-      // تحديث فوري وقسري للذاكرة المحلية لضمان النجاح
+      // تحديث يدوي فوري للذاكرة المحلية لضمان الاستقرار
       localStorage.setItem('shabik_users', JSON.stringify(filtered));
-      return filtered;
+      return [...filtered]; // إجبار React على ملاحظة التغيير
     });
 
-    // إذا كان المستخدم يحذف نفسه، قم بتسجيل الخروج
+    // طرد المستخدم إذا كان هو من يتم حذفه
     if (userPhone === phone) {
       logout();
     }
