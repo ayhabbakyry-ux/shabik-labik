@@ -32,12 +32,12 @@ export function AdminPanel() {
     const confirmDelete = window.confirm(`هل أنت متأكد من حذف الحساب ذو الرقم (${phone}) نهائياً؟`);
     
     if (confirmDelete) {
-      // تنفيذ عملية الحذف
+      // تنفيذ عملية الحذف الفورية
       deleteUser(phone);
       
       toast({
         title: "تم الحذف",
-        description: `تم إزالة المستخدم بنجاح من النظام.`,
+        description: `تم إزالة المستخدم (${phone}) بنجاح من النظام.`,
       });
     }
   };
@@ -134,6 +134,7 @@ export function AdminPanel() {
                           size="icon" 
                           className="text-destructive hover:bg-destructive/10 cursor-pointer" 
                           onClick={() => handleDeleteClick(user.phone)}
+                          type="button"
                         >
                           <Trash2 className="h-5 w-5" />
                         </Button>
