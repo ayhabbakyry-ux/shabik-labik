@@ -20,7 +20,7 @@ export function AdminPanel() {
   const pendingTxs = transactions.filter(t => t.status === 'Pending');
 
   const handleDeleteClick = (phone: string) => {
-    console.log("AdminPanel: Delete button clicked for phone:", phone);
+    console.log("AdminPanel: Requesting delete for:", phone);
     
     if (phone === adminCurrentPhone) {
       toast({
@@ -34,11 +34,12 @@ export function AdminPanel() {
     const confirmDelete = window.confirm(`هل أنت متأكد من حذف حساب الرقم (${phone}) نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`);
     
     if (confirmDelete) {
-      console.log("AdminPanel: Confirming deletion for:", phone);
+      // استدعاء دالة الحذف من المخزن
       deleteUser(phone);
+      
       toast({
-        title: "تم الحذف",
-        description: `تم إزالة الحساب (${phone}) بنجاح من النظام.`,
+        title: "تم الحذف بنجاح",
+        description: `تم إزالة الحساب (${phone}) من النظام وتحديث الذاكرة.`,
       });
     }
   };

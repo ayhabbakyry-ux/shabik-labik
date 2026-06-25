@@ -67,7 +67,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const savedUsers = localStorage.getItem('shabik_users');
-      if (savedUsers) setAllUsers(JSON.parse(savedUsers));
+      if (savedUsers) {
+        setAllUsers(JSON.parse(savedUsers));
+      }
 
       const savedAuth = localStorage.getItem('shabik_auth');
       if (savedAuth) {
@@ -90,7 +92,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // المزامنة مع LocalStorage
+  // المزامنة التلقائية مع LocalStorage (للحفظ الدوري)
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem('shabik_users', JSON.stringify(allUsers));
@@ -109,9 +111,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [passwordRequests, isLoaded]);
 
-  // دالة تسجيل الدخول - تتحقق من وجود الحساب
   const login = (phone: string, password: string) => {
-    // حالة المدير
     if (phone === ADMIN_PHONE) {
       if (password === ADMIN_PASS) {
         const data = { phone, name: "المدير أيهم", balance: userBalance };
@@ -124,7 +124,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       return { success: false, message: "كلمة سر المدير خاطئة" };
     }
 
-    // حالة المستخدم العادي
     const user = allUsers.find(u => u.phone === phone);
     if (!user) {
       return { success: false, message: "عذراً، هذا الرقم غير مسجل لدينا" };
@@ -143,7 +142,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return { success: true, message: "تم تسجيل الدخول بنجاح" };
   };
 
-  // دالة إنشاء حساب جديد
   const register = (phone: string, name: string, pass: string) => {
     const exists = allUsers.some(u => u.phone === phone);
     if (exists) {
@@ -151,7 +149,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
 
     const newUser: AppUser = { phone, name, password: pass, balance: 0 };
-    setAllUsers(prev => [...prev, newUser]);
+    setAllUsers(prev => {
+      const updated = [...prev, newUser];
+      localStorage.setItem('shabik_users', JSON.stringify(updated));
+      return updated;
+    });
     return { success: true, message: "تم إنشاء الحساب بنجاح، يمكنك الآن تسجيل الدخول" };
   };
 
@@ -185,9 +187,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setTransactions(prev => prev.map(tx => {
       if (tx.id === transactionId) {
         if (action === 'approve' && tx.status !== 'Completed') {
-          setAllUsers(prevUsers => prevUsers.map(u => 
-            u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
-          ));
+          setAllUsers(prevUsers => {
+            const updated = prevUsers.map(u => 
+              u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
+            );
+            localStorage.setItem('shabik_users', JSON.stringify(updated));
+            return updated;
+          });
           if (tx.userPhone === userPhone) setUserBalance(prev => prev + tx.amount);
           return { ...tx, status: 'Completed' };
         }
@@ -197,14 +203,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
-  // الحذف النهائي والصارم
+  // وظيفة الحذف النهائية والصارمة
   const deleteUser = (phone: string) => {
+    console.log("Store: Attempting to delete user:", phone);
     if (phone === ADMIN_PHONE) return;
 
     setAllUsers(prev => {
-      const newList = prev.filter(u => u.phone !== phone);
-      localStorage.setItem('shabik_users', JSON.stringify(newList));
-      return newList;
+      const filtered = prev.filter(u => u.phone !== phone);
+      // تحديث مباشر وفوري للذاكرة المحلية لضمان عدم عودة البيانات
+      localStorage.setItem('shabik_users', JSON.stringify(filtered));
+      console.log("Store: Deleted. Remaining users:", filtered.length);
+      return filtered;
     });
 
     // طرد المستخدم إذا كان هو المحذوف
