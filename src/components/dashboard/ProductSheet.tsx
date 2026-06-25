@@ -22,7 +22,8 @@ interface ProductItem {
   name: string;
   price: string | number;
   category_name?: string;
-  category_img?: string;
+  category_id?: string | number;
+  image?: string;
 }
 
 export function ProductSheet({ 
@@ -46,37 +47,19 @@ export function ProductSheet({
     setErrorMsg(null);
     try {
       const response = await fetch(`/api/products`, { cache: 'no-store' });
-      const text = await response.text();
       
       if (!response.ok) {
-        let errorData;
-        try {
-          errorData = JSON.parse(text);
-        } catch {
-          errorData = { error: `خطأ تقني من السيرفر: ${text.substring(0, 100)}` };
-        }
-        throw new Error(errorData.error || `خطأ ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `خطأ في جلب البيانات (${response.status})`);
       }
       
-      if (!text || text.trim() === "" || text.trim().startsWith("<!DOCTYPE html>")) {
-        setAllProducts([]);
-        return;
-      }
-
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        setAllProducts([]);
-        return;
-      }
+      const data = await response.json();
       
       if (data && data.error) {
         throw new Error(data.error);
       }
 
-      const products = Array.isArray(data) ? data : (data.data || data.products || []);
-      setAllProducts(products);
+      setAllProducts(Array.isArray(data) ? data : []);
     } catch (error: any) {
       setErrorMsg(error.message);
     } finally {
@@ -87,11 +70,16 @@ export function ProductSheet({
   const filteredProducts = useMemo(() => {
     if (!allProducts.length) return [];
     const searchKey = filterValue.toLowerCase();
-    // فلترة ديناميكية تعتمد على الاسم أو اسم القسم بالإنجليزية لضمان التطابق مع Zid API
+    
     return allProducts.filter(p => {
       const prodName = (p.name || "").toLowerCase();
       const catName = (p.category_name || "").toLowerCase();
-      return prodName.includes(searchKey) || catName.includes(searchKey);
+      const catId = String(p.category_id || "");
+      
+      // فلترة ذكية: تبحث في الاسم أو القسم أو معرف القسم
+      return prodName.includes(searchKey) || 
+             catName.includes(searchKey) || 
+             catId === searchKey;
     }).map(p => ({
       ...p,
       customerPrice: (Number(p.price) * 1.04).toFixed(0)
@@ -128,7 +116,7 @@ export function ProductSheet({
                 <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
               </Button>
             </div>
-            <SheetDescription className="text-right text-xs">مزامنة مباشرة مع سيرفر الراغب (Zid Platform)</SheetDescription>
+            <SheetDescription className="text-right text-xs">مزامنة مباشرة مع متجر الراغب (Zid)</SheetDescription>
           </SheetHeader>
         </div>
 
@@ -157,8 +145,8 @@ export function ProductSheet({
                     <Card key={product.id} className="border-none shadow-sm hover:shadow-md transition-shadow bg-white overflow-hidden group">
                       <CardContent className="p-5 space-y-4">
                         <div className="flex items-center gap-3">
-                          {product.category_img ? (
-                            <img src={product.category_img} alt={product.name} className="w-14 h-14 rounded-xl object-cover shadow-sm group-hover:scale-105 transition-transform" />
+                          {product.image ? (
+                            <img src={product.image} alt={product.name} className="w-14 h-14 rounded-xl object-cover shadow-sm group-hover:scale-105 transition-transform" />
                           ) : (
                             <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center">
                               <ShoppingCart className="h-6 w-6 text-primary" />
@@ -171,7 +159,12 @@ export function ProductSheet({
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-[11px] font-bold text-muted-foreground pr-1 flex items-center gap-1 justify-end">الآي دي أو رقم الهاتف <UserIcon className="h-3 w-3" /></label>
-                          <Input placeholder="أدخل البيانات..." className="text-right h-11 bg-muted/50 border-none" value={targetIds[product.id] || ""} onChange={(e) => setTargetIds(prev => ({ ...prev, [product.id]: e.target.value }))} />
+                          <Input 
+                            placeholder="أدخل البيانات..." 
+                            className="text-right h-11 bg-muted/50 border-none" 
+                            value={targetIds[product.id] || ""} 
+                            onChange={(e) => setTargetIds(prev => ({ ...prev, [product.id]: e.target.value }))} 
+                          />
                         </div>
                         <div className="flex items-center justify-between pt-3 border-t border-dashed border-muted">
                           <p className="text-primary font-black text-xl">{Number(product.customerPrice).toLocaleString()} <span className="text-[10px] font-medium">{currency}</span></p>
