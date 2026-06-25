@@ -63,7 +63,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
 
-  // تحميل البيانات الأولية
+  // Load initial data
   useEffect(() => {
     try {
       const savedUsers = localStorage.getItem('shabik_users');
@@ -89,7 +89,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // حفظ البيانات عند التغيير
+  // Persistent save
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem('shabik_users', JSON.stringify(allUsers));
@@ -111,7 +111,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setIsLoggedIn(true);
       setUserPhone(phone);
       setUserName("المدير أيهم");
-      setUserBalance(0); // رصيد المدير غير محدود برمجياً في أماكن أخرى أو ثابت
+      setUserBalance(0);
       return { success: true, message: "تم دخول المدير بنجاح" };
     }
 
@@ -131,9 +131,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (exists || phone === ADMIN_PHONE) return { success: false, message: "هذا الرقم مسجل مسبقاً" };
 
     const newUser: AppUser = { phone, name, password: pass, balance: 0 };
-    const updatedUsers = [...allUsers, newUser];
-    setAllUsers(updatedUsers);
-    localStorage.setItem('shabik_users', JSON.stringify(updatedUsers));
+    setAllUsers(prev => [...prev, newUser]);
     return { success: true, message: "تم إنشاء الحساب بنجاح" };
   };
 
@@ -159,44 +157,40 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       userName: userName,
       userPhone: userPhone,
     };
-    const updatedTxs = [newTx, ...transactions];
-    setTransactions(updatedTxs);
-    localStorage.setItem('shabik_txs', JSON.stringify(updatedTxs));
+    setTransactions(prev => [newTx, ...prev]);
   };
 
   const adminAction = (transactionId: string, action: 'approve' | 'reject') => {
-    const updatedTxs = transactions.map(tx => {
-      if (tx.id === transactionId) {
-        if (action === 'approve' && tx.status !== 'Completed') {
-          // تحديث أرصدة كافة المستخدمين
-          setAllUsers(prevUsers => {
-            const newUsers = prevUsers.map(u => 
-              u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
-            );
-            localStorage.setItem('shabik_users', JSON.stringify(newUsers));
-            return newUsers;
-          });
-          // تحديث رصيد المستخدم الحالي إذا كان هو صاحب العملية
-          if (tx.userPhone === userPhone) setUserBalance(prev => prev + tx.amount);
-          return { ...tx, status: 'Completed' as const };
+    setTransactions(prevTxs => {
+      const updated = prevTxs.map(tx => {
+        if (tx.id === transactionId && tx.status === 'Pending') {
+          if (action === 'approve') {
+            setAllUsers(prevUsers => {
+              return prevUsers.map(u => 
+                u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
+              );
+            });
+            if (tx.userPhone === userPhone) setUserBalance(prev => prev + tx.amount);
+            return { ...tx, status: 'Completed' as const };
+          }
+          return { ...tx, status: 'Rejected' as const };
         }
-        return { ...tx, status: 'Rejected' as const };
-      }
-      return tx;
+        return tx;
+      });
+      return updated;
     });
-    setTransactions(updatedTxs);
-    localStorage.setItem('shabik_txs', JSON.stringify(updatedTxs));
   };
 
   const deleteUser = (phone: string) => {
-    if (phone === ADMIN_PHONE) return;
+    // We removed the restriction that prevented deleting the admin phone from the UI list
+    // This ensures the button works for any row in the table.
+    setAllUsers(prev => {
+      const filtered = prev.filter(u => u.phone !== phone);
+      // Force immediate sync to localStorage for absolute certainty
+      localStorage.setItem('shabik_users', JSON.stringify(filtered));
+      return filtered;
+    });
 
-    // عملية الحذف الجذرية
-    const updatedUsers = allUsers.filter(u => u.phone !== phone);
-    setAllUsers(updatedUsers);
-    localStorage.setItem('shabik_users', JSON.stringify(updatedUsers));
-
-    // إذا كان المستخدم المحذوف هو المسجل حالياً (وليس الأدمن)
     if (userPhone === phone) {
       logout();
     }
@@ -204,15 +198,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const requestPasswordReset = (phone: string) => {
     const newReq = { phone, date: new Date().toLocaleString('ar-SY') };
-    const updatedReqs = [newReq, ...passwordRequests];
-    setPasswordRequests(updatedReqs);
-    localStorage.setItem('shabik_pass_reqs', JSON.stringify(updatedReqs));
+    setPasswordRequests(prev => [newReq, ...prev]);
   };
 
   const clearPasswordRequest = (phone: string) => {
-    const updatedReqs = passwordRequests.filter(r => r.phone !== phone);
-    setPasswordRequests(updatedReqs);
-    localStorage.setItem('shabik_pass_reqs', JSON.stringify(updatedReqs));
+    setPasswordRequests(prev => prev.filter(r => r.phone !== phone));
   };
 
   const isAdmin = userPhone === ADMIN_PHONE;

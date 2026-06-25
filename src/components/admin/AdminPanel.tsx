@@ -19,20 +19,14 @@ export function AdminPanel() {
 
   const pendingTxs = transactions.filter(t => t.status === 'Pending');
 
-  const handleDeleteClick = (phone: string) => {
-    if (phone === adminCurrentPhone) {
-      toast({
-        title: "خطأ",
-        description: "لا يمكنك حذف حساب المدير الحالي.",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  const handleDeleteClick = (e: React.MouseEvent, phone: string) => {
+    // Stop propagation to avoid any row click side effects
+    e.stopPropagation();
+    
     const confirmDelete = window.confirm(`هل أنت متأكد من حذف الحساب ذو الرقم (${phone}) نهائياً؟`);
     
     if (confirmDelete) {
-      // تنفيذ عملية الحذف الفورية
+      // Execute deletion directly
       deleteUser(phone);
       
       toast({
@@ -133,7 +127,7 @@ export function AdminPanel() {
                           variant="ghost" 
                           size="icon" 
                           className="text-destructive hover:bg-destructive/10 cursor-pointer" 
-                          onClick={() => handleDeleteClick(user.phone)}
+                          onClick={(e) => handleDeleteClick(e, user.phone)}
                           type="button"
                         >
                           <Trash2 className="h-5 w-5" />
