@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -11,7 +12,7 @@ export async function GET(request: Request) {
   const categoryId = searchParams.get('categoryId');
 
   try {
-    // محاولة جلب المنتجات باستخدام طلب POST (وهو الشائع في أنظمة الراغب)
+    // الاتصال بسيرفر الراغب باستخدام الـ Token الحقيقي
     const response = await fetch(`${AL_RAGHEB_BASE_URL}/api/products`, {
       method: 'POST', 
       headers: {
@@ -26,25 +27,20 @@ export async function GET(request: Request) {
     });
 
     if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
+      console.error(`[ALRAGHEB API ERROR]: Status ${response.status}`);
+      return NextResponse.json([]);
     }
 
     const data = await response.json();
     
-    // استخراج المنتجات حسب هيكلية الراغب (غالباً تكون في data.data أو data)
+    // استخراج المنتجات حسب هيكلية الراغب الفعلية
+    // غالباً ما تكون في data.data أو مباشرة في المصفوفة
     const products = data.data || data.products || (Array.isArray(data) ? data : []);
 
     return NextResponse.json(products);
 
   } catch (error: any) {
     console.error("[API ERROR]:", error.message);
-    
-    // بيانات احتياطية لضمان عمل الواجهة في حال وجود مشكلة تقنية مؤقتة
-    const fallbackData = [
-      { id: 1, name: "منتج تجريبي 1", price: 1000 },
-      { id: 2, name: "منتج تجريبي 2", price: 2000 }
-    ];
-    
     return NextResponse.json([]);
   }
 }

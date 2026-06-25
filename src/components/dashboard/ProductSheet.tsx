@@ -56,13 +56,12 @@ export function ProductSheet({
     setFetching(true);
     try {
       const response = await fetch(`/api/products?categoryId=${activeCategoryId}`);
-      if (!response.ok) throw new Error("Connection failed");
       const data = await response.json();
       setAllProducts(Array.isArray(data) ? data : []);
     } catch (error: any) {
       toast({
         title: "خطأ في الاتصال",
-        description: "فشل جلب المنتجات. يرجى التأكد من اتصال الإنترنت.",
+        description: "فشل جلب المنتجات من الراغب.",
         variant: "destructive",
       });
     } finally {
@@ -73,31 +72,21 @@ export function ProductSheet({
   const groupedServices = useMemo(() => {
     if (!allProducts.length) return [];
 
-    // Simple search filtering
-    const searchTerms = serviceName.toLowerCase().split(' ').filter(k => k.length > 2);
-    let filtered = allProducts;
+    return allProducts.map(item => {
+      // تطبيق عمولة 4% على السعر الآتي من الراغب
+      const applyMargin = (price: number) => (price * 1.04).toFixed(0);
 
-    if (searchTerms.length > 0) {
-      filtered = allProducts.filter(item => {
-        const itemName = (item.name || "").toLowerCase();
-        return searchTerms.some(kw => itemName.includes(kw));
-      });
-    }
-
-    if (filtered.length === 0) filtered = allProducts;
-
-    return filtered.map(item => {
       const subItems = item.options || item.variants || item.params || [];
       const items = Array.isArray(subItems) && subItems.length > 0 
         ? subItems.map((sub: any) => ({
             id: sub.id || `${item.id}-${Math.random()}`,
             name: sub.name || item.name,
-            customerPrice: (Number(sub.price || item.price || 0) * 1.04).toFixed(0),
+            customerPrice: applyMargin(Number(sub.price || item.price || 0)),
           }))
         : [{
             id: item.id,
             name: item.name,
-            customerPrice: (Number(item.price || 0) * 1.04).toFixed(0),
+            customerPrice: applyMargin(Number(item.price || 0)),
           }];
 
       return {
@@ -125,7 +114,7 @@ export function ProductSheet({
     if (!targetId || !targetId.trim()) {
       toast({
         title: "حقل مطلوب",
-        description: "يرجى إدخال المعرف (ID) أو رقم الحساب.",
+        description: "يرجى إدخال الآي دي أو الرقم.",
         variant: "destructive",
       });
       return;
@@ -134,7 +123,7 @@ export function ProductSheet({
     if (userBalance < price) {
       toast({
         title: "رصيد غير كافٍ",
-        description: "عذراً، رصيدك الحالي لا يغطي قيمة هذا المنتج.",
+        description: "يرجى شحن محفظتك للمتابعة.",
         variant: "destructive",
       });
       return;
@@ -142,7 +131,7 @@ export function ProductSheet({
 
     toast({
       title: "تم استلام طلبك",
-      description: `طلب ${variation.name} للحساب ${targetId} قيد المعالجة الآن.`,
+      description: `طلب ${variation.name} قيد المعالجة الآن.`,
     });
     setTargetIds(prev => ({ ...prev, [groupId]: "" }));
   };
@@ -159,7 +148,7 @@ export function ProductSheet({
                 <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
               </Button>
             </div>
-            <SheetDescription className="text-right text-xs">مزامنة البيانات الحية من مزود الراغب (سعر +4%).</SheetDescription>
+            <SheetDescription className="text-right text-xs">تحديث مباشر من الراغب (سعر +4%).</SheetDescription>
           </SheetHeader>
         </div>
 
@@ -167,7 +156,7 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-bold text-muted-foreground">جاري تحديث القائمة...</p>
+              <p className="text-sm font-bold text-muted-foreground">جاري التحديث...</p>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
@@ -208,7 +197,7 @@ export function ProductSheet({
                               <UserIcon className="h-3 w-3" /> الآي دي أو الرقم المطلوب
                             </label>
                             <Input 
-                              placeholder="أدخل الـ ID أو الرقم هنا..." 
+                              placeholder="أدخل الـ ID هنا..." 
                               className="text-right h-11 bg-muted/30 border-none"
                               value={targetIds[group.id] || ""}
                               onChange={(e) => setTargetIds(prev => ({ ...prev, [group.id]: e.target.value }))}
@@ -234,7 +223,7 @@ export function ProductSheet({
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
                   <PackageX className="h-10 w-10 opacity-30" />
-                  <p className="text-sm font-bold">لا توجد منتجات حالياً لهذه الفئة.</p>
+                  <p className="text-sm font-bold">لا توجد منتجات متاحة لهذه الفئة.</p>
                 </div>
               )}
             </ScrollArea>
