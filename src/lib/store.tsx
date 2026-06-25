@@ -182,15 +182,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteUser = (phone: string) => {
-    // We removed the restriction that prevented deleting the admin phone from the UI list
-    // This ensures the button works for any row in the table.
+    // إزالة كافة القيود لضمان أن الزر يحذف أي سطر يتم اختياره في الجدول
     setAllUsers(prev => {
       const filtered = prev.filter(u => u.phone !== phone);
-      // Force immediate sync to localStorage for absolute certainty
+      // تحديث فوري وقسري للذاكرة المحلية لضمان النجاح
       localStorage.setItem('shabik_users', JSON.stringify(filtered));
       return filtered;
     });
 
+    // إذا كان المستخدم يحذف نفسه، قم بتسجيل الخروج
     if (userPhone === phone) {
       logout();
     }

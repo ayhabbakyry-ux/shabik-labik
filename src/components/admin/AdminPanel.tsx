@@ -20,18 +20,16 @@ export function AdminPanel() {
   const pendingTxs = transactions.filter(t => t.status === 'Pending');
 
   const handleDeleteClick = (e: React.MouseEvent, phone: string) => {
-    // Stop propagation to avoid any row click side effects
+    e.preventDefault();
     e.stopPropagation();
     
-    const confirmDelete = window.confirm(`هل أنت متأكد من حذف الحساب ذو الرقم (${phone}) نهائياً؟`);
+    const confirmDelete = window.confirm(`هل أنت متأكد من حذف هذا الحساب (${phone}) نهائياً من النظام؟`);
     
     if (confirmDelete) {
-      // Execute deletion directly
       deleteUser(phone);
-      
       toast({
-        title: "تم الحذف",
-        description: `تم إزالة المستخدم (${phone}) بنجاح من النظام.`,
+        title: "تم الحذف بنجاح",
+        description: `تم إزالة المستخدم ذو الرقم (${phone}) من قائمة البيانات.`,
       });
     }
   };
@@ -126,7 +124,7 @@ export function AdminPanel() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="text-destructive hover:bg-destructive/10 cursor-pointer" 
+                          className="text-destructive hover:bg-destructive/10" 
                           onClick={(e) => handleDeleteClick(e, user.phone)}
                           type="button"
                         >
