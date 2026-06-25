@@ -10,24 +10,24 @@ export async function GET() {
             method: 'GET',
             headers: {
                 'api-token': '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0',
-                'Accept': 'application/json, text/plain, */*',
+                'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept-Language': 'ar,en;q=0.9'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             },
             cache: 'no-store'
         });
 
         const textData = await response.text();
 
-        // إذا كان الرد لا يزال صفحة ويب، نقوم بالتحويل للبيانات الاحتياطية لضمان عمل الواجهة
+        // التحقق مما إذا كان الرد عبارة عن صفحة HTML (مؤشر على رفض الطلب أو توجيه خاطئ)
         if (!textData || textData.trim().startsWith('<!doctype') || textData.trim().startsWith('<html')) {
-            console.log("Returned HTML or Empty, using Fallback Data instead.");
+            console.error("Returned HTML or Empty Response from Alragheb. Using Fallback Data.");
             return NextResponse.json(getFallbackData());
         }
 
         try {
             const data = JSON.parse(textData);
+            // استخراج مصفوفة المنتجات بناءً على هيكلية منصة زد/الراغب المتوقعة
             const productsArray = Array.isArray(data) ? data : (data.products || data.data || []);
             
             if (productsArray.length === 0) return NextResponse.json(getFallbackData());
@@ -49,12 +49,12 @@ export async function GET() {
         }
 
     } catch (error) {
-        console.error('API Local Fallback triggered:', error);
+        console.error('API Server Fetch Error:', error);
         return NextResponse.json(getFallbackData());
     }
 }
 
-// دالة البيانات الاحتياطية لضمان تشغيل الفقاعات والأقسام دائماً دون انهيار
+// دالة البيانات الاحتياطية لضمان استمرارية عمل الواجهة في حال فشل الربط الخارجي
 function getFallbackData() {
     return [
         { 
