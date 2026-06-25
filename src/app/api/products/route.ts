@@ -21,22 +21,33 @@ export async function GET() {
             cache: 'no-store'
         });
 
+        // قراءة الاستجابة كنص أولاً لتجنب خطأ Unexpected end of JSON input
+        const textData = await response.text();
+        console.log("[ALRAGHEB API RAW RESPONSE]:", textData);
+
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`[ALRAGHEB API ERROR]: Status ${response.status}`, errorText);
+            console.error(`[ALRAGHEB API ERROR]: Status ${response.status}`, textData);
             return NextResponse.json(
-                { error: `سيرفر الراغب أرجع خطأ: ${response.status}`, details: errorText }, 
+                { error: `سيرفر الراغب أرجع خطأ: ${response.status}`, details: textData }, 
                 { status: response.status }
             );
         }
 
-        const data = await response.json();
-        console.log("[ALRAGHEB API SUCCESS]: Data received successfully");
-        
-        // استخراج مصفوفة المنتجات بناءً على هيكلية الراغب القياسية
-        const productsArray = data.data || data.products || (Array.isArray(data) ? data : []);
+        // إذا كانت الاستجابة فارغة، نعيد مصفوفة فارغة بدلاً من محاولة عمل JSON.parse
+        if (!textData || textData.trim() === "") {
+            console.warn("[ALRAGHEB API]: Received empty response body.");
+            return NextResponse.json([]);
+        }
 
-        return NextResponse.json(productsArray);
+        try {
+            const data = JSON.parse(textData);
+            // استخراج مصفوفة المنتجات بناءً على هيكلية الراغب القياسية
+            const productsArray = data.data || data.products || (Array.isArray(data) ? data : []);
+            return NextResponse.json(productsArray);
+        } catch (parseError) {
+            console.error("[JSON PARSE ERROR]: Failed to parse Alragheb response", parseError);
+            return NextResponse.json({ error: "البيانات المستلمة من سيرفر الراغب ليست بصيغة JSON صحيحة" }, { status: 500 });
+        }
 
     } catch (error: any) {
         console.error("[INTERNAL SERVER ERROR]:", error.message);

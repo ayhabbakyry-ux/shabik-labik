@@ -46,14 +46,31 @@ export function ProductSheet({
     setErrorMsg(null);
     try {
       const response = await fetch(`/api/products`, { cache: 'no-store' });
-      const data = await response.json();
+      
+      // قراءة الاستجابة كنص أولاً لتجنب خطأ Unexpected end of JSON input
+      const text = await response.text();
       
       if (!response.ok) {
-        // قراءة الخطأ القادم من السيرفر بشكل مرن
-        const errorMessage = (typeof data === 'object' && data !== null) 
-          ? (data.error || data.message || `Error ${response.status}`) 
-          : "فشل الاتصال بالمسار الداخلي";
-        throw new Error(errorMessage);
+        let errorData;
+        try {
+          errorData = text ? JSON.parse(text) : { error: `Error ${response.status}` };
+        } catch (e) {
+          errorData = { error: text || `Error ${response.status}` };
+        }
+        throw new Error(errorData.error || errorData.message || `Error ${response.status}`);
+      }
+      
+      // التعامل مع الاستجابة الفارغة
+      if (!text || text.trim() === "") {
+        setAllProducts([]);
+        return;
+      }
+
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error("فشل في قراءة بيانات المنتجات المستلمة (JSON Error)");
       }
       
       // التوافق مع هيكلية البيانات: مصفوفة مباشرة أو كائن يحتوي على مصفوفة
