@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo, useState, useCallback } from 'react';
@@ -13,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PackageX, RefreshCw, ShoppingCart, User as UserIcon } from "lucide-react";
+import { Loader2, PackageX, RefreshCw, ShoppingCart, User as UserIcon, AlertCircle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useUser } from "@/lib/store";
 import { Input } from "@/components/ui/input";
@@ -27,6 +26,11 @@ interface ProductItem {
   image?: string;
 }
 
+/**
+ * @component ProductSheet
+ * @description مكون واجهة العرض المسؤول عن جلب وعرض المنتجات من الـ API الداخلي.
+ * يقوم هذا المكون بطلب البيانات من /api/products ديناميكياً وتحديث الواجهة والأسعار.
+ */
 export function ProductSheet({ 
   children, 
   serviceName, 
@@ -38,28 +42,43 @@ export function ProductSheet({
 }) {
   const [allProducts, setAllProducts] = useState<ProductItem[]>([]);
   const [fetching, setFetching] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [ordering, setOrdering] = useState<string | null>(null);
   const [targetIds, setTargetIds] = useState<Record<string, string>>({});
   const { toast } = useToast();
   const { currency, userBalance, deductBalance } = useUser();
 
+  // جلب البيانات من السيرفر الداخلي
   const fetchProducts = useCallback(async () => {
     setFetching(true);
+    setErrorMsg(null);
     try {
       const response = await fetch(`/api/products`, { cache: 'no-store' });
+      
+      if (!response.ok) {
+        throw new Error(`Server returned status: ${response.status}`);
+      }
+
       const data = await response.json();
-      setAllProducts(Array.isArray(data) ? data : []);
+      
+      // التأكد من أن البيانات مصفوفة وتحديث الـ State
+      if (Array.isArray(data)) {
+        setAllProducts(data);
+      } else if (data.error) {
+        setErrorMsg(data.error);
+        setAllProducts([]);
+      } else {
+        setAllProducts([]);
+      }
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "خطأ في الاتصال",
-        description: "تعذر جلب المنتجات الحية حالياً."
-      });
+      setErrorMsg(error.message || "فشل الاتصال بمسار المنتجات الداخلي.");
+      console.error("UI Fetch Error:", error);
     } finally {
       setFetching(false);
     }
-  }, [toast]);
+  }, []);
 
+  // فلترة المنتجات بناءً على القسم المختار (ببجي، فري فاير، إلخ)
   const filteredProducts = useMemo(() => {
     if (!allProducts.length) return [];
     const searchKey = filterValue.toLowerCase();
@@ -74,7 +93,8 @@ export function ProductSheet({
              catId.includes(searchKey);
     }).map(p => ({
       ...p,
-      customerPrice: (Number(p.price) * 1.04).toFixed(0) // عمولة 4% ثابتة
+      // تطبيق عمولة 4% ثابتة على سعر المورد
+      customerPrice: (Number(p.price) * 1.04).toFixed(0)
     }));
   }, [allProducts, filterValue]);
 
@@ -83,51 +103,49 @@ export function ProductSheet({
     const price = Number(product.customerPrice);
 
     if (!targetId || !targetId.trim()) {
-      toast({ title: "حقل مطلوب", description: "يرجى إدخال الآي دي أو الرقم المطلوب.", variant: "destructive" });
+      toast({ title: "حقل مطلوب", description: "يرجى إدخال الآي دي أو الرقم المطلوب لطلب المنتج.", variant: "destructive" });
       return;
     }
 
     if (userBalance < price) {
-      toast({ title: "رصيد غير كافٍ", description: "رصيدك الحالي في المحفظة أقل من سعر المنتج.", variant: "destructive" });
+      toast({ title: "رصيد غير كافٍ", description: "رصيدك الحالي أقل من سعر المنتج المطلوب.", variant: "destructive" });
       return;
     }
 
     setOrdering(String(product.id));
     
     try {
-      const orderUuid = crypto.randomUUID();
       const response = await fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
               product_id: product.id,
               playerId: targetId,
-              order_uuid: orderUuid
+              order_uuid: crypto.randomUUID()
           })
       });
 
       const result = await response.json();
 
       if (result.success) {
-          // الخصم من المحفظة المحلية فقط عند نجاح الشحن الفعلي من المزود
           deductBalance(price, `${product.name} - ID: ${targetId}`);
           toast({ 
             title: "نجح الشحن التلقائي", 
-            description: `تم شحن ${product.name} بنجاح إلى المعرف ${targetId}.`,
+            description: `تم شحن ${product.name} بنجاح إلى ${targetId}.`,
             className: "bg-green-600 text-white"
           });
           setTargetIds(prev => ({ ...prev, [product.id]: "" }));
       } else {
           toast({ 
             title: "فشل تنفيذ الطلب", 
-            description: result.message || "حدث خطأ غير متوقع عند المزود.",
+            description: result.message || "حدث خطأ عند المزود، يرجى المحاولة لاحقاً.",
             variant: "destructive" 
           });
       }
     } catch (error) {
       toast({ 
         title: "خطأ تقني", 
-        description: "فشل الاتصال بسيرفر الشحن، يرجى المحاولة لاحقاً.", 
+        description: "تعذر الاتصال بسيرفر الشحن حالياً.", 
         variant: "destructive" 
       });
     } finally {
@@ -147,7 +165,7 @@ export function ProductSheet({
                 <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
               </Button>
             </div>
-            <SheetDescription className="text-right text-xs">الشحن يتم تلقائياً وفوراً عند الطلب</SheetDescription>
+            <SheetDescription className="text-right text-xs">يتم جلب البيانات الحية والأسعار من السيرفر الآن</SheetDescription>
           </SheetHeader>
         </div>
 
@@ -155,7 +173,16 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-bold text-muted-foreground">جاري المزامنة مع المزود...</p>
+              <p className="text-sm font-bold text-muted-foreground">جاري تحديث الأسعار والمنتجات...</p>
+            </div>
+          ) : errorMsg ? (
+            <div className="h-full p-6 flex flex-col items-center justify-center text-center gap-4">
+               <div className="bg-destructive/10 p-4 rounded-full"><AlertCircle className="h-10 w-10 text-destructive" /></div>
+               <div className="space-y-2">
+                 <p className="font-bold text-destructive">خطأ في جلب البيانات</p>
+                 <p className="text-xs text-muted-foreground bg-white p-3 rounded-lg border border-dashed">{errorMsg}</p>
+               </div>
+               <Button onClick={fetchProducts} variant="outline" size="sm">إعادة المحاولة</Button>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
@@ -174,14 +201,14 @@ export function ProductSheet({
                           )}
                           <div className="flex-1 text-right">
                             <h4 className="font-bold text-foreground text-sm line-clamp-2">{product.name}</h4>
-                            <p className="text-[10px] text-green-600 font-bold mt-1">متوفر للشحن الفوري</p>
+                            <p className="text-[10px] text-green-600 font-bold mt-1">متوفر للشحن التلقائي فوراً</p>
                           </div>
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-[11px] font-bold text-muted-foreground pr-1 flex items-center gap-1 justify-end">الآي دي أو رقم الهاتف <UserIcon className="h-3 w-3" /></label>
                           <Input 
-                            placeholder="أدخل المعرف المطلوب..." 
-                            className="text-right h-11 bg-muted/50 border-none" 
+                            placeholder="أدخل المعرف أو الرقم..." 
+                            className="text-right h-11 bg-muted/50 border-none focus:ring-1 focus:ring-primary" 
                             value={targetIds[product.id] || ""} 
                             onChange={(e) => setTargetIds(prev => ({ ...prev, [product.id]: e.target.value }))} 
                             disabled={ordering === String(product.id)}
@@ -194,8 +221,7 @@ export function ProductSheet({
                             disabled={ordering === String(product.id)}
                             className="rounded-full bg-primary font-bold px-8 shadow-lg active:scale-95 transition-all"
                           >
-                            {ordering === String(product.id) ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : null}
-                            طلب الآن
+                            {ordering === String(product.id) ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : "طلب الآن"}
                           </Button>
                         </div>
                       </CardContent>

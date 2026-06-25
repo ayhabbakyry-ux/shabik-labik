@@ -1,8 +1,13 @@
-
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+/**
+ * @fileOverview مسار السيرفر لجلب المنتجات من متجر الراغب.
+ * يقوم هذا المسار بالتواصل مع API الراغب باستخدام التوكن والترويسات الصحيحة،
+ * ثم يقوم بتحويل الحقول العربية إلى حقول إنجليزية لتسهيل المعالجة في الواجهة.
+ */
 
 export async function GET() {
     try {
@@ -10,29 +15,30 @@ export async function GET() {
             method: 'GET',
             headers: {
                 'api-token': '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0',
-                'Accept': 'application/json',
+                'Accept': 'application/json, text/plain, */*',
                 'Content-Type': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept-Language': 'ar,en;q=0.9'
             },
             cache: 'no-store'
         });
 
         const textData = await response.text();
 
-        // التحقق مما إذا كان الرد عبارة عن صفحة HTML (مؤشر على رفض الطلب أو توجيه خاطئ)
+        // التحقق من الرد: إذا كان HTML (صفحة ويب) فهذا يعني وجود حظر أو خطأ في الربط
         if (!textData || textData.trim().startsWith('<!doctype') || textData.trim().startsWith('<html')) {
-            console.error("Returned HTML or Empty Response from Alragheb. Using Fallback Data.");
+            console.error("Returned HTML from Alragheb. IP might be blocked or Token invalid.");
             return NextResponse.json(getFallbackData());
         }
 
         try {
             const data = JSON.parse(textData);
-            // استخراج مصفوفة المنتجات بناءً على هيكلية منصة زد/الراغب المتوقعة
+            // استخراج مصفوفة المنتجات (منصة زد قد ترسلها مباشرة أو داخل حقل products)
             const productsArray = Array.isArray(data) ? data : (data.products || data.data || []);
             
             if (productsArray.length === 0) return NextResponse.json(getFallbackData());
 
-            // تحويل الحقول العربية القادمة من الراغب إلى حقول إنجليزية لتفهمها الواجهة
+            // تحويل الحقول العربية (Mapping) لتوافق تصميم الواجهة
             const formattedProducts = productsArray.map((prod: any) => ({
                 id: prod.id,
                 name: prod.الاسم || prod.name || '',
@@ -44,17 +50,17 @@ export async function GET() {
 
             return NextResponse.json(formattedProducts);
         } catch (parseError) {
-            console.error("JSON Parse Error, using Fallback Data.");
+            console.error("JSON Parsing failed for Alragheb response.");
             return NextResponse.json(getFallbackData());
         }
 
     } catch (error) {
-        console.error('API Server Fetch Error:', error);
+        console.error('Connection to Alragheb failed:', error);
         return NextResponse.json(getFallbackData());
     }
 }
 
-// دالة البيانات الاحتياطية لضمان استمرارية عمل الواجهة في حال فشل الربط الخارجي
+// بيانات احتياطية حقيقية لضمان عمل الواجهة والأقسام في حال فشل الربط الخارجي
 function getFallbackData() {
     return [
         { 
