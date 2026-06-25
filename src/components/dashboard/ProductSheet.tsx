@@ -46,42 +46,23 @@ export function ProductSheet({
     setErrorMsg(null);
     try {
       const response = await fetch(`/api/products`, { cache: 'no-store' });
-      
       const text = await response.text();
       
       if (!response.ok) {
-        let errorData;
-        try {
-          errorData = text ? JSON.parse(text) : { error: `HTTP ${response.status}` };
-        } catch (e) {
-          errorData = { error: text || `HTTP ${response.status}` };
-        }
-        throw new Error(errorData.error || errorData.message || `خطأ ${response.status}`);
+        const errorData = text ? JSON.parse(text) : { error: `خطأ ${response.status}` };
+        throw new Error(errorData.error || `خطأ ${response.status}`);
       }
       
-      if (!text || text.trim() === "") {
-        setAllProducts([]);
-        return;
+      const data = JSON.parse(text);
+      
+      if (data && data.error) {
+        throw new Error(data.error);
       }
 
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        throw new Error("البيانات المستلمة ليست JSON. الرد الخام: " + text.substring(0, 100));
-      }
-      
-      let products: ProductItem[] = [];
-      if (Array.isArray(data)) {
-        products = data;
-      } else if (data && typeof data === 'object') {
-        products = data.data || data.products || [];
-      }
-      
-      setAllProducts(Array.isArray(products) ? products : []);
+      const products = Array.isArray(data) ? data : (data.data || data.products || []);
+      setAllProducts(products);
     } catch (error: any) {
-      console.error("Fetch error:", error);
-      setErrorMsg(error.message || "حدث خطأ غير متوقع أثناء جلب المنتجات");
+      setErrorMsg(error.message);
     } finally {
       setFetching(false);
     }
@@ -105,27 +86,17 @@ export function ProductSheet({
     const price = Number(product.customerPrice);
 
     if (!targetId || !targetId.trim()) {
-      toast({
-        title: "حقل مطلوب",
-        description: "يرجى إدخال الآي دي أو الرقم المطلوب.",
-        variant: "destructive",
-      });
+      toast({ title: "حقل مطلوب", description: "يرجى إدخال الآي دي أو الرقم المطلوب.", variant: "destructive" });
       return;
     }
 
     if (userBalance < price) {
-      toast({
-        title: "رصيد غير كافٍ",
-        description: "يرجى شحن محفظتك لإتمام العملية.",
-        variant: "destructive",
-      });
+      toast({ title: "رصيد غير كافٍ", description: "رصيدك الحالي أقل من سعر المنتج، يرجى الشحن.", variant: "destructive" });
       return;
     }
 
-    toast({
-      title: "تم استلام طلبك",
-      description: `طلب ${product.name} قيد المراجعة الفورية.`,
-    });
+    // محاكاة استجابة الطلب برموز أخطاء الراغب
+    toast({ title: "تم إرسال الطلب", description: `طلب ${product.name} قيد المعالجة الآن.` });
     setTargetIds(prev => ({ ...prev, [product.id]: "" }));
   };
 
@@ -141,9 +112,7 @@ export function ProductSheet({
                 <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
               </Button>
             </div>
-            <SheetDescription className="text-right text-xs">
-              الأسعار حقيقية ومباشرة من السيرفر
-            </SheetDescription>
+            <SheetDescription className="text-right text-xs">مزامنة مباشرة مع سيرفر الراغب</SheetDescription>
           </SheetHeader>
         </div>
 
@@ -151,20 +120,18 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-bold text-muted-foreground">جاري الاتصال بسيرفر الراغب...</p>
+              <p className="text-sm font-bold text-muted-foreground">جاري تحديث القائمة...</p>
             </div>
           ) : errorMsg ? (
             <div className="p-8 h-full flex flex-col items-center justify-center text-center gap-4">
-               <div className="bg-destructive/10 p-4 rounded-full">
-                  <AlertCircle className="h-12 w-12 text-destructive" />
-               </div>
+               <div className="bg-destructive/10 p-4 rounded-full"><AlertCircle className="h-12 w-12 text-destructive" /></div>
                <div className="space-y-2">
-                  <h3 className="font-bold text-lg text-destructive">فشل جلب البيانات</h3>
-                  <div className="text-xs text-muted-foreground max-w-[300px] overflow-auto max-h-[200px] bg-white p-3 rounded-lg border border-destructive/20 text-left ltr" dir="ltr">
+                  <h3 className="font-bold text-lg text-destructive">تنبيه من النظام</h3>
+                  <div className="text-sm font-medium bg-white p-4 rounded-xl border border-destructive/20 text-center shadow-sm">
                     {errorMsg}
                   </div>
                </div>
-               <Button onClick={fetchProducts} variant="outline" className="mt-2">إعادة المحاولة</Button>
+               <Button onClick={fetchProducts} variant="outline" className="mt-2">إعادة محاولة الاتصال</Button>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
@@ -183,32 +150,16 @@ export function ProductSheet({
                           )}
                           <div className="flex-1 text-right">
                             <h4 className="font-bold text-foreground text-sm line-clamp-2">{product.name}</h4>
-                            <p className="text-[10px] text-green-600 font-bold mt-1">متوفر الآن</p>
+                            <p className="text-[10px] text-green-600 font-bold mt-1">متوفر</p>
                           </div>
                         </div>
-
                         <div className="space-y-1.5">
-                          <label className="text-[11px] font-bold text-muted-foreground pr-1 flex items-center gap-1 justify-end">
-                            الآي دي أو رقم الهاتف <UserIcon className="h-3 w-3" />
-                          </label>
-                          <Input 
-                            placeholder="أدخل البيانات هنا..." 
-                            className="text-right h-11 bg-muted/50 border-none"
-                            value={targetIds[product.id] || ""}
-                            onChange={(e) => setTargetIds(prev => ({ ...prev, [product.id]: e.target.value }))}
-                          />
+                          <label className="text-[11px] font-bold text-muted-foreground pr-1 flex items-center gap-1 justify-end">الآي دي أو رقم الهاتف <UserIcon className="h-3 w-3" /></label>
+                          <Input placeholder="أدخل البيانات..." className="text-right h-11 bg-muted/50 border-none" value={targetIds[product.id] || ""} onChange={(e) => setTargetIds(prev => ({ ...prev, [product.id]: e.target.value }))} />
                         </div>
-
                         <div className="flex items-center justify-between pt-3 border-t border-dashed border-muted">
-                          <p className="text-primary font-black text-xl">
-                            {Number(product.customerPrice).toLocaleString()} <span className="text-[10px] font-medium">{currency}</span>
-                          </p>
-                          <Button 
-                            onClick={() => handleOrder(product)}
-                            className="rounded-full bg-primary font-bold px-8 shadow-lg active:scale-95 transition-all"
-                          >
-                            طلب الآن
-                          </Button>
+                          <p className="text-primary font-black text-xl">{Number(product.customerPrice).toLocaleString()} <span className="text-[10px] font-medium">{currency}</span></p>
+                          <Button onClick={() => handleOrder(product)} className="rounded-full bg-primary font-bold px-8 shadow-lg active:scale-95 transition-all">طلب الآن</Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -216,13 +167,8 @@ export function ProductSheet({
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4 bg-white/50 rounded-3xl mx-2 mt-4 border border-dashed border-muted-foreground/20">
-                  <div className="bg-muted p-4 rounded-full">
-                    <PackageX className="h-10 w-10 opacity-30" />
-                  </div>
-                  <div className="text-center px-6">
-                    <p className="text-sm font-bold text-foreground">عذراً، لا توجد منتجات حالياً</p>
-                    <p className="text-[10px] mt-1 opacity-70">تأكد من تفعيل الأقسام في حسابك بالراغب.</p>
-                  </div>
+                  <div className="bg-muted p-4 rounded-full"><PackageX className="h-10 w-10 opacity-30" /></div>
+                  <p className="text-sm font-bold text-foreground">لا توجد منتجات في هذا القسم</p>
                 </div>
               )}
             </ScrollArea>

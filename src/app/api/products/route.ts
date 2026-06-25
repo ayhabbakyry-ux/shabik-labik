@@ -3,16 +3,23 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+// قاموس ترجمة أخطاء الراغب الرسمية
+const ALRAGHEB_ERRORS: Record<number, string> = {
+    120: "رمز API مطلوب! يرجى التحقق من التوكن.",
+    121: "خطأ في الرمز المميز! التوكن الذي تم إدخاله غير صحيح.",
+    122: "غير مسموح باستخدام الـ API! يرجى تفعيل صلاحية المطورين من لوحة الراغب.",
+    123: "عنوان IP غير مسموح به! يرجى إضافة الـ IP الخاص بموقعنا داخل لوحة تحكم حسابك في الراغب.",
+    130: "الموقع قيد الصيانة حالياً من طرف المزود.",
+    100: "رصيدك غير كافٍ لإتمام هذه العملية.",
+    107: "معرف اللاعب محظور أو غير صحيح."
+};
+
 export async function GET() {
-    // التوكن الصريح لضمان العمل الفوري وتجاوز مشاكل ملفات البيئة
+    // التوكن الصريح لضمان العمل الفوري
     const HARDCODED_TOKEN = "64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0";
     const ALRAGHEB_API_URL = "https://alragheb-store.com/client/api/products";
 
-    let textData = "";
-
     try {
-        console.log("[ALRAGHEB API]: Initiating request to " + ALRAGHEB_API_URL);
-
         const response = await fetch(ALRAGHEB_API_URL, {
             method: 'GET',
             headers: {
@@ -23,41 +30,36 @@ export async function GET() {
             cache: 'no-store'
         });
 
-        // قراءة الاستجابة كنص أولاً لتشخيص الأخطاء
-        textData = await response.text();
-        console.log("[ALRAGHEB API RAW RESPONSE]:", textData);
-
+        const textData = await response.text();
+        
         if (!response.ok) {
-            console.error(`[ALRAGHEB API ERROR]: Status ${response.status}`, textData);
-            return NextResponse.json(
-                { error: `سيرفر الراغب أرجع خطأ ${response.status}: ${textData.substring(0, 300)}` }, 
-                { status: response.status }
-            );
+            return NextResponse.json({ error: `سيرفر الراغب أرجع خطأ ${response.status}` }, { status: response.status });
         }
 
-        // إذا كانت الاستجابة فارغة، نعيد مصفوفة فارغة
         if (!textData || textData.trim() === "") {
-            console.warn("[ALRAGHEB API]: Received empty response body.");
             return NextResponse.json([]);
         }
 
         try {
             const data = JSON.parse(textData);
-            // استخراج مصفوفة المنتجات بناءً على هيكلية الراغب القياسية
+
+            // التحقق من وجود كود خطأ داخل الرد
+            if (data && data.status && ALRAGHEB_ERRORS[data.status]) {
+                return NextResponse.json({ error: ALRAGHEB_ERRORS[data.status], code: data.status }, { status: 400 });
+            }
+
+            // استخراج مصفوفة المنتجات
             const productsArray = data.data || data.products || (Array.isArray(data) ? data : []);
             return NextResponse.json(productsArray);
         } catch (parseError) {
-            console.error("[JSON PARSE ERROR]: Failed to parse Alragheb response", parseError);
-            // إرسال النص الخام كرسالة خطأ للواجهة لمعرفة السبب الحقيقي
             return NextResponse.json({ 
-                error: "الرد المستلم ليس JSON صحيح. الرد الخام: " + textData.substring(0, 500) 
+                error: "الرد المستلم ليس JSON صحيح. الرد الخام: " + textData.substring(0, 200) 
             }, { status: 400 });
         }
 
     } catch (error: any) {
-        console.error("[INTERNAL SERVER ERROR]:", error.message);
         return NextResponse.json(
-            { error: 'حدث خطأ داخلي في السيرفر أثناء الاتصال: ' + error.message }, 
+            { error: 'حدث خطأ في الاتصال بالسيرفر: ' + error.message }, 
             { status: 500 }
         );
     }

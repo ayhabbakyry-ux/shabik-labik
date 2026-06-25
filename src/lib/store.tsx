@@ -125,7 +125,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteUser = useCallback((phone: string) => {
-    // تحديث قسري وذري لضمان الحذف الفوري
     setAllUsers(prev => {
       const updated = prev.filter(u => u.phone !== phone);
       localStorage.setItem('shabik_users', JSON.stringify(updated));
