@@ -39,6 +39,7 @@ type UserContextType = {
   register: (phone: string, name: string, pass: string) => { success: boolean; message: string };
   logout: () => void;
   addBalance: (amount: number) => void;
+  deductBalance: (amount: number, productDetails: string) => void;
   requestDeposit: (amount: number, proofImage: string) => void;
   adminAction: (transactionId: string, action: 'approve' | 'reject') => void;
   deleteUser: (phone: string) => void;
@@ -85,7 +86,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setIsLoggedIn(true);
       setUserPhone(authData.phone);
       setUserName(authData.name);
-      setUserBalance(authData.balance || 0);
+      // Get latest balance for this user from allUsers if possible
+      const currentU = savedUsers ? JSON.parse(savedUsers).find((u: any) => u.phone === authData.phone) : authData;
+      setUserBalance(currentU?.balance || 0);
     }
   }, []);
 
@@ -144,6 +147,31 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       return updated;
     });
     setUserBalance(prev => prev + amount);
+  };
+
+  const deductBalance = (amount: number, productDetails: string) => {
+    setAllUsers(prev => {
+      const updated = prev.map(u => u.phone === userPhone ? { ...u, balance: u.balance - amount } : u);
+      localStorage.setItem('shabik_users', JSON.stringify(updated));
+      return updated;
+    });
+    setUserBalance(prev => prev - amount);
+
+    const newTx: Transaction = {
+      id: `ORD-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+      type: 'شراء منتج',
+      amount,
+      status: 'Completed',
+      date: new Date().toLocaleString('ar-SY'),
+      userName: userName,
+      userPhone: userPhone,
+      details: productDetails
+    };
+    setTransactions(prev => {
+      const updated = [newTx, ...prev];
+      localStorage.setItem('shabik_txs', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const requestDeposit = (amount: number, proofImage: string) => {
@@ -209,7 +237,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   return (
     <UserContext.Provider value={{ 
       isLoggedIn, isAdmin, userPhone, userName, userBalance, transactions, allUsers, passwordRequests,
-      login, register, logout, addBalance, requestDeposit, adminAction, deleteUser, requestPasswordReset, clearPasswordRequest, currency
+      login, register, logout, addBalance, deductBalance, requestDeposit, adminAction, deleteUser, requestPasswordReset, clearPasswordRequest, currency
     }}>
       {children}
     </UserContext.Provider>

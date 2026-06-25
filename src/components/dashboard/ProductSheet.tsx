@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState, useCallback } from 'react';
@@ -12,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PackageX, RefreshCw, ShoppingCart, User as UserIcon, AlertCircle } from "lucide-react";
+import { Loader2, PackageX, RefreshCw, ShoppingCart, User as UserIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useUser } from "@/lib/store";
 import { Input } from "@/components/ui/input";
@@ -37,29 +38,22 @@ export function ProductSheet({
 }) {
   const [allProducts, setAllProducts] = useState<ProductItem[]>([]);
   const [fetching, setFetching] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [ordering, setOrdering] = useState<string | null>(null);
   const [targetIds, setTargetIds] = useState<Record<string, string>>({});
   const { toast } = useToast();
-  const { currency, userBalance } = useUser();
+  const { currency, userBalance, deductBalance } = useUser();
 
   const fetchProducts = useCallback(async () => {
     setFetching(true);
-    setErrorMsg(null);
     try {
       const response = await fetch(`/api/products`, { cache: 'no-store' });
       const data = await response.json();
-      
-      if (data && data.error) {
-        throw new Error(data.error);
-      }
-
       setAllProducts(Array.isArray(data) ? data : []);
     } catch (error: any) {
-      setErrorMsg(error.message);
       toast({
         variant: "destructive",
-        title: "تنبيه النظام",
-        description: "تعذر تحديث البيانات الحية، تم تفعيل قائمة المنتجات المستقرة."
+        title: "خطأ في الاتصال",
+        description: "تعذر جلب المنتجات الحية حالياً."
       });
     } finally {
       setFetching(false);
@@ -75,17 +69,16 @@ export function ProductSheet({
       const catName = (p.category_name || "").toLowerCase();
       const catId = String(p.category_id || "").toLowerCase();
       
-      // فلترة ذكية وشاملة تضمن ظهور المنتج في قسمه الصحيح
       return prodName.includes(searchKey) || 
              catName.includes(searchKey) || 
              catId.includes(searchKey);
     }).map(p => ({
       ...p,
-      customerPrice: (Number(p.price) * 1.04).toFixed(0)
+      customerPrice: (Number(p.price) * 1.04).toFixed(0) // عمولة 4% ثابتة
     }));
   }, [allProducts, filterValue]);
 
-  const handleOrder = (product: any) => {
+  const handleOrder = async (product: any) => {
     const targetId = targetIds[product.id];
     const price = Number(product.customerPrice);
 
@@ -95,12 +88,51 @@ export function ProductSheet({
     }
 
     if (userBalance < price) {
-      toast({ title: "رصيد غير كافٍ", description: "رصيدك الحالي أقل من سعر المنتج، يرجى الشحن.", variant: "destructive" });
+      toast({ title: "رصيد غير كافٍ", description: "رصيدك الحالي في المحفظة أقل من سعر المنتج.", variant: "destructive" });
       return;
     }
 
-    toast({ title: "تم إرسال الطلب", description: `طلب ${product.name} قيد المعالجة الآن.` });
-    setTargetIds(prev => ({ ...prev, [product.id]: "" }));
+    setOrdering(String(product.id));
+    
+    try {
+      const orderUuid = crypto.randomUUID();
+      const response = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+              product_id: product.id,
+              playerId: targetId,
+              order_uuid: orderUuid
+          })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+          // الخصم من المحفظة المحلية فقط عند نجاح الشحن الفعلي من المزود
+          deductBalance(price, `${product.name} - ID: ${targetId}`);
+          toast({ 
+            title: "نجح الشحن التلقائي", 
+            description: `تم شحن ${product.name} بنجاح إلى المعرف ${targetId}.`,
+            className: "bg-green-600 text-white"
+          });
+          setTargetIds(prev => ({ ...prev, [product.id]: "" }));
+      } else {
+          toast({ 
+            title: "فشل تنفيذ الطلب", 
+            description: result.message || "حدث خطأ غير متوقع عند المزود.",
+            variant: "destructive" 
+          });
+      }
+    } catch (error) {
+      toast({ 
+        title: "خطأ تقني", 
+        description: "فشل الاتصال بسيرفر الشحن، يرجى المحاولة لاحقاً.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setOrdering(null);
+    }
   };
 
   return (
@@ -115,7 +147,7 @@ export function ProductSheet({
                 <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
               </Button>
             </div>
-            <SheetDescription className="text-right text-xs">مزامنة مباشرة مع مزود الخدمة</SheetDescription>
+            <SheetDescription className="text-right text-xs">الشحن يتم تلقائياً وفوراً عند الطلب</SheetDescription>
           </SheetHeader>
         </div>
 
@@ -123,7 +155,7 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-bold text-muted-foreground">جاري المزامنة...</p>
+              <p className="text-sm font-bold text-muted-foreground">جاري المزامنة مع المزود...</p>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
@@ -142,21 +174,29 @@ export function ProductSheet({
                           )}
                           <div className="flex-1 text-right">
                             <h4 className="font-bold text-foreground text-sm line-clamp-2">{product.name}</h4>
-                            <p className="text-[10px] text-green-600 font-bold mt-1">متوفر الآن</p>
+                            <p className="text-[10px] text-green-600 font-bold mt-1">متوفر للشحن الفوري</p>
                           </div>
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-[11px] font-bold text-muted-foreground pr-1 flex items-center gap-1 justify-end">الآي دي أو رقم الهاتف <UserIcon className="h-3 w-3" /></label>
                           <Input 
-                            placeholder="أدخل البيانات..." 
+                            placeholder="أدخل المعرف المطلوب..." 
                             className="text-right h-11 bg-muted/50 border-none" 
                             value={targetIds[product.id] || ""} 
                             onChange={(e) => setTargetIds(prev => ({ ...prev, [product.id]: e.target.value }))} 
+                            disabled={ordering === String(product.id)}
                           />
                         </div>
                         <div className="flex items-center justify-between pt-3 border-t border-dashed border-muted">
                           <p className="text-primary font-black text-xl">{Number(product.customerPrice).toLocaleString()} <span className="text-[10px] font-medium">{currency}</span></p>
-                          <Button onClick={() => handleOrder(product)} className="rounded-full bg-primary font-bold px-8 shadow-lg active:scale-95 transition-all">طلب الآن</Button>
+                          <Button 
+                            onClick={() => handleOrder(product)} 
+                            disabled={ordering === String(product.id)}
+                            className="rounded-full bg-primary font-bold px-8 shadow-lg active:scale-95 transition-all"
+                          >
+                            {ordering === String(product.id) ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : null}
+                            طلب الآن
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -165,7 +205,7 @@ export function ProductSheet({
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4 bg-white/50 rounded-3xl mx-2 mt-4 border border-dashed border-muted-foreground/20">
                   <div className="bg-muted p-4 rounded-full"><PackageX className="h-10 w-10 opacity-30" /></div>
-                  <p className="text-sm font-bold text-foreground">عذراً، لا توجد منتجات حالياً لهذا القسم</p>
+                  <p className="text-sm font-bold text-foreground">عذراً، لا توجد منتجات متاحة لهذا القسم حالياً.</p>
                 </div>
               )}
             </ScrollArea>
