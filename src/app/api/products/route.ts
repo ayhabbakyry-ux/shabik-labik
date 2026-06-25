@@ -5,16 +5,19 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * @fileOverview مسار الإنتاج لجلب المنتجات من متجر الراغب.
- * تم تجهيزه بترويسات متكاملة لتخطي حماية المنصات ونظام طوارئ (Fallback).
+ * @fileOverview مسار الإنتاج المطور لجلب المنتجات من متجر الراغب.
+ * يستخدم المتغيرات البيئية للأمان ويدعم نظام الطوارئ (Fallback).
  */
 
 export async function GET() {
+    // جلب التوكن من البيئة أو استخدام القيمة الافتراضية كاحتياط
+    const API_TOKEN = process.env.ALRAGHEB_TOKEN || '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0';
+
     try {
         const response = await fetch('https://alragheb-store.com', {
             method: 'GET',
             headers: {
-                'api-token': '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0',
+                'api-token': API_TOKEN,
                 'Accept': 'application/json, text/plain, */*',
                 'Content-Type': 'application/json',
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -85,22 +88,6 @@ function getFallbackData() {
             "category_name": "Free Fire", 
             "category_id": "Free Fire", 
             "image": "https://picsum.photos/seed/ff1/200/200" 
-        },
-        {
-            "id": 101,
-            "name": "وحدات سيريتل 5000",
-            "price": 6500,
-            "category_name": "Syriatel",
-            "category_id": "Syriatel",
-            "image": ""
-        },
-        {
-            "id": 102,
-            "name": "وحدات MTN 5000",
-            "price": 6400,
-            "category_name": "MTN",
-            "category_id": "MTN",
-            "image": ""
         }
     ];
 }

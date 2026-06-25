@@ -5,11 +5,14 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
         const { product_id, playerId, order_uuid } = body;
+        
+        // جلب التوكن من البيئة للأمان
+        const API_TOKEN = process.env.ALRAGHEB_TOKEN || '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0';
 
         const response = await fetch('https://alragheb-store.com', {
             method: 'POST',
             headers: {
-                'api-token': '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0',
+                'api-token': API_TOKEN,
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
