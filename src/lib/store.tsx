@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export type Transaction = {
   id: string;
@@ -89,22 +89,24 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Persistent save
+  // Sync state changes to localStorage
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem('shabik_users', JSON.stringify(allUsers));
-      localStorage.setItem('shabik_txs', JSON.stringify(transactions));
-      localStorage.setItem('shabik_pass_reqs', JSON.stringify(passwordRequests));
-      
-      if (isLoggedIn) {
-        localStorage.setItem('shabik_auth', JSON.stringify({
-          phone: userPhone,
-          name: userName,
-          balance: userBalance
-        }));
-      }
     }
-  }, [allUsers, transactions, passwordRequests, isLoggedIn, userPhone, userName, userBalance, isLoaded]);
+  }, [allUsers, isLoaded]);
+
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem('shabik_txs', JSON.stringify(transactions));
+    }
+  }, [transactions, isLoaded]);
+
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem('shabik_pass_reqs', JSON.stringify(passwordRequests));
+    }
+  }, [passwordRequests, isLoaded]);
 
   const login = (phone: string, password: string) => {
     if (phone === ADMIN_PHONE && password === ADMIN_PASS) {
@@ -112,6 +114,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setUserPhone(phone);
       setUserName("المدير أيهم");
       setUserBalance(0);
+      const authData = { phone, name: "المدير أيهم", balance: 0 };
+      localStorage.setItem('shabik_auth', JSON.stringify(authData));
       return { success: true, message: "تم دخول المدير بنجاح" };
     }
 
@@ -123,6 +127,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setUserPhone(phone);
     setUserName(user.name);
     setUserBalance(user.balance);
+    localStorage.setItem('shabik_auth', JSON.stringify({
+      phone: user.phone,
+      name: user.name,
+      balance: user.balance
+    }));
     return { success: true, message: "تم تسجيل الدخول بنجاح" };
   };
 
@@ -131,11 +140,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (exists || phone === ADMIN_PHONE) return { success: false, message: "هذا الرقم مسجل مسبقاً" };
 
     const newUser: AppUser = { phone, name, password: pass, balance: 0 };
-    setAllUsers(prev => {
-      const updated = [...prev, newUser];
-      localStorage.setItem('shabik_users', JSON.stringify(updated));
-      return updated;
-    });
+    setAllUsers(prev => [...prev, newUser]);
     return { success: true, message: "تم إنشاء الحساب بنجاح" };
   };
 
@@ -166,15 +171,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const adminAction = (transactionId: string, action: 'approve' | 'reject') => {
     setTransactions(prevTxs => {
-      const updated = prevTxs.map(tx => {
+      return prevTxs.map(tx => {
         if (tx.id === transactionId && tx.status === 'Pending') {
           if (action === 'approve') {
             setAllUsers(prevUsers => {
-              const updatedUsers = prevUsers.map(u => 
+              return prevUsers.map(u => 
                 u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
               );
-              localStorage.setItem('shabik_users', JSON.stringify(updatedUsers));
-              return updatedUsers;
             });
             if (tx.userPhone === userPhone) setUserBalance(prev => prev + tx.amount);
             return { ...tx, status: 'Completed' as const };
@@ -183,17 +186,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }
         return tx;
       });
-      return updated;
     });
   };
 
   const deleteUser = (phone: string) => {
-    // حذف قسري ومباشر
+    // تحديث الحالة فوراً وبشكل قسري
     setAllUsers(prev => {
       const filtered = prev.filter(u => u.phone !== phone);
-      // تحديث يدوي فوري للذاكرة المحلية لضمان الاستقرار
+      // تحديث الذاكرة المحلية في نفس اللحظة لضمان الاستقرار
       localStorage.setItem('shabik_users', JSON.stringify(filtered));
-      return [...filtered]; // إجبار React على ملاحظة التغيير
+      return [...filtered];
     });
 
     // طرد المستخدم إذا كان هو من يتم حذفه

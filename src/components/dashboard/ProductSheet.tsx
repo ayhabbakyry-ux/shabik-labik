@@ -28,7 +28,6 @@ import {
 interface ProductItem {
   id: string | number;
   product_id?: string | number;
-  parent_id: string | number;
   name: string;
   price: string | number;
   options?: any[];
@@ -56,17 +55,13 @@ export function ProductSheet({
     if (!activeCategoryId) return;
     setFetching(true);
     try {
-      const response = await fetch(`/api/products?categoryId=${activeCategoryId}`, {
-        cache: 'no-store'
-      });
-      const result = await response.json();
-      
-      const rawItems = Array.isArray(result) ? result : (result.data || result.products || []);
-      setAllProducts(rawItems);
+      const response = await fetch(`/api/products?categoryId=${activeCategoryId}`);
+      const data = await response.json();
+      setAllProducts(Array.isArray(data) ? data : []);
     } catch (error: any) {
       toast({
         title: "خطأ في الاتصال",
-        description: "تعذر جلب البيانات. يرجى المحاولة لاحقاً.",
+        description: "فشل جلب المنتجات من الراغب.",
         variant: "destructive",
       });
     } finally {
@@ -75,56 +70,42 @@ export function ProductSheet({
   }, [activeCategoryId, toast]);
 
   const groupedServices = useMemo(() => {
-    if (!allProducts || !Array.isArray(allProducts)) return [];
+    if (!allProducts.length) return [];
 
+    // تصفية المنتجات بناءً على اسم الخدمة (مثل "ببجي")
     const searchTerms = serviceName.toLowerCase().split(' ').filter(k => k.length > 2);
     let filtered = allProducts;
 
     if (searchTerms.length > 0) {
       filtered = allProducts.filter(item => {
-        const itemName = item.name?.toLowerCase() || "";
+        const itemName = (item.name || "").toLowerCase();
         return searchTerms.some(kw => itemName.includes(kw));
       });
     }
 
-    if (filtered.length === 0) {
-      filtered = allProducts;
-    }
+    // إذا لم يتم العثور على تصفية دقيقة، نعرض الفئة كاملة
+    if (filtered.length === 0) filtered = allProducts;
 
-    const groups: Record<string, { id: string; mainTitle: string; items: any[] }> = {};
-
-    filtered.forEach((item) => {
-      const groupKey = item.id.toString();
-      const mainTitle = item.name || serviceName;
-
-      if (!groups[groupKey]) {
-        groups[groupKey] = { id: groupKey, mainTitle: mainTitle, items: [] };
-      }
-
+    return filtered.map(item => {
       const subItems = item.options || item.variants || item.params || [];
-      
-      if (Array.isArray(subItems) && subItems.length > 0) {
-        subItems.forEach((sub: any) => {
-          const basePrice = Number(sub.price || item.price || 0);
-          groups[groupKey].items.push({
+      const items = Array.isArray(subItems) && subItems.length > 0 
+        ? subItems.map((sub: any) => ({
             id: sub.id || `${item.id}-${Math.random()}`,
             name: sub.name || item.name,
-            customerPrice: (basePrice * 1.04).toFixed(0),
-            price: basePrice
-          });
-        });
-      } else {
-        const basePrice = Number(item.price || 0);
-        groups[groupKey].items.push({
-          id: item.id,
-          name: item.name,
-          customerPrice: (basePrice * 1.04).toFixed(0),
-          price: basePrice
-        });
-      }
-    });
+            customerPrice: (Number(sub.price || item.price || 0) * 1.04).toFixed(0),
+          }))
+        : [{
+            id: item.id,
+            name: item.name,
+            customerPrice: (Number(item.price || 0) * 1.04).toFixed(0),
+          }];
 
-    return Object.values(groups);
+      return {
+        id: item.id.toString(),
+        mainTitle: item.name || serviceName,
+        items
+      };
+    });
   }, [allProducts, serviceName]);
 
   useEffect(() => {
@@ -142,17 +123,18 @@ export function ProductSheet({
 
     if (!targetId || !targetId.trim()) {
       toast({
-        title: "عذراً، هذا الحقل مطلوب",
-        description: "يرجى إدخال الآي دي أو رقم الهاتف المطلوب شحنه.",
+        title: "حقل مطلوب",
+        description: "يرجى إدخال المعرف (ID) أو رقم الحساب.",
         variant: "destructive",
       });
       return;
     }
 
     toast({
-      title: "تم استلام الطلب",
-      description: `طلب ${variation.name} للحساب (${targetId}) بقيمة ${Number(variation.customerPrice).toLocaleString()} ${currency} قيد التنفيذ.`,
+      title: "تم استلام طلبك",
+      description: `طلب ${variation.name} للحساب ${targetId} قيد المعالجة.`,
     });
+    setTargetIds(prev => ({ ...prev, [groupId]: "" }));
   };
 
   return (
@@ -167,7 +149,7 @@ export function ProductSheet({
                 <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
               </Button>
             </div>
-            <SheetDescription className="text-right text-xs">مزامنة البيانات الحية من مزود الخدمة.</SheetDescription>
+            <SheetDescription className="text-right text-xs">مزامنة البيانات الحية من مزود الراغب.</SheetDescription>
           </SheetHeader>
         </div>
 
@@ -175,72 +157,63 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-bold text-muted-foreground">جاري جلب الفئات المخصصة...</p>
+              <p className="text-sm font-bold text-muted-foreground">جاري تحديث القائمة...</p>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
               {groupedServices.length > 0 ? (
-                <div className="grid gap-6">
+                <div className="grid gap-4">
                   {groupedServices.map((group) => {
                     const selectedId = selectedOptions[group.id];
                     const currentItem = group.items.find((i) => i.id.toString() === selectedId) || group.items[0];
 
                     return (
-                      <Card key={group.id} className="border-none shadow-md bg-white overflow-hidden">
+                      <Card key={group.id} className="border-none shadow-sm bg-white overflow-hidden">
                         <CardContent className="p-5 space-y-4">
                           <div className="flex items-center gap-3">
-                            <div className="p-3 bg-primary/10 rounded-xl"><Zap className="h-5 w-5 text-primary" /></div>
-                            <div className="text-right flex-1">
-                              <h4 className="font-bold text-lg text-foreground">{group.mainTitle}</h4>
-                              <p className="text-[11px] text-muted-foreground">اختر الفئة وأدخل البيانات بالأسفل</p>
-                            </div>
+                            <div className="p-2 bg-primary/10 rounded-lg"><Zap className="h-5 w-5 text-primary" /></div>
+                            <h4 className="font-bold text-foreground text-right flex-1">{group.mainTitle}</h4>
                           </div>
 
                           {group.items.length > 1 && (
-                            <div className="space-y-2">
-                              <label className="text-[11px] font-bold text-muted-foreground pr-1">الفئات المتوفرة</label>
-                              <Select 
-                                value={selectedId} 
-                                onValueChange={(val) => setSelectedOptions(prev => ({ ...prev, [group.id]: val }))}
-                              >
-                                <SelectTrigger className="w-full text-right bg-muted/30 border-none h-12 text-sm font-medium">
-                                  <SelectValue placeholder="اختر الفئة..." />
-                                </SelectTrigger>
-                                <SelectContent dir="rtl">
-                                  {group.items.map((item) => (
-                                    <SelectItem key={item.id} value={item.id.toString()}>
-                                      {item.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
+                            <Select 
+                              value={selectedId} 
+                              onValueChange={(val) => setSelectedOptions(prev => ({ ...prev, [group.id]: val }))}
+                            >
+                              <SelectTrigger className="w-full text-right bg-muted/30 border-none h-11">
+                                <SelectValue placeholder="اختر الفئة" />
+                              </SelectTrigger>
+                              <SelectContent dir="rtl">
+                                {group.items.map((item) => (
+                                  <SelectItem key={item.id} value={item.id.toString()}>
+                                    {item.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           )}
 
-                          <div className="space-y-2 pt-2">
+                          <div className="space-y-1.5">
                             <label className="text-[11px] font-bold text-muted-foreground pr-1 flex items-center gap-1">
                               <User className="h-3 w-3" /> الآي دي أو الرقم المطلوب
                             </label>
                             <Input 
-                              placeholder="أدخل الـ ID أو رقم الهاتف هنا..." 
-                              className="text-right h-12 bg-muted/30 border-none focus:ring-1 focus:ring-primary"
+                              placeholder="أدخل الـ ID أو الرقم هنا..." 
+                              className="text-right h-11 bg-muted/30 border-none"
                               value={targetIds[group.id] || ""}
                               onChange={(e) => setTargetIds(prev => ({ ...prev, [group.id]: e.target.value }))}
                             />
                           </div>
 
-                          <div className="flex items-center justify-between pt-4 border-t border-dashed">
-                            <div className="text-right">
-                              <p className="text-[10px] text-muted-foreground font-bold">السعر (مع عمولة 4%)</p>
-                              <p className="text-primary font-bold text-2xl">
-                                {currentItem ? Number(currentItem.customerPrice).toLocaleString() : "0"} <span className="text-xs">{currency}</span>
-                              </p>
-                            </div>
+                          <div className="flex items-center justify-between pt-2 border-t border-dashed">
+                            <p className="text-primary font-bold text-xl">
+                              {currentItem ? Number(currentItem.customerPrice).toLocaleString() : "0"} <span className="text-xs">{currency}</span>
+                            </p>
                             <Button 
                               onClick={() => handleOrder(group.id, currentItem)}
-                              className="rounded-full px-8 h-12 bg-primary shadow-lg font-bold"
+                              className="rounded-full bg-primary font-bold px-6"
                             >
-                              <ShoppingCart className="ml-2 h-4 w-4" /> اطلب الآن
+                              <ShoppingCart className="ml-2 h-4 w-4" /> اطلب
                             </Button>
                           </div>
                         </CardContent>
@@ -249,9 +222,9 @@ export function ProductSheet({
                   })}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4">
-                  <PackageX className="h-12 w-12 opacity-30" />
-                  <p className="text-sm font-bold text-center px-4">عذراً، لم يتم العثور على منتجات مطابقة لهذا القسم حالياً.</p>
+                <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
+                  <PackageX className="h-10 w-10 opacity-30" />
+                  <p className="text-sm font-bold">لا توجد منتجات حالياً.</p>
                 </div>
               )}
             </ScrollArea>
