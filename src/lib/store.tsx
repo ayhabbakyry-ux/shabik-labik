@@ -94,7 +94,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // 2. مزامنة التغييرات مع الذاكرة المحلية
+  // 2. مزامنة التغييرات مع الذاكرة المحلية (تلقائياً عند تغيير الحالة)
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem('shabik_users', JSON.stringify(allUsers));
@@ -121,10 +121,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         balance: userBalance
       }));
       
-      // مزامنة رصيد المستخدم الحالي في قائمة الكل
-      setAllUsers(prev => prev.map(u => 
-        u.phone === userPhone ? { ...u, balance: userBalance, name: userName } : u
-      ));
+      // مزامنة رصيد المستخدم الحالي في قائمة الكل إذا تغير
+      setAllUsers(prev => {
+        const userExists = prev.some(u => u.phone === userPhone);
+        if (!userExists) return prev;
+        
+        return prev.map(u => 
+          u.phone === userPhone ? { ...u, balance: userBalance, name: userName } : u
+        );
+      });
     }
   }, [userBalance, isLoggedIn, userPhone, userName, isLoaded]);
 
@@ -190,25 +195,28 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
+  // دالة الحذف النهائية والمؤكدة
   const deleteUser = (phone: string) => {
-    console.log("Store: Deleting user", phone);
-    // تحديث الحالة فوراً
-    setAllUsers(prev => {
-      const newList = prev.filter(u => u.phone !== phone);
-      // تحديث الذاكرة المحلية يدوياً للتأكد من المزامنة
-      localStorage.setItem('shabik_users', JSON.stringify(newList));
-      return newList;
-    });
+    console.log("Store: Initiating deletion for phone:", phone);
     
-    setPasswordRequests(prev => {
-      const newList = prev.filter(r => r.phone !== phone);
-      localStorage.setItem('shabik_pass_reqs', JSON.stringify(newList));
-      return newList;
-    });
+    // 1. تحديث قائمة المستخدمين في الحالة
+    const filteredUsers = allUsers.filter(u => u.phone !== phone);
+    setAllUsers(filteredUsers);
     
+    // 2. تحديث قائمة طلبات كلمة السر
+    const filteredRequests = passwordRequests.filter(r => r.phone !== phone);
+    setPasswordRequests(filteredRequests);
+
+    // 3. تحديث الذاكرة المحلية يدوياً وفورياً لضمان عدم العودة
+    localStorage.setItem('shabik_users', JSON.stringify(filteredUsers));
+    localStorage.setItem('shabik_pass_reqs', JSON.stringify(filteredRequests));
+
+    // 4. إذا كان المحذوف هو المستخدم الحالي، قم بتسجيل خروجه
     if (phone === userPhone) {
       logout();
     }
+    
+    console.log("Store: Deletion completed for:", phone);
   };
 
   const requestPasswordReset = (phone: string) => {
