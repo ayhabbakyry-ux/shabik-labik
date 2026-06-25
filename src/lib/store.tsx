@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 export type Transaction = {
   id: string;
@@ -63,7 +63,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
 
-  // تحميل البيانات عند بدء التشغيل
+  // 1. تحميل البيانات عند بدء التشغيل مرة واحدة فقط
   useEffect(() => {
     try {
       const savedUsers = localStorage.getItem('shabik_users');
@@ -92,7 +92,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // المزامنة التلقائية مع LocalStorage (للحفظ الدوري)
+  // 2. المزامنة التلقائية للبيانات العامة (ما عدا الحذف الذي سنعالجه يدوياً)
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem('shabik_users', JSON.stringify(allUsers));
@@ -149,11 +149,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
 
     const newUser: AppUser = { phone, name, password: pass, balance: 0 };
-    setAllUsers(prev => {
-      const updated = [...prev, newUser];
-      localStorage.setItem('shabik_users', JSON.stringify(updated));
-      return updated;
-    });
+    setAllUsers(prev => [...prev, newUser]);
     return { success: true, message: "تم إنشاء الحساب بنجاح، يمكنك الآن تسجيل الدخول" };
   };
 
@@ -191,7 +187,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             const updated = prevUsers.map(u => 
               u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
             );
-            localStorage.setItem('shabik_users', JSON.stringify(updated));
             return updated;
           });
           if (tx.userPhone === userPhone) setUserBalance(prev => prev + tx.amount);
@@ -203,24 +198,22 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
-  // وظيفة الحذف النهائية والصارمة
-  const deleteUser = (phone: string) => {
-    console.log("Store: Attempting to delete user:", phone);
+  // وظيفة الحذف النهائية والصارمة - تعتمد على التصفية الفورية والمزامنة اليدوية
+  const deleteUser = useCallback((phone: string) => {
     if (phone === ADMIN_PHONE) return;
 
     setAllUsers(prev => {
       const filtered = prev.filter(u => u.phone !== phone);
-      // تحديث مباشر وفوري للذاكرة المحلية لضمان عدم عودة البيانات
+      // مزامنة يدوية فورية لضمان عدم عودة البيانات عند التحديث
       localStorage.setItem('shabik_users', JSON.stringify(filtered));
-      console.log("Store: Deleted. Remaining users:", filtered.length);
       return filtered;
     });
 
-    // طرد المستخدم إذا كان هو المحذوف
+    // طرد المستخدم فوراً إذا كان هو المحذوف
     if (userPhone === phone) {
       logout();
     }
-  };
+  }, [userPhone, ADMIN_PHONE]);
 
   const requestPasswordReset = (phone: string) => {
     const newReq = { phone, date: new Date().toLocaleString('ar-SY') };
