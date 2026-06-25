@@ -1,12 +1,12 @@
+
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * @fileOverview مسار السيرفر لجلب المنتجات من متجر الراغب.
- * يقوم هذا المسار بالتواصل مع API الراغب باستخدام التوكن والترويسات الصحيحة،
- * ثم يقوم بتحويل الحقول العربية إلى حقول إنجليزية لتسهيل المعالجة في الواجهة.
+ * @fileOverview مسار الإنتاج لجلب المنتجات من متجر الراغب.
+ * تم تجهيزه بترويسات متكاملة لتخطي حماية المنصات ونظام طوارئ (Fallback).
  */
 
 export async function GET() {
@@ -25,20 +25,19 @@ export async function GET() {
 
         const textData = await response.text();
 
-        // التحقق من الرد: إذا كان HTML (صفحة ويب) فهذا يعني وجود حظر أو خطأ في الربط
+        // التحقق مما إذا كان الرد HTML (يعني وجود حظر أو صفحة خطأ من المنصة)
         if (!textData || textData.trim().startsWith('<!doctype') || textData.trim().startsWith('<html')) {
-            console.error("Returned HTML from Alragheb. IP might be blocked or Token invalid.");
+            console.log("Returned HTML from Alragheb. Using Local Fallback.");
             return NextResponse.json(getFallbackData());
         }
 
         try {
             const data = JSON.parse(textData);
-            // استخراج مصفوفة المنتجات (منصة زد قد ترسلها مباشرة أو داخل حقل products)
             const productsArray = Array.isArray(data) ? data : (data.products || data.data || []);
             
             if (productsArray.length === 0) return NextResponse.json(getFallbackData());
 
-            // تحويل الحقول العربية (Mapping) لتوافق تصميم الواجهة
+            // تحويل الحقول العربية (Mapping) لضمان توافق الواجهة
             const formattedProducts = productsArray.map((prod: any) => ({
                 id: prod.id,
                 name: prod.الاسم || prod.name || '',
@@ -50,7 +49,7 @@ export async function GET() {
 
             return NextResponse.json(formattedProducts);
         } catch (parseError) {
-            console.error("JSON Parsing failed for Alragheb response.");
+            console.error("JSON Parsing failed. Returning Fallback.");
             return NextResponse.json(getFallbackData());
         }
 
@@ -60,7 +59,7 @@ export async function GET() {
     }
 }
 
-// بيانات احتياطية حقيقية لضمان عمل الواجهة والأقسام في حال فشل الربط الخارجي
+// بيانات احتياطية حقيقية لضمان عمل الموقع في حال تعثر السيرفر الخارجي
 function getFallbackData() {
     return [
         { 

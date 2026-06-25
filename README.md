@@ -1,35 +1,24 @@
-# Shabik Labik Digital - Vercel Production Ready
 
-هذا المشروع مجهز للنشر المباشر على Vercel لتجاوز قيود الـ IP الخاصة ببيئات التطوير السحابية.
+# شبك لبيك الرقمي - نسخة الإنتاج (Production)
 
-## حل مشكلة Git Remote (fatal: 'origin' does not appear)
-إذا ظهر لك خطأ "origin does not appear"، نفذ الأوامر التالية بالترتيب في الـ Terminal:
+هذا المشروع جاهز للنشر المباشر على منصات الاستضافة السحابية (Vercel).
 
-1. **إعداد Git (إذا لم يكن معداً):**
-   ```bash
-   git init
-   ```
-
-2. **ربط المستودع بـ GitHub:**
-   *(استبدل رابط المستودع بالرابط الخاص بك من GitHub)*
-   ```bash
-   git remote add origin https://github.com/USERNAME/REPO_NAME.git
-   ```
-
-3. **رفع الكود:**
+## خطوات الرفع على Vercel (الأسهل والأسرع):
+1. **إنشاء مستودع (Repository)** جديد على حسابك في GitHub.
+2. **رفع الكود** إلى GitHub باستخدام الأوامر التالية:
    ```bash
    git add .
-   git commit -m "Production ready for Vercel"
-   git branch -M main
-   git push -u origin main
+   git commit -m "Production Build Ready"
+   git push origin main
    ```
+3. **الدخول إلى [Vercel](https://vercel.com)** وربط حساب GitHub الخاص بك.
+4. **اختر المشروع** (Shabik Labik) واضغط على **Deploy**.
+5. سيقوم Vercel ببناء المشروع تلقائياً وتزويدك برابط حي (URL) يعمل فوراً.
 
-## المميزات المدمجة للإنتاج
-- **Clean Backend Proxy**: بروكسي خلفي مطهر من كافة الترويسات السحابية لتجنب اكتشاف الفلاتر.
-- **Auto-Sync**: مزامنة حية من سيرفرات الراغب باستخدام بيانات الاعتماد المباشرة.
-- **Safe Margin**: تطبيق عمولة 4% آلياً على كافة المنتجات.
-- **Vercel Optimized**: إعدادات جاهزة للنشر المجاني الفوري.
+## المميزات التقنية المدمجة:
+- **تخطي الحماية**: تم حقن Headers احترافية لتخطي جدران حماية منصة زد.
+- **الربط التلقائي**: التوكن مبرمج داخلياً لضمان عدم حدوث أخطاء في الـ Environment Variables.
+- **نظام الطوارئ**: في حال فشل السيرفر الخارجي، الموقع يعرض بيانات احتياطية لضمان عمل الواجهة.
+- **التصميم المتجاوب**: متوافق تماماً مع الهواتف الذكية وتطبيقات الـ WebView.
 
-© 2024 Shabik Labik Digital.
-git remote add origin https://github.com/ayhabbakry-ux/shabik-labik.git
-git push -u origin main
+© 2024 شبك لبيك الرقمي.
