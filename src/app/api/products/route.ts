@@ -1,4 +1,3 @@
-
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +11,8 @@ export async function GET(request: Request) {
   const categoryId = searchParams.get('categoryId');
 
   try {
-    const response = await fetch(`${AL_RAGHEB_BASE_URL}/client/api/products`, {
+    // الاتصال بسيرفر الراغب باستخدام التوكن الموفر
+    const response = await fetch(`${AL_RAGHEB_BASE_URL}/api/products`, {
       method: 'POST', 
       headers: {
         'Content-Type': 'application/json',
@@ -26,15 +26,17 @@ export async function GET(request: Request) {
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[AL-RAGHEB API ERROR]:", response.status, errorText);
       throw new Error(`API Connection Failed: ${response.status}`);
     }
 
     const data = await response.json();
     
-    // معالجة استجابة الراغب القياسية
+    // استخلاص المنتجات بناءً على هيكلية استجابة الراغب المتوقعة (data.data)
     let products = [];
     if (data.status === "success" || data.data) {
-      products = data.data || data.products || data;
+      products = data.data || data.products || [];
     } else {
       products = Array.isArray(data) ? data : (data.products || []);
     }
@@ -42,9 +44,9 @@ export async function GET(request: Request) {
     return NextResponse.json(products);
 
   } catch (error: any) {
-    console.error("[AL-RAGHEB API ERROR]:", error.message);
+    console.error("[AL-RAGHEB PROXY ERROR]:", error.message);
     
-    // بيانات احتياطية في حال تعطل السيرفر المؤقت
+    // بيانات تجريبية في حال فشل الاتصال لضمان عدم توقف الواجهة
     const MOCK_DATA: Record<string, any[]> = {
       "2": [
         { id: 101, name: "ببجي موبايل 60 UC", price: 15000 },

@@ -1,7 +1,6 @@
-
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 export type Transaction = {
   id: string;
@@ -63,7 +62,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
 
-  // 1. التحميل الأولي
+  // 1. التحميل الأولي من الذاكرة المحلية
   useEffect(() => {
     try {
       const savedUsers = localStorage.getItem('shabik_users');
@@ -88,7 +87,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setIsLoaded(true);
   }, []);
 
-  // 2. المزامنة التلقائية للذاكرة المحلية (للعمليات العامة)
+  // 2. المزامنة المستمرة مع الذاكرة المحلية
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem('shabik_users', JSON.stringify(allUsers));
@@ -108,6 +107,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [passwordRequests, isLoaded]);
 
   const login = (phone: string, password: string) => {
+    // دخول المدير
     if (phone === ADMIN_PHONE && password === ADMIN_PASS) {
       setIsLoggedIn(true);
       setUserPhone(phone);
@@ -117,6 +117,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       return { success: true, message: "تم دخول المدير بنجاح" };
     }
 
+    // دخول المستخدمين العاديين (يجب أن يكون الحساب موجوداً)
     const user = allUsers.find(u => u.phone === phone);
     if (!user) return { success: false, message: "عذراً، هذا الرقم غير مسجل" };
     if (user.password !== password) return { success: false, message: "كلمة السر خاطئة" };
@@ -145,21 +146,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('shabik_auth');
   };
 
-  // دالة الحذف القسري والفوري
-  const deleteUser = (phone: string) => {
-    // 1. تحديث المصفوفة في الحالة فوراً
+  // دالة الحذف القهرية والمباشرة
+  const deleteUser = useCallback((phone: string) => {
     setAllUsers(prev => {
       const updated = prev.filter(u => u.phone !== phone);
-      // 2. تحديث الذاكرة المحلية يدوياً وفي نفس اللحظة لضمان القطعية
+      // تحديث فوري للذاكرة المحلية لضمان القطعية
       localStorage.setItem('shabik_users', JSON.stringify(updated));
       return [...updated];
     });
-    
-    // إذا كان المستخدم المحذوف هو المسجل حالياً، يتم تسجيل خروجه
+
+    // إذا كان الحساب المحذوف هو المسجل حالياً، يتم تسجيل خروجه
     if (userPhone === phone) {
       logout();
     }
-  };
+  }, [userPhone]);
 
   const addBalance = (amount: number) => {
     setUserBalance(prev => prev + amount);

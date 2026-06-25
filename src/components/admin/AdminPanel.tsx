@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useUser } from "@/lib/store";
@@ -20,11 +19,11 @@ export function AdminPanel() {
   const pendingTxs = transactions.filter(t => t.status === 'Pending');
 
   const handleDelete = (phone: string) => {
-    if (window.confirm(`هل أنت متأكد من حذف الحساب (${phone}) نهائياً؟`)) {
+    if (window.confirm(`هل أنت متأكد من حذف الحساب (${phone}) نهائياً؟ لن يتمكن من الدخول مرة أخرى.`)) {
       deleteUser(phone);
       toast({
-        title: "تم الحذف",
-        description: `تم إزالة الحساب بنجاح من النظام.`,
+        title: "تم الحذف النهائي",
+        description: `تم إزالة الحساب من النظام والذاكرة المحلية بنجاح.`,
       });
     }
   };
@@ -95,7 +94,7 @@ export function AdminPanel() {
           <Card>
             <CardHeader>
               <CardTitle className="text-right">قائمة كافة المستخدمين</CardTitle>
-              <CardDescription className="text-right">عرض وحذف الحسابات المسجلة في التطبيق.</CardDescription>
+              <CardDescription className="text-right">عرض وحذف الحسابات المسجلة. الحذف هنا يمنع المستخدم من الدخول مرة أخرى.</CardDescription>
             </CardHeader>
             <CardContent>
               <Table dir="rtl">
@@ -105,7 +104,7 @@ export function AdminPanel() {
                     <TableHead className="text-right">رقم الهاتف</TableHead>
                     <TableHead className="text-right">كلمة السر</TableHead>
                     <TableHead className="text-right">الرصيد</TableHead>
-                    <TableHead className="text-right">إجراء الحذف</TableHead>
+                    <TableHead className="text-right">الإجراء</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -129,7 +128,7 @@ export function AdminPanel() {
                   ))}
                   {allUsers.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">لا يوجد مستخدمون حالياً.</TableCell>
+                      <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">لا يوجد مستخدمون مسجلون حالياً.</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -147,7 +146,7 @@ export function AdminPanel() {
             </CardHeader>
             <CardContent className="space-y-4">
               {passwordRequests.length === 0 ? (
-                <p className="text-center py-10 text-muted-foreground">لا توجد طلبات جديدة.</p>
+                <p className="text-center py-10 text-muted-foreground">لا توجد طلبات جديدة حالياً.</p>
               ) : (
                 passwordRequests.map((req) => (
                   <div key={req.phone} className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border">
