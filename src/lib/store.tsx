@@ -119,14 +119,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const exists = allUsers.some(u => u.phone === phone);
     if (exists || phone === ADMIN_PHONE) return { success: false, message: "هذا الرقم مسجل مسبقاً" };
     
-    // الرصيد الابتدائي صفر دائماً لضمان النزاهة
+    // الرصيد الابتدائي صفر دائماً لضمان النزاهة والعمل الفعلي
     const newUser: AppUser = { phone, name, password: pass, balance: 0 };
     setAllUsers(prev => {
       const updated = [...prev, newUser];
       localStorage.setItem('shabik_users', JSON.stringify(updated));
       return updated;
     });
-    return { success: true, message: "تم إنشاء الحساب بنجاح، رصيدك الحالي 0" };
+    return { success: true, message: "تم إنشاء الحساب بنجاح، رصيدك الحالي 0 ل.س.ج" };
   };
 
   const deleteUser = useCallback((phone: string) => {
