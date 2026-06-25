@@ -7,7 +7,7 @@ import { ShieldCheck, Phone, Lock, User, ArrowRight, HelpCircle } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useUser } from "@/lib/store";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
@@ -16,8 +16,7 @@ export default function AuthPage() {
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const { login, isLoggedIn, requestPasswordReset } = useUser();
+  const { login, register, isLoggedIn, requestPasswordReset } = useUser();
   const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
@@ -31,42 +30,47 @@ export default function AuthPage() {
 
   const handleAuth = (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
     
     if (!phone || !password) {
-      setError("عذراً، جميع الحقول مطلوبة");
+      toast({ variant: "destructive", title: "خطأ", description: "عذراً، جميع الحقول مطلوبة" });
       return;
     }
 
-    if (!isLogin && !name) {
-      setError("عذراً، يجب إدخال الاسم لإنشاء حساب");
-      return;
-    }
-
-    const adminPhone = "0939549573";
-    const adminPass = "872003";
-
-    if (phone === adminPhone) {
-      if (password !== adminPass) {
-        setError("عذراً، كلمة السر الخاصة بالمدير غير صحيحة");
+    if (isLogin) {
+      // عملية تسجيل الدخول
+      const result = login(phone, password);
+      if (result.success) {
+        toast({ title: "مرحباً بك", description: result.message });
+        router.push("/dashboard");
+      } else {
+        toast({ variant: "destructive", title: "فشل الدخول", description: result.message });
+      }
+    } else {
+      // عملية إنشاء حساب
+      if (!name) {
+        toast({ variant: "destructive", title: "خطأ", description: "يرجى إدخال اسمك لإنشاء الحساب" });
         return;
       }
+      const result = register(phone, name, password);
+      if (result.success) {
+        toast({ title: "تم التسجيل", description: result.message });
+        setIsLogin(true); // التحويل لتبويب تسجيل الدخول بعد النجاح
+      } else {
+        toast({ variant: "destructive", title: "فشل التسجيل", description: result.message });
+      }
     }
-
-    login(phone, name || (phone === adminPhone ? "المدير أيهم" : "مستخدم"), password);
-    router.push("/dashboard");
   };
 
   const handleForgotPassword = (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone) {
-      setError("الرجاء إدخال رقم الهاتف أولاً");
+      toast({ variant: "destructive", description: "الرجاء إدخال رقم الهاتف أولاً" });
       return;
     }
     requestPasswordReset(phone);
     toast({
       title: "تم إرسال الطلب",
-      description: "تم إبلاغ الإدارة بطلبك لاستعادة كلمة السر، يرجى التواصل مع الدعم.",
+      description: "تم إبلاغ الإدارة بطلبك، يرجى التواصل مع الدعم لاستكمال استعادة الحساب.",
     });
     setIsForgotPassword(false);
   };
@@ -74,7 +78,7 @@ export default function AuthPage() {
   if (isForgotPassword) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6" dir="rtl">
-        <Card className="w-full max-w-md shadow-2xl border-none">
+        <Card className="w-full max-w-md shadow-2xl border-none animate-in fade-in zoom-in duration-300">
           <CardHeader>
             <CardTitle className="text-xl text-right flex items-center gap-2">
               <HelpCircle className="h-5 w-5 text-primary" /> استعادة الحساب
@@ -83,7 +87,6 @@ export default function AuthPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleForgotPassword} className="space-y-4">
-              {error && <p className="text-destructive text-sm font-bold text-right">{error}</p>}
               <div className="space-y-2">
                 <Label className="text-right block">رقم الهاتف</Label>
                 <Input 
@@ -104,7 +107,7 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6" dir="rtl">
-      <div className="mb-8 text-center">
+      <div className="mb-8 text-center animate-in slide-in-from-top duration-500">
         <div className="bg-primary p-4 rounded-3xl inline-block shadow-xl mb-4">
           <ShieldCheck className="h-12 w-12 text-white" />
         </div>
@@ -112,7 +115,7 @@ export default function AuthPage() {
         <p className="text-muted-foreground font-medium">بوابتك للخدمات الرقمية المتكاملة</p>
       </div>
 
-      <Card className="w-full max-w-md shadow-2xl border-none">
+      <Card className="w-full max-w-md shadow-2xl border-none animate-in fade-in slide-in-from-bottom-4 duration-500">
         <Tabs defaultValue="login" className="w-full" onValueChange={(v) => setIsLogin(v === "login")}>
           <CardHeader>
             <TabsList className="grid w-full grid-cols-2 mb-4">
@@ -124,15 +127,9 @@ export default function AuthPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleAuth} className="space-y-4">
-              {error && (
-                <div className="bg-destructive/10 p-3 rounded-lg border border-destructive/20 mb-4">
-                  <p className="text-destructive text-sm font-bold text-right">{error}</p>
-                </div>
-              )}
-              
               {!isLogin && (
-                <div className="space-y-2">
-                  <Label htmlFor="name" className="text-right block">الاسم الكامل</Label>
+                <div className="space-y-2 animate-in fade-in duration-300">
+                  <Label htmlFor="name" className="text-right block font-bold">الاسم الكامل</Label>
                   <div className="relative">
                     <User className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input 
@@ -147,7 +144,7 @@ export default function AuthPage() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="phone" className="text-right block">رقم الهاتف</Label>
+                <Label htmlFor="phone" className="text-right block font-bold">رقم الهاتف</Label>
                 <div className="relative">
                   <Phone className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input 
@@ -161,7 +158,7 @@ export default function AuthPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-right block">كلمة السر</Label>
+                <Label htmlFor="password" className="text-right block font-bold">كلمة السر</Label>
                 <div className="relative">
                   <Lock className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input 

@@ -35,7 +35,8 @@ type UserContextType = {
   transactions: Transaction[];
   allUsers: AppUser[];
   passwordRequests: PasswordRequest[];
-  login: (phone: string, name: string, pass: string) => void;
+  login: (phone: string, password: string) => { success: boolean; message: string };
+  register: (phone: string, name: string, pass: string) => { success: boolean; message: string };
   logout: () => void;
   addBalance: (amount: number) => void;
   requestDeposit: (amount: number, proofImage: string) => void;
@@ -60,41 +61,36 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   
   const currency = "ل.س.ج";
   const ADMIN_PHONE = "0939549573";
+  const ADMIN_PASS = "872003";
 
-  // 1. تحميل البيانات عند بدء التشغيل
+  // تحميل البيانات عند بدء التشغيل
   useEffect(() => {
     try {
+      const savedUsers = localStorage.getItem('shabik_users');
+      if (savedUsers) setAllUsers(JSON.parse(savedUsers));
+
       const savedAuth = localStorage.getItem('shabik_auth');
       if (savedAuth) {
-        const data = JSON.parse(savedAuth);
+        const authData = JSON.parse(savedAuth);
         setIsLoggedIn(true);
-        setUserPhone(data.phone);
-        setUserName(data.name || "مستخدم");
-        setUserBalance(data.balance || 0);
-      }
-
-      const savedUsers = localStorage.getItem('shabik_users');
-      if (savedUsers) {
-        setAllUsers(JSON.parse(savedUsers));
+        setUserPhone(authData.phone);
+        setUserName(authData.name);
+        setUserBalance(authData.balance);
       }
 
       const savedTxs = localStorage.getItem('shabik_txs');
-      if (savedTxs) {
-        setTransactions(JSON.parse(savedTxs));
-      }
+      if (savedTxs) setTransactions(JSON.parse(savedTxs));
 
       const savedPassReqs = localStorage.getItem('shabik_pass_reqs');
-      if (savedPassReqs) {
-        setPasswordRequests(JSON.parse(savedPassReqs));
-      }
+      if (savedPassReqs) setPasswordRequests(JSON.parse(savedPassReqs));
     } catch (e) {
-      console.error("Error loading data from localStorage", e);
+      console.error("Error loading data", e);
     } finally {
       setIsLoaded(true);
     }
   }, []);
 
-  // 2. مزامنة التغييرات مع الذاكرة المحلية (تلقائياً عند تغيير الحالة)
+  // المزامنة مع LocalStorage
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem('shabik_users', JSON.stringify(allUsers));
@@ -113,39 +109,50 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [passwordRequests, isLoaded]);
 
-  useEffect(() => {
-    if (isLoggedIn && isLoaded) {
-      localStorage.setItem('shabik_auth', JSON.stringify({ 
-        phone: userPhone, 
-        name: userName,
-        balance: userBalance
-      }));
-      
-      // مزامنة رصيد المستخدم الحالي في قائمة الكل إذا تغير
-      setAllUsers(prev => {
-        const userExists = prev.some(u => u.phone === userPhone);
-        if (!userExists) return prev;
-        
-        return prev.map(u => 
-          u.phone === userPhone ? { ...u, balance: userBalance, name: userName } : u
-        );
-      });
+  // دالة تسجيل الدخول - تتحقق من وجود الحساب
+  const login = (phone: string, password: string) => {
+    // حالة المدير
+    if (phone === ADMIN_PHONE) {
+      if (password === ADMIN_PASS) {
+        const data = { phone, name: "المدير أيهم", balance: userBalance };
+        setIsLoggedIn(true);
+        setUserPhone(phone);
+        setUserName(data.name);
+        localStorage.setItem('shabik_auth', JSON.stringify(data));
+        return { success: true, message: "تم دخول المدير بنجاح" };
+      }
+      return { success: false, message: "كلمة سر المدير خاطئة" };
     }
-  }, [userBalance, isLoggedIn, userPhone, userName, isLoaded]);
 
-  const login = (phone: string, name: string, pass: string) => {
+    // حالة المستخدم العادي
+    const user = allUsers.find(u => u.phone === phone);
+    if (!user) {
+      return { success: false, message: "عذراً، هذا الرقم غير مسجل لدينا" };
+    }
+
+    if (user.password !== password) {
+      return { success: false, message: "كلمة السر غير صحيحة" };
+    }
+
+    const authData = { phone, name: user.name, balance: user.balance };
     setIsLoggedIn(true);
     setUserPhone(phone);
-    setUserName(name);
-    
-    const existingUser = allUsers.find(u => u.phone === phone);
-    const initialBalance = existingUser ? existingUser.balance : 0;
-    setUserBalance(initialBalance);
+    setUserName(user.name);
+    setUserBalance(user.balance);
+    localStorage.setItem('shabik_auth', JSON.stringify(authData));
+    return { success: true, message: "تم تسجيل الدخول بنجاح" };
+  };
 
-    if (!existingUser) {
-      const newUser: AppUser = { phone, name, password: pass, balance: 0 };
-      setAllUsers(prev => [...prev, newUser]);
+  // دالة إنشاء حساب جديد
+  const register = (phone: string, name: string, pass: string) => {
+    const exists = allUsers.some(u => u.phone === phone);
+    if (exists) {
+      return { success: false, message: "هذا الرقم مسجل مسبقاً، يرجى تسجيل الدخول" };
     }
+
+    const newUser: AppUser = { phone, name, password: pass, balance: 0 };
+    setAllUsers(prev => [...prev, newUser]);
+    return { success: true, message: "تم إنشاء الحساب بنجاح، يمكنك الآن تسجيل الدخول" };
   };
 
   const logout = () => {
@@ -177,16 +184,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const adminAction = (transactionId: string, action: 'approve' | 'reject') => {
     setTransactions(prev => prev.map(tx => {
       if (tx.id === transactionId) {
-        if (action === 'approve') {
-          if (tx.status !== 'Completed') {
-            setAllUsers(prevUsers => prevUsers.map(u => 
-              u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
-            ));
-            
-            if (tx.userPhone === userPhone) {
-              setUserBalance(current => current + tx.amount);
-            }
-          }
+        if (action === 'approve' && tx.status !== 'Completed') {
+          setAllUsers(prevUsers => prevUsers.map(u => 
+            u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
+          ));
+          if (tx.userPhone === userPhone) setUserBalance(prev => prev + tx.amount);
           return { ...tx, status: 'Completed' };
         }
         return { ...tx, status: 'Rejected' };
@@ -195,28 +197,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
-  // دالة الحذف النهائية والمؤكدة
+  // الحذف النهائي والصارم
   const deleteUser = (phone: string) => {
-    console.log("Store: Initiating deletion for phone:", phone);
-    
-    // 1. تحديث قائمة المستخدمين في الحالة
-    const filteredUsers = allUsers.filter(u => u.phone !== phone);
-    setAllUsers(filteredUsers);
-    
-    // 2. تحديث قائمة طلبات كلمة السر
-    const filteredRequests = passwordRequests.filter(r => r.phone !== phone);
-    setPasswordRequests(filteredRequests);
+    if (phone === ADMIN_PHONE) return;
 
-    // 3. تحديث الذاكرة المحلية يدوياً وفورياً لضمان عدم العودة
-    localStorage.setItem('shabik_users', JSON.stringify(filteredUsers));
-    localStorage.setItem('shabik_pass_reqs', JSON.stringify(filteredRequests));
+    setAllUsers(prev => {
+      const newList = prev.filter(u => u.phone !== phone);
+      localStorage.setItem('shabik_users', JSON.stringify(newList));
+      return newList;
+    });
 
-    // 4. إذا كان المحذوف هو المستخدم الحالي، قم بتسجيل خروجه
-    if (phone === userPhone) {
+    // طرد المستخدم إذا كان هو المحذوف
+    if (userPhone === phone) {
       logout();
     }
-    
-    console.log("Store: Deletion completed for:", phone);
   };
 
   const requestPasswordReset = (phone: string) => {
@@ -233,7 +227,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   return (
     <UserContext.Provider value={{ 
       isLoggedIn, isAdmin, userPhone, userName, userBalance, transactions, allUsers, passwordRequests,
-      login, logout, addBalance, requestDeposit, adminAction, deleteUser, requestPasswordReset, clearPasswordRequest, currency
+      login, register, logout, addBalance, requestDeposit, adminAction, deleteUser, requestPasswordReset, clearPasswordRequest, currency
     }}>
       {children}
     </UserContext.Provider>
@@ -242,8 +236,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
 export function useUser() {
   const context = useContext(UserContext);
-  if (context === undefined) {
-    throw new Error('useUser must be used within a UserProvider');
-  }
+  if (context === undefined) throw new Error('useUser must be used within a UserProvider');
   return context;
 }
