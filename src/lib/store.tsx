@@ -125,21 +125,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteUser = useCallback((phone: string) => {
-    // 1. تحديث الذاكرة المحلية أولاً لضمان عدم العودة
-    const savedUsers = localStorage.getItem('shabik_users');
-    if (savedUsers) {
-      const users = JSON.parse(savedUsers);
-      const filtered = users.filter((u: any) => u.phone !== phone);
-      localStorage.setItem('shabik_users', JSON.stringify(filtered));
-    }
+    // 1. التحديث القسري والمباشر للذاكرة المحلية
+    const currentUsers = JSON.parse(localStorage.getItem('shabik_users') || '[]');
+    const filteredUsers = currentUsers.filter((u: any) => u.phone !== phone);
+    localStorage.setItem('shabik_users', JSON.stringify(filteredUsers));
 
     // 2. تحديث الحالة (State) فوراً وبشكل قسري
-    setAllUsers(current => {
-      const updated = current.filter(u => u.phone !== phone);
-      return [...updated];
-    });
+    setAllUsers([...filteredUsers]);
 
-    // 3. إذا كان المستخدم المحذوف هو المسجل حالياً، سجل خروجه
+    // 3. التحقق مما إذا كان المستخدم المحذوف هو المسجل حالياً
     if (userPhone === phone) {
       logout();
     }

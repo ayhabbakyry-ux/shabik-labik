@@ -49,13 +49,15 @@ export function ProductSheet({
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || data.message || "فشل جلب المنتجات من السيرفر");
+        throw new Error(data.error || data.message || "فشل الاتصال بسيرفر الراغب");
       }
       
-      setAllProducts(Array.isArray(data) ? data : []);
+      // التوافق مع هيكلية البيانات المختلفة
+      const products = Array.isArray(data) ? data : (data.data || data.products || []);
+      setAllProducts(products);
     } catch (error: any) {
       console.error("Fetch error:", error);
-      setErrorMsg(error.message);
+      setErrorMsg(error.message || "خطأ غير معروف في الاتصال");
     } finally {
       setFetching(false);
     }
@@ -70,7 +72,7 @@ export function ProductSheet({
       const prodName = (p.name || "").toLowerCase();
       const catName = (p.category_name || "").toLowerCase();
       
-      // فلترة ذكية: تبحث عن الكلمة المفتاحية (مثلاً PUBG) في اسم المنتج أو اسم القسم
+      // فلترة ذكية: تبحث عن الكلمة المفتاحية (مثل PUBG) في الاسم أو القسم
       return prodName.includes(searchKey) || catName.includes(searchKey);
     }).map(p => ({
       ...p,
@@ -102,7 +104,7 @@ export function ProductSheet({
 
     toast({
       title: "تم استلام طلبك",
-      description: `طلب ${product.name} قيد المراجعة الفورية. سيتم خصم ${price} ${currency} من رصيدك.`,
+      description: `طلب ${product.name} قيد المراجعة الفورية.`,
     });
     setTargetIds(prev => ({ ...prev, [product.id]: "" }));
   };
@@ -120,7 +122,7 @@ export function ProductSheet({
               </Button>
             </div>
             <SheetDescription className="text-right text-xs">
-              أسعار مباشرة من متجر الراغب + 4% عمولة
+              الأسعار حقيقية ومباشرة من السيرفر
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -159,7 +161,7 @@ export function ProductSheet({
                           )}
                           <div className="flex-1 text-right">
                             <h4 className="font-bold text-foreground text-sm line-clamp-2">{product.name}</h4>
-                            <p className="text-[10px] text-green-600 font-bold mt-1">شحن فوري متاح</p>
+                            <p className="text-[10px] text-green-600 font-bold mt-1">متوفر الآن</p>
                           </div>
                         </div>
 
@@ -197,7 +199,7 @@ export function ProductSheet({
                   </div>
                   <div className="text-center px-6">
                     <p className="text-sm font-bold text-foreground">عذراً، لا توجد منتجات حالياً لهذا القسم</p>
-                    <p className="text-[10px] mt-1 opacity-70">تأكد من تفعيل المنتجات في حسابك بالراغب.</p>
+                    <p className="text-[10px] mt-1 opacity-70">تأكد من تفعيل الأقسام في حسابك بالراغب.</p>
                   </div>
                 </div>
               )}
