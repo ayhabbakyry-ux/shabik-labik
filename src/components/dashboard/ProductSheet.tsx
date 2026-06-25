@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PackageX, RefreshCw, ShoppingCart, User as UserIcon, AlertCircle } from "lucide-react";
+import { Loader2, PackageX, RefreshCw, ShoppingCart, User as UserIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useUser } from "@/lib/store";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,6 @@ interface ProductItem {
   name: string;
   price: string | number;
   category_name?: string;
-  parent_id?: string | number;
   category_img?: string;
 }
 
@@ -44,14 +43,14 @@ export function ProductSheet({
   const fetchProducts = useCallback(async () => {
     setFetching(true);
     try {
-      const response = await fetch(`/api/products`);
+      const response = await fetch(`/api/products`, { cache: 'no-store' });
       if (!response.ok) throw new Error("API Error");
       const data = await response.json();
       setAllProducts(Array.isArray(data) ? data : []);
     } catch (error: any) {
       toast({
         title: "خطأ في الاتصال",
-        description: "تأكد من الـ API Token ومن اتصال الإنترنت.",
+        description: "تأكد من الـ API Token في ملف .env ومن اتصال الإنترنت.",
         variant: "destructive",
       });
     } finally {
@@ -62,8 +61,8 @@ export function ProductSheet({
   const filteredProducts = useMemo(() => {
     if (!allProducts.length) return [];
     
-    // فلترة ذكية: تبحث عن الكلمة المفتاحية في اسم المنتج أو اسم القسم
-    // تحويل كل شيء لصغير الأحرف لضمان المطابقة
+    // فلترة ذكية ديناميكية: تبحث عن الكلمة المفتاحية في اسم المنتج أو اسم القسم
+    // يتم تحويل الكلمة المفتاحية (مثل PUBG) لتبحث في البيانات القادمة من الراغب بالإنجليزية
     const searchKey = filterValue.toLowerCase();
     
     return allProducts.filter(p => {
@@ -101,7 +100,7 @@ export function ProductSheet({
 
     toast({
       title: "تم استلام طلبك",
-      description: `طلب ${product.name} قيد المراجعة الفورية.`,
+      description: `طلب ${product.name} قيد المراجعة الفورية. سيتم خصم ${price} ${currency} من رصيدك.`,
     });
     setTargetIds(prev => ({ ...prev, [product.id]: "" }));
   };
@@ -185,7 +184,7 @@ export function ProductSheet({
                   </div>
                   <div className="text-center px-6">
                     <p className="text-sm font-bold text-foreground">عذراً، لا توجد منتجات حالياً لهذا القسم</p>
-                    <p className="text-[10px] mt-1 opacity-70">تأكد من وجود رصيد في حسابك لدى الراغب أو جرب قسماً آخر.</p>
+                    <p className="text-[10px] mt-1 opacity-70">تأكد من وجود رصيد في حسابك لدى الراغب، أو تأكد من الـ Token في ملف .env.</p>
                   </div>
                 </div>
               )}

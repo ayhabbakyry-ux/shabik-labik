@@ -125,11 +125,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   // دالة الحذف القسرية والفورية
   const deleteUser = useCallback((phone: string) => {
-    setAllUsers(prevUsers => {
-      const updated = prevUsers.filter(u => u.phone !== phone);
-      // تحديث الذاكرة المحلية فوراً لمنع استعادة البيانات
+    setAllUsers(currentUsers => {
+      const updated = currentUsers.filter(u => u.phone !== phone);
+      // تحديث الذاكرة المحلية فوراً
       localStorage.setItem('shabik_users', JSON.stringify(updated));
-      return updated;
+      return [...updated]; // ضمان تحديث الواجهة بمصفوفة جديدة
     });
 
     if (userPhone === phone) {
@@ -156,45 +156,53 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       userName: userName,
       userPhone: userPhone,
     };
-    const updatedTxs = [newTx, ...transactions];
-    setTransactions(updatedTxs);
-    localStorage.setItem('shabik_txs', JSON.stringify(updatedTxs));
+    setTransactions(prev => {
+      const updated = [newTx, ...prev];
+      localStorage.setItem('shabik_txs', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const adminAction = (transactionId: string, action: 'approve' | 'reject') => {
-    const updatedTxs = transactions.map(tx => {
-      if (tx.id === transactionId && tx.status === 'Pending') {
-        if (action === 'approve') {
-          setAllUsers(prevUsers => {
-            const newUsers = prevUsers.map(u => u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u);
-            localStorage.setItem('shabik_users', JSON.stringify(newUsers));
-            return newUsers;
-          });
-          
-          if (tx.userPhone === userPhone) {
-             setUserBalance(prev => prev + tx.amount);
+    setTransactions(prevTxs => {
+      const updated = prevTxs.map(tx => {
+        if (tx.id === transactionId && tx.status === 'Pending') {
+          if (action === 'approve') {
+            setAllUsers(prevUsers => {
+              const newUsers = prevUsers.map(u => u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u);
+              localStorage.setItem('shabik_users', JSON.stringify(newUsers));
+              // تحديث رصيد المستخدم الحالي إذا كان هو صاحب العملية
+              if (tx.userPhone === userPhone) {
+                setUserBalance(prev => prev + tx.amount);
+              }
+              return newUsers;
+            });
+            return { ...tx, status: 'Completed' as const };
           }
-          return { ...tx, status: 'Completed' as const };
+          return { ...tx, status: 'Rejected' as const };
         }
-        return { ...tx, status: 'Rejected' as const };
-      }
-      return tx;
+        return tx;
+      });
+      localStorage.setItem('shabik_txs', JSON.stringify(updated));
+      return updated;
     });
-    setTransactions(updatedTxs);
-    localStorage.setItem('shabik_txs', JSON.stringify(updatedTxs));
   };
 
   const requestPasswordReset = (phone: string) => {
     const newReq = { phone, date: new Date().toLocaleString('ar-SY') };
-    const updated = [newReq, ...passwordRequests];
-    setPasswordRequests(updated);
-    localStorage.setItem('shabik_pass_reqs', JSON.stringify(updated));
+    setPasswordRequests(prev => {
+      const updated = [newReq, ...prev];
+      localStorage.setItem('shabik_pass_reqs', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const clearPasswordRequest = (phone: string) => {
-    const updated = passwordRequests.filter(r => r.phone !== phone);
-    setPasswordRequests(updated);
-    localStorage.setItem('shabik_pass_reqs', JSON.stringify(updated));
+    setPasswordRequests(prev => {
+      const updated = prev.filter(r => r.phone !== phone);
+      localStorage.setItem('shabik_pass_reqs', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const isAdmin = userPhone === ADMIN_PHONE;

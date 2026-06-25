@@ -6,7 +6,7 @@ export const revalidate = 0;
 const ALRAGHEB_API_URL = "https://alragheb-store.com/client/api/products";
 
 export async function GET() {
-  // استخدام التوكن من ملف .env أو القيمة المباشرة
+  // جلب التوكن من متغيرات البيئة
   const API_TOKEN = process.env.ALRAGHEB_TOKEN || "64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0";
 
   try {
@@ -16,24 +16,24 @@ export async function GET() {
         'Accept': 'application/json',
         'api-token': API_TOKEN
       },
-      next: { revalidate: 0 }
+      cache: 'no-store'
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[ALRAGHEB API ERROR]: Status ${response.status}`, errorText);
-      return NextResponse.json({ error: "Failed to fetch from provider" }, { status: response.status });
+      return NextResponse.json({ error: "فشل الاتصال بمزود الخدمة" }, { status: response.status });
     }
 
     const data = await response.json();
     
-    // استخراج مصفوفة المنتجات بناءً على هيكلية رد السيرفر
+    // استخراج مصفوفة المنتجات بناءً على هيكلية الراغب
     const products = data.data || data.products || (Array.isArray(data) ? data : []);
 
     return NextResponse.json(products);
 
   } catch (error: any) {
     console.error("[API ROUTE ERROR]:", error.message);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ error: "حدث خطأ داخلي في السيرفر" }, { status: 500 });
   }
 }
