@@ -7,7 +7,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { useUser } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowRight, Menu, ShieldAlert } from "lucide-react";
+import { ArrowRight, Menu } from "lucide-react";
 
 export default function AdminPage() {
   const { isAdmin, isLoggedIn } = useUser();
@@ -25,38 +25,43 @@ export default function AdminPage() {
   if (!isAdmin) return null;
 
   return (
-    <div className="min-h-screen bg-background" dir="rtl">
+    <div className="min-h-screen bg-[#f8f9fc]" dir="rtl">
       <DesktopHeader />
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-      {/* Mobile Header */}
-      <div className="md:hidden flex items-center justify-between p-4 bg-white border-b sticky top-0 z-40">
+      {/* Mobile Top Header */}
+      <div className="md:hidden flex items-center justify-between p-4 bg-white border-b sticky top-0 z-40 shadow-sm">
         <button 
           onClick={() => router.push('/dashboard')}
-          className="p-2 hover:bg-gray-100 rounded-full transition active:scale-95 flex items-center gap-1"
+          className="p-2 hover:bg-primary/10 rounded-xl transition active:scale-95 flex items-center gap-1 text-primary"
         >
-          <ArrowRight className="h-6 w-6 text-primary" />
-          <span className="text-xs font-bold text-primary">الرئيسية</span>
+          <ArrowRight className="h-6 w-6" />
+          <span className="text-xs font-bold">الرئيسية</span>
         </button>
-        <h1 className="text-lg font-bold font-headline">لوحة الإدارة</h1>
+        <span className="font-bold text-sm">إدارة المنصة</span>
         <button 
           onClick={() => setIsSidebarOpen(true)}
-          className="p-2 hover:bg-gray-100 rounded-full"
+          className="p-2 hover:bg-muted rounded-xl text-primary"
         >
-          <Menu className="h-6 w-6 text-primary" />
+          <Menu className="h-6 w-6" />
         </button>
       </div>
 
-      <main className="max-w-7xl mx-auto p-4 md:p-8 pb-24">
-        <div className="hidden md:flex items-center gap-2 mb-6">
+      <main className="max-w-7xl mx-auto p-4 md:p-10 pb-24 md:pb-12">
+        {/* Desktop Breadcrumb */}
+        <div className="hidden md:flex items-center gap-2 mb-8 animate-in slide-in-from-right duration-500">
            <button 
              onClick={() => router.push('/dashboard')}
-             className="flex items-center gap-2 text-primary font-bold hover:underline"
+             className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow-sm text-primary font-bold hover:bg-primary hover:text-white transition-all group"
            >
-             <ArrowRight className="h-5 w-5" /> العودة للرئيسية
+             <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" /> 
+             العودة للوحة الرئيسية
            </button>
         </div>
-        <AdminPanel />
+
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <AdminPanel />
+        </div>
       </main>
 
       <Navbar />

@@ -86,7 +86,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setIsLoggedIn(true);
       setUserPhone(authData.phone);
       setUserName(authData.name);
-      // Get latest balance for this user from allUsers if possible
+      
       const currentU = savedUsers ? JSON.parse(savedUsers).find((u: any) => u.phone === authData.phone) : authData;
       setUserBalance(currentU?.balance || 0);
     }
@@ -119,13 +119,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const exists = allUsers.some(u => u.phone === phone);
     if (exists || phone === ADMIN_PHONE) return { success: false, message: "هذا الرقم مسجل مسبقاً" };
     
+    // الرصيد الابتدائي صفر دائماً لضمان النزاهة
     const newUser: AppUser = { phone, name, password: pass, balance: 0 };
     setAllUsers(prev => {
       const updated = [...prev, newUser];
       localStorage.setItem('shabik_users', JSON.stringify(updated));
       return updated;
     });
-    return { success: true, message: "تم إنشاء الحساب بنجاح" };
+    return { success: true, message: "تم إنشاء الحساب بنجاح، رصيدك الحالي 0" };
   };
 
   const deleteUser = useCallback((phone: string) => {

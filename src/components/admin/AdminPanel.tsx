@@ -1,13 +1,15 @@
+
 "use client";
 
 import { useUser } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, X, ShieldAlert, Phone, User, Hash, Trash2, KeyRound, Clock } from "lucide-react";
+import { Check, X, ShieldAlert, Phone, User, Hash, Trash2, KeyRound, Clock, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export function AdminPanel() {
   const { 
@@ -30,134 +32,168 @@ export function AdminPanel() {
   };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto py-8 px-4" dir="rtl">
-      <div className="flex items-center gap-3 text-destructive justify-end">
-        <div className="text-right">
-          <h1 className="text-2xl font-bold font-headline">لوحة تحكم المعلم</h1>
-          <p className="text-sm text-muted-foreground">الإدارة الكاملة للنظام والمستخدمين</p>
+    <div className="space-y-6 w-full max-w-7xl mx-auto pb-10" dir="rtl">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
+        <div className="flex items-center gap-3 text-destructive">
+          <ShieldAlert className="h-10 w-10" />
+          <div className="text-right">
+            <h1 className="text-2xl md:text-3xl font-black font-headline">لوحة تحكم الإدارة</h1>
+            <p className="text-sm text-muted-foreground font-medium">إدارة الطلبات، الحسابات، وكلمات المرور</p>
+          </div>
         </div>
-        <ShieldAlert className="h-8 w-8" />
       </div>
 
       <Tabs defaultValue="deposits" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-8">
-          <TabsTrigger value="deposits">طلبات الإيداع ({pendingTxs.length})</TabsTrigger>
-          <TabsTrigger value="users">إدارة الحسابات ({allUsers.length})</TabsTrigger>
-          <TabsTrigger value="passwords">استعادة الحساب ({passwordRequests.length})</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 h-auto p-1 bg-muted/50 rounded-xl mb-8">
+          <TabsTrigger value="deposits" className="py-3 rounded-lg data-[state=active]:shadow-md">
+            طلبات الإيداع ({pendingTxs.length})
+          </TabsTrigger>
+          <TabsTrigger value="users" className="py-3 rounded-lg data-[state=active]:shadow-md">
+            الحسابات ({allUsers.length})
+          </TabsTrigger>
+          <TabsTrigger value="passwords" className="py-3 rounded-lg data-[state=active]:shadow-md">
+            كلمات المرور ({passwordRequests.length})
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="deposits" className="space-y-4">
+        <TabsContent value="deposits" className="space-y-4 animate-in fade-in duration-300">
           {pendingTxs.length === 0 ? (
-            <Card className="bg-muted/50 border-dashed">
-              <CardContent className="p-12 text-center text-muted-foreground">
-                لا توجد طلبات إيداع معلقة.
-              </CardContent>
-            </Card>
+            <div className="py-20 text-center bg-muted/20 border-2 border-dashed rounded-3xl">
+              <p className="text-muted-foreground font-bold">لا توجد طلبات إيداع معلقة حالياً.</p>
+            </div>
           ) : (
-            pendingTxs.map((tx) => (
-              <Card key={tx.id} className="border-r-4 border-r-yellow-500">
-                <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-                  <div className="space-y-2 text-right w-full">
-                    <div className="flex items-center justify-end gap-2">
-                      <Badge variant="outline">{tx.date}</Badge>
-                      <span className="font-bold font-mono text-primary flex items-center gap-1">
-                        <Hash className="h-3 w-3" /> {tx.id}
-                      </span>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4 text-sm bg-muted/30 p-3 rounded-lg">
-                      <div className="flex flex-col items-end">
-                        <span className="text-[10px] text-muted-foreground flex items-center gap-1"><User className="h-3 w-3" /> اسم المستخدم</span>
-                        <span className="font-bold">{tx.userName}</span>
+            <div className="grid gap-4">
+              {pendingTxs.map((tx) => (
+                <Card key={tx.id} className="overflow-hidden border-none shadow-sm hover:shadow-md transition-all">
+                  <CardContent className="p-0">
+                    <div className="flex flex-col md:flex-row">
+                      <div className="bg-yellow-500 w-full md:w-2" />
+                      <div className="flex-1 p-5 flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="flex flex-col gap-3 w-full md:w-auto">
+                          <div className="flex items-center gap-2">
+                             <Badge variant="secondary" className="font-mono">{tx.date}</Badge>
+                             <span className="text-xs font-bold text-primary">#{tx.id}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 text-sm bg-muted/30 p-3 rounded-xl">
+                            <div className="text-right">
+                              <p className="text-[10px] text-muted-foreground">الاسم</p>
+                              <p className="font-bold">{tx.userName}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] text-muted-foreground">الهاتف</p>
+                              <p className="font-mono font-bold">{tx.userPhone}</p>
+                            </div>
+                          </div>
+                          <p className="text-2xl font-black text-green-600">
+                            +{tx.amount.toLocaleString()} <span className="text-xs">{currency}</span>
+                          </p>
+                        </div>
+                        
+                        <div className="flex gap-2 w-full md:w-auto">
+                          <Button 
+                            variant="outline" 
+                            className="flex-1 md:w-28 text-destructive border-destructive/20 hover:bg-destructive/10" 
+                            onClick={() => adminAction(tx.id, 'reject')}
+                          >
+                            <X className="h-4 w-4 ml-2" /> رفض
+                          </Button>
+                          <Button 
+                            className="flex-1 md:w-28 bg-green-600 hover:bg-green-700 text-white" 
+                            onClick={() => adminAction(tx.id, 'approve')}
+                          >
+                            <Check className="h-4 w-4 ml-2" /> قبول
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex flex-col items-end">
-                        <span className="text-[10px] text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" /> الرقم</span>
-                        <span className="font-bold font-mono">{tx.userPhone}</span>
-                      </div>
                     </div>
-
-                    <p className="text-2xl font-black text-green-600">
-                      +{tx.amount.toLocaleString()} {currency}
-                    </p>
-                  </div>
-                  
-                  <div className="flex gap-2 w-full md:w-auto">
-                    <Button variant="outline" className="flex-1 text-destructive" onClick={() => adminAction(tx.id, 'reject')}><X className="h-4 w-4 ml-1" /> رفض</Button>
-                    <Button className="flex-1 bg-green-600" onClick={() => adminAction(tx.id, 'approve')}><Check className="h-4 w-4 ml-1" /> موافقة</Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           )}
         </TabsContent>
 
-        <TabsContent value="users">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-right">قائمة كافة المستخدمين</CardTitle>
+        <TabsContent value="users" className="animate-in fade-in duration-300">
+          <Card className="border-none shadow-sm overflow-hidden">
+            <CardHeader className="bg-white border-b">
+              <CardTitle className="text-lg font-bold text-right">قائمة المستخدمين المسجلين</CardTitle>
             </CardHeader>
-            <CardContent>
-              <Table dir="rtl">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-right">الاسم</TableHead>
-                    <TableHead className="text-right">رقم الهاتف</TableHead>
-                    <TableHead className="text-right">الرصيد</TableHead>
-                    <TableHead className="text-right">الإجراء</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {allUsers.map((user) => (
-                    <TableRow key={user.phone}>
-                      <TableCell className="text-right font-bold">{user.name}</TableCell>
-                      <TableCell className="text-right font-mono">{user.phone}</TableCell>
-                      <TableCell className="text-right font-bold text-primary">{user.balance.toLocaleString()} {currency}</TableCell>
-                      <TableCell className="text-right">
-                        <Button 
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(user.phone)}
-                          className="text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {allUsers.length === 0 && (
+            <CardContent className="p-0">
+              <ScrollArea className="w-full">
+                <Table>
+                  <TableHeader className="bg-muted/30">
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">لا يوجد مستخدمون مسجلون.</TableCell>
+                      <TableHead className="text-right font-bold">الاسم</TableHead>
+                      <TableHead className="text-right font-bold">الهاتف</TableHead>
+                      <TableHead className="text-right font-bold">الرصيد</TableHead>
+                      <TableHead className="text-center font-bold">إدارة</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {allUsers.map((user) => (
+                      <TableRow key={user.phone} className="hover:bg-muted/10">
+                        <TableCell className="text-right font-bold">{user.name}</TableCell>
+                        <TableCell className="text-right font-mono text-xs">{user.phone}</TableCell>
+                        <TableCell className="text-right font-black text-primary">
+                          {user.balance.toLocaleString()} {currency}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="text-destructive hover:bg-destructive/10 rounded-full"
+                            onClick={() => handleDelete(user.phone)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {allUsers.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-20 text-muted-foreground italic">لا يوجد مستخدمون حالياً.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="passwords">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-right flex items-center justify-end gap-2">
-                طلبات استعادة الحساب <KeyRound className="h-5 w-5" />
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {passwordRequests.length === 0 ? (
-                <p className="text-center py-10 text-muted-foreground">لا توجد طلبات جديدة.</p>
-              ) : (
-                passwordRequests.map((req) => (
-                  <div key={req.phone} className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border">
-                    <Button variant="ghost" size="sm" onClick={() => clearPasswordRequest(req.phone)}><X className="h-4 w-4" /></Button>
-                    <div className="text-right">
-                      <p className="font-bold flex items-center justify-end gap-2">{req.phone} <Phone className="h-4 w-4 text-primary" /></p>
-                      <p className="text-[10px] text-muted-foreground flex items-center justify-end gap-1">{req.date} <Clock className="h-3 w-3" /></p>
+        <TabsContent value="passwords" className="animate-in fade-in duration-300">
+          <div className="grid gap-4">
+            {passwordRequests.length === 0 ? (
+              <div className="py-20 text-center bg-muted/20 border-2 border-dashed rounded-3xl">
+                <p className="text-muted-foreground font-bold">لا توجد طلبات استعادة معلقة.</p>
+              </div>
+            ) : (
+              passwordRequests.map((req) => (
+                <Card key={req.phone} className="border-none shadow-sm overflow-hidden">
+                  <CardContent className="p-5 flex items-center justify-between bg-white">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => clearPasswordRequest(req.phone)}
+                      className="text-muted-foreground hover:bg-muted"
+                    >
+                      <X className="h-5 w-5" />
+                    </Button>
+                    <div className="text-right space-y-1">
+                      <div className="flex items-center justify-end gap-2 text-primary font-black">
+                        <span className="font-mono text-lg">{req.phone}</span>
+                        <Phone className="h-4 w-4" />
+                      </div>
+                      <div className="flex items-center justify-end gap-2 text-[10px] text-muted-foreground">
+                        <span>{req.date}</span>
+                        <Clock className="h-3 w-3" />
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
         </TabsContent>
       </Tabs>
     </div>
