@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { Send, Landmark, Image as ImageIcon, AlertCircle, Copy, CheckCircle2, Smartphone } from "lucide-react";
+import { Send, Landmark, Image as ImageIcon, AlertCircle, Copy, CheckCircle2, Smartphone, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/store";
 import {
@@ -30,146 +30,88 @@ export function WalletCard() {
   const handleDeposit = () => {
     setError("");
     const numAmount = Number(amount);
-
     if (!amount || isNaN(numAmount)) {
-      setError("عذراً، هذا الحقل مطلوب (المبلغ)");
+      setError("يرجى إدخال المبلغ");
       return;
     }
-
-    if (numAmount < 120) {
-      setError("عذراً، أقل مبلغ للإيداع هو 120 ل.س.ج");
+    if (numAmount < 100) {
+      setError("أقل مبلغ للشحن هو 100 ليرة");
       return;
     }
-
     if (!imageProof) {
-      setError("عذراً، يجب رفع صورة الإشعار لإتمام العملية");
+      setError("يجب رفع صورة الإشعار");
       return;
     }
-
     requestDeposit(numAmount, imageProof);
     setOpen(false);
     setAmount("");
     setImageProof(null);
-    toast({
-      title: "تم إرسال الطلب بنجاح",
-      description: "سيقوم المسؤول بمراجعة إشعار الدفع وتأكيد الرصيد قريباً.",
-    });
-  };
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      // محاكاة رفع صورة ناجحة
-      setImageProof("proof_image_uploaded_sim"); 
-    }
+    toast({ title: "تم إرسال الطلب", description: "سيتم تفعيل الرصيد بعد مراجعة الإدارة." });
   };
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
-    toast({
-      description: "تم نسخ الرقم بنجاح",
-    });
+    toast({ description: "تم النسخ بنجاح" });
     setTimeout(() => setCopiedId(null), 2000);
   };
 
   const accounts = [
     { id: 'syriatel', label: 'سيريتل كاش', value: '0939549573', icon: <Send className="h-4 w-4" /> },
     { id: 'mtn', label: 'إم تي إن كاش', value: '0943899403', icon: <Smartphone className="h-4 w-4" /> },
-    { id: 'sham', label: 'شام كاش (المعرف)', value: '5d093f196b8cd72873f06d5dbbfb2d43', icon: <Landmark className="h-4 w-4" />, isMono: true },
+    { id: 'sham', label: 'شام كاش', value: '5d093f196b8cd72873f06d5dbbfb2d43', icon: <Landmark className="h-4 w-4" />, isMono: true },
   ];
 
   return (
-    <div className="bg-[#2d3a5a] p-6 rounded-2xl shadow-xl flex flex-col items-center text-center">
-      <img 
-        src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/Icon-pictures.svg/1200px-Icon-pictures.svg.png" 
-        alt="Logo" 
-        className="w-16 h-16 mb-4 object-contain" 
-      />
+    <div className="bg-[#1c232d] p-8 rounded-[32px] shadow-2xl flex flex-col items-center text-center relative overflow-hidden border border-white/5">
+      <div className="absolute top-0 left-0 w-24 h-24 bg-primary/10 rounded-full -ml-12 -mt-12 blur-2xl"></div>
       
-      <div className="text-white text-lg opacity-90 mb-1">الرصيد المتاح</div>
-      <div className="text-white text-4xl font-bold mb-4">{currency} {userBalance.toLocaleString()}</div>
+      <div className="bg-primary/20 p-4 rounded-2xl mb-4">
+        <Wallet className="h-8 w-8 text-primary" />
+      </div>
+      
+      <div className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">الرصيد المتاح</div>
+      <div className="text-white text-4xl font-black mb-6">{userBalance.toLocaleString()} <span className="text-xs font-medium text-gray-500">{currency}</span></div>
       
       <div className="flex gap-3 w-full">
-        <button className="flex-1 bg-[#475569] py-2 rounded-lg text-white font-medium hover:bg-[#58687e] transition-colors">
-          التفاصيل
+        <button 
+          onClick={() => setOpen(true)}
+          className="flex-1 bg-primary py-4 rounded-2xl text-white font-black text-sm shadow-xl shadow-primary/20 active:scale-95 transition-all"
+        >
+          إيداع رصيد
         </button>
         
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <button className="flex-1 bg-[#2563eb] py-2 rounded-lg text-white font-bold hover:bg-[#3b82f6] transition-colors">
-              إيداع رصيد
-            </button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px] overflow-hidden" dir="rtl">
+          <DialogContent className="sm:max-w-[425px] overflow-hidden bg-[#11151d] border-gray-800 text-white" dir="rtl">
             <DialogHeader>
-              <DialogTitle className="text-right font-headline">شحن المحفظة</DialogTitle>
-              <DialogDescription className="text-right">
-                حول المبلغ للحسابات أدناه وارفع صورة الإشعار.
-              </DialogDescription>
+              <DialogTitle className="text-right font-headline text-xl">شحن المحفظة</DialogTitle>
+              <DialogDescription className="text-right text-gray-400">حول المبلغ وارفع صورة الإشعار.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="bg-muted p-4 rounded-xl text-sm space-y-4">
+              <div className="bg-[#1c232d] p-4 rounded-2xl border border-gray-800 space-y-4">
                 {accounts.map((acc) => (
                   <div key={acc.id} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-2 font-bold text-primary">{acc.icon} {acc.label}</span>
-                    </div>
-                    <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-gray-100 shadow-sm group">
-                      <span className={`flex-1 text-right font-bold truncate ${acc.isMono ? 'font-mono text-[10px]' : 'text-lg'}`}>
-                        {acc.value}
-                      </span>
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        className="h-8 w-8 hover:bg-primary/10"
-                        onClick={() => copyToClipboard(acc.value, acc.id)}
-                      >
-                        {copiedId === acc.id ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4 text-muted-foreground" />}
+                    <span className="flex items-center gap-2 text-[10px] font-bold text-gray-400">{acc.icon} {acc.label}</span>
+                    <div className="flex items-center gap-2 bg-black/40 p-3 rounded-xl border border-white/5">
+                      <span className={`flex-1 text-right font-bold truncate ${acc.isMono ? 'font-mono text-[10px]' : 'text-md'}`}>{acc.value}</span>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => copyToClipboard(acc.value, acc.id)}>
+                        {copiedId === acc.id ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>
                   </div>
                 ))}
               </div>
-
-              {error && (
-                <div className="flex items-center gap-2 text-destructive bg-destructive/10 p-3 rounded-lg border border-destructive/20 text-xs font-bold">
-                  <AlertCircle className="h-4 w-4" />
-                  {error}
-                </div>
-              )}
-
               <div className="grid gap-2 text-right">
-                <Label htmlFor="amount" className="font-bold">المبلغ المطلوب ( {currency} )</Label>
-                <Input 
-                  id="amount" 
-                  type="number" 
-                  placeholder="مثال: 50000" 
-                  className="text-right h-12"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-                <p className="text-[10px] text-muted-foreground">أقل مبلغ للإيداع هو 120 ل.س.ج</p>
+                <Label className="font-bold text-xs text-gray-400">المبلغ المطلوب ( {currency} )</Label>
+                <Input type="number" placeholder="مثال: 50000" className="bg-[#1c232d] border-gray-800 h-12 text-right text-white" value={amount} onChange={(e) => setAmount(e.target.value)} />
               </div>
-
               <div className="grid gap-2 text-right">
-                <Label className="font-bold">صورة إشعار التحويل (إجباري)</Label>
-                <div className="relative group">
-                  <Input 
-                    type="file" 
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="cursor-pointer opacity-0 absolute inset-0 z-10"
-                    required
-                  />
-                  <div className={`h-20 border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-1 transition-colors ${imageProof ? 'bg-green-50 border-green-500' : 'bg-muted/50 border-muted'}`}>
-                    <ImageIcon className={`h-6 w-6 ${imageProof ? 'text-green-500' : 'text-muted-foreground'}`} />
-                    <span className="text-[10px]">{imageProof ? 'تم اختيار الصورة' : 'اضغط لرفع الإشعار'}</span>
-                  </div>
-                </div>
+                <Label className="font-bold text-xs text-gray-400">صورة الإشعار (إجباري)</Label>
+                <Input type="file" accept="image/*" className="bg-[#1c232d] border-gray-800 h-12 text-right text-white cursor-pointer" onChange={(e) => setImageProof("uploaded")} />
               </div>
             </div>
             <DialogFooter>
-              <Button onClick={handleDeposit} className="w-full h-12 text-lg font-bold shadow-lg">إرسال طلب الإيداع</Button>
+              <Button onClick={handleDeposit} className="w-full h-14 text-lg font-black rounded-2xl">إرسال طلب الإيداع</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

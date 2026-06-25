@@ -13,11 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Sidebar } from "@/components/layout/Sidebar";
 
-/**
- * @fileOverview الصفحة الرئيسية المطورة (Home/Auth Page)
- * تم تصفير الرصيد، إضافة القائمة الجانبية، وحذف الأرقام الوهمية (1,000,000).
- */
-
 export default function AuthPage() {
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
@@ -28,10 +23,6 @@ export default function AuthPage() {
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => {
-    // إذا كان مسجلاً، يمكنه البقاء هنا أو الانتقال للوحة التحكم، ولكننا سنبقي الواجهة مرنة
-  }, [isLoggedIn]);
 
   const handleAuth = (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +57,7 @@ export default function AuthPage() {
   if (isForgotPassword) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6" dir="rtl">
-        <Card className="w-full max-w-md shadow-2xl border-none animate-in fade-in zoom-in duration-300">
+        <Card className="w-full max-w-md shadow-2xl border-none">
           <CardHeader>
             <CardTitle className="text-xl text-right flex items-center gap-2">
               <HelpCircle className="h-5 w-5 text-primary" /> استعادة الحساب
@@ -89,69 +80,67 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-start p-4 pt-8 md:pt-16" dir="rtl">
-      
-      {/* Sidebar & Header Button */}
+    <div className="min-h-screen bg-background flex flex-col items-center justify-start p-4 pt-8" dir="rtl">
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       
       <div className="w-full max-w-md flex justify-between items-center mb-10">
-        <div className="bg-primary/10 p-2 rounded-xl text-primary font-black text-sm">
+        <div className="bg-primary text-white px-4 py-2 rounded-2xl font-black text-sm shadow-md">
           {isLoggedIn ? `${userBalance.toLocaleString()} ${currency}` : "مرحباً بك"}
         </div>
         <button 
           onClick={() => setIsSidebarOpen(true)}
-          className="p-2 bg-white rounded-xl shadow-sm hover:bg-gray-50 active:scale-95 transition-all text-primary"
+          className="p-3 bg-white rounded-2xl shadow-sm hover:bg-gray-50 active:scale-95 transition-all text-primary border"
         >
           <Menu className="h-6 w-6" />
         </button>
       </div>
 
-      <div className="mb-8 text-center animate-in slide-in-from-top duration-500">
-        <div className="bg-primary p-4 rounded-3xl inline-block shadow-xl mb-4">
+      <div className="mb-8 text-center">
+        <div className="bg-primary p-5 rounded-[32px] inline-block shadow-2xl mb-4 transform rotate-3">
           <ShieldCheck className="h-10 w-10 text-white" />
         </div>
         <h1 className="text-2xl font-bold font-headline text-primary">شبك لبيك الرقمي</h1>
-        <p className="text-muted-foreground text-sm font-medium">بوابتك الآمنة للخدمات الرقمية</p>
+        <p className="text-muted-foreground text-sm font-medium">بوابتك الآمنة والموثوقة للشحن التلقائي</p>
       </div>
 
       {!isLoggedIn ? (
-        <Card className="w-full max-w-md shadow-2xl border-none animate-in fade-in slide-in-from-bottom-4 duration-500 bg-white/80 backdrop-blur-sm">
+        <Card className="w-full max-w-md shadow-2xl border-none bg-white/90 backdrop-blur-md rounded-[32px] overflow-hidden">
           <Tabs defaultValue="login" className="w-full" onValueChange={(v) => setIsLogin(v === "login")}>
             <CardHeader className="pb-4">
-              <TabsList className="grid w-full grid-cols-2 mb-4">
-                <TabsTrigger value="login" className="font-bold">تسجيل الدخول</TabsTrigger>
-                <TabsTrigger value="register" className="font-bold">حساب جديد</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 mb-4 bg-muted/50 p-1 rounded-2xl">
+                <TabsTrigger value="login" className="font-bold rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white">تسجيل الدخول</TabsTrigger>
+                <TabsTrigger value="register" className="font-bold rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white">حساب جديد</TabsTrigger>
               </TabsList>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleAuth} className="space-y-4">
                 {!isLogin && (
-                  <div className="space-y-2 animate-in fade-in duration-300">
-                    <Label className="text-right block font-bold text-xs">الاسم الكامل</Label>
+                  <div className="space-y-2">
+                    <Label className="text-right block font-bold text-xs pr-1">الاسم الكامل</Label>
                     <div className="relative">
                       <User className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input placeholder="أدخل اسمك" className="pr-10 h-11 text-right" value={name} onChange={(e) => setName(e.target.value)} />
+                      <Input placeholder="أدخل اسمك" className="pr-10 h-12 text-right rounded-xl border-muted bg-muted/20" value={name} onChange={(e) => setName(e.target.value)} />
                     </div>
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label className="text-right block font-bold text-xs">رقم الهاتف</Label>
+                  <Label className="text-right block font-bold text-xs pr-1">رقم الهاتف</Label>
                   <div className="relative">
                     <Phone className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="09xxxxxxxx" className="pr-10 h-11 text-right" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                    <Input placeholder="09xxxxxxxx" className="pr-10 h-12 text-right rounded-xl border-muted bg-muted/20" value={phone} onChange={(e) => setPhone(e.target.value)} />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-right block font-bold text-xs">كلمة السر</Label>
+                  <Label className="text-right block font-bold text-xs pr-1">كلمة السر</Label>
                   <div className="relative">
                     <Lock className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input id="password" type="password" placeholder="••••••••" className="pr-10 h-11 text-right" value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <Input type="password" placeholder="••••••••" className="pr-10 h-12 text-right rounded-xl border-muted bg-muted/20" value={password} onChange={(e) => setPassword(e.target.value)} />
                   </div>
                 </div>
                 {isLogin && (
-                  <button type="button" onClick={() => setIsForgotPassword(true)} className="text-[10px] text-primary font-bold hover:underline block w-full text-right">نسيت كلمة المرور؟</button>
+                  <button type="button" onClick={() => setIsForgotPassword(true)} className="text-[10px] text-primary font-bold hover:underline block w-full text-right pr-1">نسيت كلمة المرور؟</button>
                 )}
-                <Button type="submit" className="w-full h-12 text-base font-bold mt-2 shadow-lg shadow-primary/20">
+                <Button type="submit" className="w-full h-14 text-base font-bold mt-2 shadow-xl shadow-primary/20 rounded-2xl">
                   {isLogin ? "دخول للمنصة" : "إنشاء حساب"} <ArrowRight className="mr-2 h-4 w-4 rotate-180" />
                 </Button>
               </form>
@@ -159,23 +148,24 @@ export default function AuthPage() {
           </Tabs>
         </Card>
       ) : (
-        <div className="w-full max-w-md space-y-4 animate-in fade-in duration-500">
-           <Card className="border-none shadow-xl bg-gradient-to-br from-primary to-blue-900 text-white p-6 rounded-[32px]">
-              <div className="flex justify-between items-center mb-4">
-                <div className="bg-white/20 p-2 rounded-xl"><ShieldCheck className="h-6 w-6" /></div>
-                <span className="text-xs font-bold opacity-80">محفظتك الرقمية</span>
+        <div className="w-full max-w-md space-y-4">
+           <Card className="border-none shadow-2xl bg-gradient-to-br from-primary via-blue-800 to-indigo-950 text-white p-8 rounded-[40px] relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+              <div className="flex justify-between items-center mb-6">
+                <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md border border-white/10"><ShieldCheck className="h-7 w-7" /></div>
+                <span className="text-[10px] font-black tracking-widest bg-yellow-500 text-black px-3 py-1 rounded-full uppercase">VIP Member</span>
               </div>
-              <p className="text-sm opacity-90">أهلاً بك، {userName}</p>
-              <h2 className="text-3xl font-black mt-1">{userBalance.toLocaleString()} <span className="text-xs font-medium">{currency}</span></h2>
-              <Button onClick={() => router.push('/dashboard')} className="w-full mt-6 bg-white text-primary hover:bg-white/90 font-bold h-12 rounded-2xl">
-                فتح لوحة الخدمات
+              <p className="text-sm opacity-80 font-medium">أهلاً بعودتك، {userName}</p>
+              <h2 className="text-4xl font-black mt-2 tracking-tight">{userBalance.toLocaleString()} <span className="text-xs font-medium opacity-70">{currency}</span></h2>
+              <Button onClick={() => router.push('/dashboard')} className="w-full mt-8 bg-white text-primary hover:bg-white/90 font-black h-14 rounded-2xl shadow-lg">
+                فتح لوحة الخدمات الرقمية
               </Button>
            </Card>
         </div>
       )}
       
-      <div className="mt-auto py-8 text-center text-[10px] text-muted-foreground font-medium">
-        © 2024 شبك لبيك الرقمي. جميع الحقوق محفوظة.
+      <div className="mt-auto py-8 text-center text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
+        © 2024 Shabik Labik Digital. All Rights Reserved.
       </div>
     </div>
   );

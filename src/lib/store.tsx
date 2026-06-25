@@ -77,7 +77,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const savedTxs = localStorage.getItem('shabik_txs');
     const savedPassReqs = localStorage.getItem('shabik_pass_reqs');
 
-    if (savedUsers) setAllUsers(JSON.parse(savedUsers));
+    let parsedUsers = savedUsers ? JSON.parse(savedUsers) : [];
+    
+    // تصحيح فوري لأي رصيد وهمي قديم موجود في المتصفح
+    parsedUsers = parsedUsers.map((u: any) => u.balance === 1000000 ? { ...u, balance: 0 } : u);
+    setAllUsers(parsedUsers);
+    localStorage.setItem('shabik_users', JSON.stringify(parsedUsers));
+
     if (savedTxs) setTransactions(JSON.parse(savedTxs));
     if (savedPassReqs) setPasswordRequests(JSON.parse(savedPassReqs));
     
@@ -87,7 +93,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setUserPhone(authData.phone);
       setUserName(authData.name);
       
-      const currentU = savedUsers ? JSON.parse(savedUsers).find((u: any) => u.phone === authData.phone) : authData;
+      const currentU = parsedUsers.find((u: any) => u.phone === authData.phone);
       setUserBalance(currentU?.balance || 0);
     }
   }, []);
@@ -119,14 +125,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const exists = allUsers.some(u => u.phone === phone);
     if (exists || phone === ADMIN_PHONE) return { success: false, message: "هذا الرقم مسجل مسبقاً" };
     
-    // الرصيد الافتراضي هو 0 حصراً
+    // الرصيد الافتراضي هو 0 حصراً وبشكل قاطع
     const newUser: AppUser = { phone, name, password: pass, balance: 0 };
     setAllUsers(prev => {
       const updated = [...prev, newUser];
       localStorage.setItem('shabik_users', JSON.stringify(updated));
       return updated;
     });
-    return { success: true, message: "تم إنشاء الحساب، رصيدك الحالي 0 ل.س.ج" };
+    return { success: true, message: "تم إنشاء الحساب بنجاح، رصيدك الحالي 0 ل.س.ج" };
   };
 
   const deleteUser = useCallback((phone: string) => {
