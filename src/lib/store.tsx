@@ -56,12 +56,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [allUsers, setAllUsers] = useState<AppUser[]>([]);
   const [passwordRequests, setPasswordRequests] = useState<PasswordRequest[]>([]);
-  const isInitialized = useRef(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+  
   const currency = "ل.س.ج";
-
   const ADMIN_PHONE = "0939549573";
 
-  // تحميل البيانات الأولية عند بدء التطبيق
+  // 1. تحميل البيانات عند بدء التشغيل مرة واحدة فقط
   useEffect(() => {
     const savedAuth = localStorage.getItem('shabik_auth');
     if (savedAuth) {
@@ -87,45 +87,42 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setPasswordRequests(JSON.parse(savedPassReqs));
     }
     
-    isInitialized.current = true;
+    setIsLoaded(true);
   }, []);
 
-  // مزامنة المعاملات مع الذاكرة المحلية
+  // 2. مزامنة التغييرات مع الذاكرة المحلية فقط بعد التحميل الأولي
   useEffect(() => {
-    if (isInitialized.current) {
-      localStorage.setItem('shabik_txs', JSON.stringify(transactions));
-    }
-  }, [transactions]);
-
-  // مزامنة قائمة المستخدمين مع الذاكرة المحلية
-  useEffect(() => {
-    if (isInitialized.current) {
+    if (isLoaded) {
       localStorage.setItem('shabik_users', JSON.stringify(allUsers));
     }
-  }, [allUsers]);
+  }, [allUsers, isLoaded]);
 
-  // مزامنة طلبات كلمة السر
   useEffect(() => {
-    if (isInitialized.current) {
+    if (isLoaded) {
+      localStorage.setItem('shabik_txs', JSON.stringify(transactions));
+    }
+  }, [transactions, isLoaded]);
+
+  useEffect(() => {
+    if (isLoaded) {
       localStorage.setItem('shabik_pass_reqs', JSON.stringify(passwordRequests));
     }
-  }, [passwordRequests]);
+  }, [passwordRequests, isLoaded]);
 
-  // تحديث بيانات الجلسة الحالية عند تغير الرصيد أو الاسم
   useEffect(() => {
-    if (isLoggedIn && isInitialized.current) {
-      const currentAuth = JSON.parse(localStorage.getItem('shabik_auth') || '{}');
+    if (isLoggedIn && isLoaded) {
       localStorage.setItem('shabik_auth', JSON.stringify({ 
-        ...currentAuth, 
-        balance: userBalance, 
         phone: userPhone, 
-        name: userName 
+        name: userName,
+        balance: userBalance
       }));
       
-      // تحديث رصيد المستخدم في القائمة الكلية بآلية تمنع التكرار
-      setAllUsers(prev => prev.map(u => u.phone === userPhone ? { ...u, balance: userBalance, name: userName } : u));
+      // تحديث بيانات المستخدم في القائمة الكبيرة لضمان الاتساق
+      setAllUsers(prev => prev.map(u => 
+        u.phone === userPhone ? { ...u, balance: userBalance, name: userName } : u
+      ));
     }
-  }, [userBalance, isLoggedIn, userPhone, userName]);
+  }, [userBalance, isLoggedIn, userPhone, userName, isLoaded]);
 
   const login = (phone: string, name: string, pass: string) => {
     setIsLoggedIn(true);
@@ -134,9 +131,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     
     const existingUser = allUsers.find(u => u.phone === phone);
     const initialBalance = existingUser ? existingUser.balance : 0;
-    
     setUserBalance(initialBalance);
-    localStorage.setItem('shabik_auth', JSON.stringify({ phone, name, balance: initialBalance }));
 
     if (!existingUser) {
       const newUser: AppUser = { phone, name, password: pass, balance: 0 };
@@ -192,16 +187,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteUser = (phone: string) => {
-    // حذف المستخدم من القائمة الكلية بآلية تضمن تحديث الحالة فوراً
-    setAllUsers(prev => {
-      const filtered = prev.filter(u => u.phone !== phone);
-      // تحديث الذاكرة المحلية يدوياً للتأكيد الإضافي
-      localStorage.setItem('shabik_users', JSON.stringify(filtered));
-      return filtered;
-    });
-    
-    // إذا كان هذا المستخدم يملك طلب استعادة كلمة سر، نحذفه أيضاً
+    // تحديث الحالة بآلية وظيفية لضمان الدقة
+    setAllUsers(prev => prev.filter(u => u.phone !== phone));
     setPasswordRequests(prev => prev.filter(r => r.phone !== phone));
+    
+    // إذا كان المستخدم المحذوف هو المسجل حالياً، نخرجه
+    if (phone === userPhone) {
+      logout();
+    }
   };
 
   const requestPasswordReset = (phone: string) => {

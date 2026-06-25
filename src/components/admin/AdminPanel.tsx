@@ -19,7 +19,7 @@ export function AdminPanel() {
 
   const pendingTxs = transactions.filter(t => t.status === 'Pending');
 
-  const handleDeleteUser = (phone: string) => {
+  const handleDeleteClick = (phone: string) => {
     if (phone === adminCurrentPhone) {
       toast({
         title: "خطأ",
@@ -29,12 +29,11 @@ export function AdminPanel() {
       return;
     }
 
-    if (window.confirm(`هل أنت متأكد من حذف حساب الرقم (${phone}) نهائياً؟`)) {
+    if (window.confirm(`هل أنت متأكد من حذف حساب الرقم (${phone}) نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`)) {
       deleteUser(phone);
       toast({
         title: "تم الحذف",
-        description: `تم إزالة الحساب بنجاح.`,
-        variant: "destructive"
+        description: `تم إزالة الحساب (${phone}) بنجاح من النظام.`,
       });
     }
   };
@@ -130,7 +129,7 @@ export function AdminPanel() {
                           variant="ghost" 
                           size="icon" 
                           className="text-destructive hover:bg-destructive/10" 
-                          onClick={() => handleDeleteUser(user.phone)}
+                          onClick={() => handleDeleteClick(user.phone)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
