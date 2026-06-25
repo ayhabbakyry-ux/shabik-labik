@@ -125,15 +125,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteUser = useCallback((phone: string) => {
-    // 1. التحديث القسري والذري للذاكرة المحلية لضمان عدم عودة البيانات
-    const currentUsers = JSON.parse(localStorage.getItem('shabik_users') || '[]');
-    const filteredUsers = currentUsers.filter((u: AppUser) => u.phone !== phone);
-    localStorage.setItem('shabik_users', JSON.stringify(filteredUsers));
+    // تحديث قسري وذري لضمان الحذف الفوري
+    setAllUsers(prev => {
+      const updated = prev.filter(u => u.phone !== phone);
+      localStorage.setItem('shabik_users', JSON.stringify(updated));
+      return [...updated];
+    });
 
-    // 2. تحديث الحالة (State) فوراً لإجبار الواجهة على التغيير
-    setAllUsers([...filteredUsers]);
-
-    // 3. طرد المستخدم إذا كان هو الحساب المحذوف
     if (userPhone === phone) {
       logout();
     }

@@ -47,20 +47,18 @@ export function ProductSheet({
     try {
       const response = await fetch(`/api/products`, { cache: 'no-store' });
       
-      // قراءة الاستجابة كنص أولاً لتجنب خطأ Unexpected end of JSON input
       const text = await response.text();
       
       if (!response.ok) {
         let errorData;
         try {
-          errorData = text ? JSON.parse(text) : { error: `Error ${response.status}` };
+          errorData = text ? JSON.parse(text) : { error: `HTTP ${response.status}` };
         } catch (e) {
-          errorData = { error: text || `Error ${response.status}` };
+          errorData = { error: text || `HTTP ${response.status}` };
         }
-        throw new Error(errorData.error || errorData.message || `Error ${response.status}`);
+        throw new Error(errorData.error || errorData.message || `خطأ ${response.status}`);
       }
       
-      // التعامل مع الاستجابة الفارغة
       if (!text || text.trim() === "") {
         setAllProducts([]);
         return;
@@ -70,10 +68,9 @@ export function ProductSheet({
       try {
         data = JSON.parse(text);
       } catch (e) {
-        throw new Error("فشل في قراءة بيانات المنتجات المستلمة (JSON Error)");
+        throw new Error("البيانات المستلمة ليست JSON. الرد الخام: " + text.substring(0, 100));
       }
       
-      // التوافق مع هيكلية البيانات: مصفوفة مباشرة أو كائن يحتوي على مصفوفة
       let products: ProductItem[] = [];
       if (Array.isArray(data)) {
         products = data;
@@ -92,14 +89,10 @@ export function ProductSheet({
 
   const filteredProducts = useMemo(() => {
     if (!allProducts.length) return [];
-    
     const searchKey = filterValue.toLowerCase();
-    
     return allProducts.filter(p => {
       const prodName = (p.name || "").toLowerCase();
       const catName = (p.category_name || "").toLowerCase();
-      
-      // فلترة ذكية: تبحث عن الكلمة المفتاحية (مثل PUBG) في الاسم أو القسم
       return prodName.includes(searchKey) || catName.includes(searchKey);
     }).map(p => ({
       ...p,
@@ -158,7 +151,7 @@ export function ProductSheet({
           {fetching ? (
             <div className="h-full flex flex-col items-center justify-center gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-bold text-muted-foreground">جاري جلب البيانات من السيرفر...</p>
+              <p className="text-sm font-bold text-muted-foreground">جاري الاتصال بسيرفر الراغب...</p>
             </div>
           ) : errorMsg ? (
             <div className="p-8 h-full flex flex-col items-center justify-center text-center gap-4">
@@ -166,8 +159,10 @@ export function ProductSheet({
                   <AlertCircle className="h-12 w-12 text-destructive" />
                </div>
                <div className="space-y-2">
-                  <h3 className="font-bold text-lg text-destructive">خطأ في الاتصال</h3>
-                  <p className="text-sm text-muted-foreground max-w-[250px]">{errorMsg}</p>
+                  <h3 className="font-bold text-lg text-destructive">فشل جلب البيانات</h3>
+                  <div className="text-xs text-muted-foreground max-w-[300px] overflow-auto max-h-[200px] bg-white p-3 rounded-lg border border-destructive/20 text-left ltr" dir="ltr">
+                    {errorMsg}
+                  </div>
                </div>
                <Button onClick={fetchProducts} variant="outline" className="mt-2">إعادة المحاولة</Button>
             </div>
@@ -198,7 +193,7 @@ export function ProductSheet({
                           </label>
                           <Input 
                             placeholder="أدخل البيانات هنا..." 
-                            className="text-right h-11 bg-muted/50 border-none focus:ring-1 focus:ring-primary/20"
+                            className="text-right h-11 bg-muted/50 border-none"
                             value={targetIds[product.id] || ""}
                             onChange={(e) => setTargetIds(prev => ({ ...prev, [product.id]: e.target.value }))}
                           />
@@ -210,7 +205,7 @@ export function ProductSheet({
                           </p>
                           <Button 
                             onClick={() => handleOrder(product)}
-                            className="rounded-full bg-primary font-bold px-8 shadow-lg shadow-primary/10 hover:shadow-primary/20 active:scale-95 transition-all"
+                            className="rounded-full bg-primary font-bold px-8 shadow-lg active:scale-95 transition-all"
                           >
                             طلب الآن
                           </Button>
@@ -225,7 +220,7 @@ export function ProductSheet({
                     <PackageX className="h-10 w-10 opacity-30" />
                   </div>
                   <div className="text-center px-6">
-                    <p className="text-sm font-bold text-foreground">عذراً، لا توجد منتجات حالياً لهذا القسم</p>
+                    <p className="text-sm font-bold text-foreground">عذراً، لا توجد منتجات حالياً</p>
                     <p className="text-[10px] mt-1 opacity-70">تأكد من تفعيل الأقسام في حسابك بالراغب.</p>
                   </div>
                 </div>
