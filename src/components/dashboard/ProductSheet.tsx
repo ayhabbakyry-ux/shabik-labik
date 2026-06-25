@@ -49,15 +49,25 @@ export function ProductSheet({
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || data.message || "فشل الاتصال بسيرفر الراغب");
+        // قراءة الخطأ القادم من السيرفر بشكل مرن
+        const errorMessage = (typeof data === 'object' && data !== null) 
+          ? (data.error || data.message || `Error ${response.status}`) 
+          : "فشل الاتصال بالمسار الداخلي";
+        throw new Error(errorMessage);
       }
       
-      // التوافق مع هيكلية البيانات المختلفة
-      const products = Array.isArray(data) ? data : (data.data || data.products || []);
-      setAllProducts(products);
+      // التوافق مع هيكلية البيانات: مصفوفة مباشرة أو كائن يحتوي على مصفوفة
+      let products: ProductItem[] = [];
+      if (Array.isArray(data)) {
+        products = data;
+      } else if (data && typeof data === 'object') {
+        products = data.data || data.products || [];
+      }
+      
+      setAllProducts(Array.isArray(products) ? products : []);
     } catch (error: any) {
       console.error("Fetch error:", error);
-      setErrorMsg(error.message || "خطأ غير معروف في الاتصال");
+      setErrorMsg(error.message || "حدث خطأ غير متوقع أثناء جلب المنتجات");
     } finally {
       setFetching(false);
     }
