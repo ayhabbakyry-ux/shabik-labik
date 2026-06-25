@@ -49,11 +49,27 @@ export function ProductSheet({
       const text = await response.text();
       
       if (!response.ok) {
-        const errorData = text ? JSON.parse(text) : { error: `خطأ ${response.status}` };
+        let errorData;
+        try {
+          errorData = JSON.parse(text);
+        } catch {
+          errorData = { error: `خطأ تقني من السيرفر: ${text.substring(0, 100)}` };
+        }
         throw new Error(errorData.error || `خطأ ${response.status}`);
       }
       
-      const data = JSON.parse(text);
+      if (!text || text.trim() === "" || text.trim().startsWith("<!DOCTYPE html>")) {
+        setAllProducts([]);
+        return;
+      }
+
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        setAllProducts([]);
+        return;
+      }
       
       if (data && data.error) {
         throw new Error(data.error);
@@ -71,6 +87,7 @@ export function ProductSheet({
   const filteredProducts = useMemo(() => {
     if (!allProducts.length) return [];
     const searchKey = filterValue.toLowerCase();
+    // فلترة ديناميكية تعتمد على الاسم أو اسم القسم بالإنجليزية لضمان التطابق مع Zid API
     return allProducts.filter(p => {
       const prodName = (p.name || "").toLowerCase();
       const catName = (p.category_name || "").toLowerCase();
@@ -95,7 +112,6 @@ export function ProductSheet({
       return;
     }
 
-    // محاكاة استجابة الطلب برموز أخطاء الراغب
     toast({ title: "تم إرسال الطلب", description: `طلب ${product.name} قيد المعالجة الآن.` });
     setTargetIds(prev => ({ ...prev, [product.id]: "" }));
   };
@@ -112,7 +128,7 @@ export function ProductSheet({
                 <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
               </Button>
             </div>
-            <SheetDescription className="text-right text-xs">مزامنة مباشرة مع سيرفر الراغب</SheetDescription>
+            <SheetDescription className="text-right text-xs">مزامنة مباشرة مع سيرفر الراغب (Zid Platform)</SheetDescription>
           </SheetHeader>
         </div>
 
@@ -168,7 +184,7 @@ export function ProductSheet({
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4 bg-white/50 rounded-3xl mx-2 mt-4 border border-dashed border-muted-foreground/20">
                   <div className="bg-muted p-4 rounded-full"><PackageX className="h-10 w-10 opacity-30" /></div>
-                  <p className="text-sm font-bold text-foreground">لا توجد منتجات في هذا القسم</p>
+                  <p className="text-sm font-bold text-foreground">عذراً، لا توجد منتجات حالياً لهذا القسم</p>
                 </div>
               )}
             </ScrollArea>

@@ -125,11 +125,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteUser = useCallback((phone: string) => {
-    setAllUsers(prev => {
-      const updated = prev.filter(u => u.phone !== phone);
-      localStorage.setItem('shabik_users', JSON.stringify(updated));
-      return [...updated];
-    });
+    // تحديث ذري وقسري للبيانات
+    const currentUsers = JSON.parse(localStorage.getItem('shabik_users') || '[]');
+    const filteredUsers = currentUsers.filter((u: AppUser) => u.phone !== phone);
+    localStorage.setItem('shabik_users', JSON.stringify(filteredUsers));
+    setAllUsers([...filteredUsers]);
 
     if (userPhone === phone) {
       logout();
