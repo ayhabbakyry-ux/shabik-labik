@@ -13,19 +13,27 @@ import { useToast } from "@/hooks/use-toast";
 export function AdminPanel() {
   const { 
     transactions, adminAction, currency, allUsers, deleteUser, 
-    passwordRequests, clearPasswordRequest 
+    passwordRequests, clearPasswordRequest, userPhone: adminCurrentPhone
   } = useUser();
   const { toast } = useToast();
 
   const pendingTxs = transactions.filter(t => t.status === 'Pending');
 
   const handleDeleteUser = (phone: string) => {
-    // تأكيد الحذف من المدير قبل التنفيذ
+    if (phone === adminCurrentPhone) {
+      toast({
+        title: "خطأ",
+        description: "لا يمكنك حذف حساب المدير الحالي.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (window.confirm(`هل أنت متأكد من حذف حساب الرقم (${phone}) نهائياً؟`)) {
       deleteUser(phone);
       toast({
-        title: "تم الحذف بنجاح",
-        description: `تم إزالة حساب الرقم ${phone} من قاعدة البيانات.`,
+        title: "تم الحذف",
+        description: `تم إزالة الحساب بنجاح.`,
         variant: "destructive"
       });
     }

@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
 export type Transaction = {
   id: string;
@@ -56,6 +56,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [allUsers, setAllUsers] = useState<AppUser[]>([]);
   const [passwordRequests, setPasswordRequests] = useState<PasswordRequest[]>([]);
+  const isInitialized = useRef(false);
   const currency = "ل.س.ج";
 
   const ADMIN_PHONE = "0939549573";
@@ -85,28 +86,34 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (savedPassReqs) {
       setPasswordRequests(JSON.parse(savedPassReqs));
     }
+    
+    isInitialized.current = true;
   }, []);
 
   // مزامنة المعاملات مع الذاكرة المحلية
   useEffect(() => {
-    if (transactions.length > 0) {
+    if (isInitialized.current) {
       localStorage.setItem('shabik_txs', JSON.stringify(transactions));
     }
   }, [transactions]);
 
   // مزامنة قائمة المستخدمين مع الذاكرة المحلية
   useEffect(() => {
-    localStorage.setItem('shabik_users', JSON.stringify(allUsers));
+    if (isInitialized.current) {
+      localStorage.setItem('shabik_users', JSON.stringify(allUsers));
+    }
   }, [allUsers]);
 
   // مزامنة طلبات كلمة السر
   useEffect(() => {
-    localStorage.setItem('shabik_pass_reqs', JSON.stringify(passwordRequests));
+    if (isInitialized.current) {
+      localStorage.setItem('shabik_pass_reqs', JSON.stringify(passwordRequests));
+    }
   }, [passwordRequests]);
 
   // تحديث بيانات الجلسة الحالية عند تغير الرصيد أو الاسم
   useEffect(() => {
-    if (isLoggedIn) {
+    if (isLoggedIn && isInitialized.current) {
       const currentAuth = JSON.parse(localStorage.getItem('shabik_auth') || '{}');
       localStorage.setItem('shabik_auth', JSON.stringify({ 
         ...currentAuth, 
@@ -115,8 +122,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         name: userName 
       }));
       
-      // تحديث رصيد المستخدم في القائمة الكلية
-      setAllUsers(prev => prev.map(u => u.phone === userPhone ? { ...u, balance: userBalance } : u));
+      // تحديث رصيد المستخدم في القائمة الكلية بآلية تمنع التكرار
+      setAllUsers(prev => prev.map(u => u.phone === userPhone ? { ...u, balance: userBalance, name: userName } : u));
     }
   }, [userBalance, isLoggedIn, userPhone, userName]);
 
@@ -185,11 +192,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteUser = (phone: string) => {
-    // حذف المستخدم من القائمة الكلية وتحديث الحالة فوراً
+    // حذف المستخدم من القائمة الكلية بآلية تضمن تحديث الحالة فوراً
     setAllUsers(prev => {
-      const updated = prev.filter(u => u.phone !== phone);
-      localStorage.setItem('shabik_users', JSON.stringify(updated));
-      return updated;
+      const filtered = prev.filter(u => u.phone !== phone);
+      // تحديث الذاكرة المحلية يدوياً للتأكيد الإضافي
+      localStorage.setItem('shabik_users', JSON.stringify(filtered));
+      return filtered;
     });
     
     // إذا كان هذا المستخدم يملك طلب استعادة كلمة سر، نحذفه أيضاً
