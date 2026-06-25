@@ -5,32 +5,23 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * @fileOverview مسار الربط المطور بناءً على التوثيق الرسمي لمتجر الراغب.
- * - التوثيق يشترط إرسال التوكن في حقل: api-token
- * - الرابط الرسمي: https://api.alragheb-store.com/client/api/products
+ * @fileOverview مسار جلب المنتجات المحدث بالتوكن الحقيقي والترويسات الصحيحة.
  */
-
 export async function GET() {
-    // التوكن الخاص بمتجر الراغب
-    const API_TOKEN = process.env.ALRAGHEB_TOKEN || '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0';
-    
-    // الرابط المعتمد من التوثيق الرسمي
+    const API_TOKEN = '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0';
     const ENDPOINT = 'https://api.alragheb-store.com/client/api/products';
 
     try {
-        console.log("Connecting to Al-Ragheb API via official endpoint...");
-
         const response = await fetch(ENDPOINT, {
             method: 'GET',
             headers: {
-                'api-token': API_TOKEN, // الترويسة المطلوبة في التوثيق حصراً
+                'api-token': API_TOKEN,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },
             cache: 'no-store'
         });
 
-        // إذا كان السيرفر أرجع خطأ (مثل 401، 403، 422)
         if (!response.ok) {
             let errorData;
             try {
@@ -38,10 +29,6 @@ export async function GET() {
             } catch (e) {
                 errorData = { message: "فشل السيرفر في إرجاع استجابة JSON" };
             }
-            
-            console.error(`API Provider Error (${response.status}):`, errorData);
-            
-            // نرجع 200 لتجنب انهيار التطبيق (502) ولنتمكن من عرض رمز الخطأ في الواجهة الأمامية
             return NextResponse.json({ 
                 success: false, 
                 error: errorData,
@@ -50,11 +37,8 @@ export async function GET() {
         }
 
         const data = await response.json();
-        
-        // استخراج المصفوفة (التوثيق يرجع مصفوفة مباشرة أو كائن يحتوي على products)
         const productsArray = Array.isArray(data) ? data : (data.products || data.data || []);
         
-        // تنظيف وتنسيق البيانات للواجهة العربية
         const formattedProducts = productsArray.map((prod: any) => ({
             id: prod.id,
             name: prod.الاسم || prod.name || prod.title || 'منتج غير مسمى',
@@ -67,7 +51,6 @@ export async function GET() {
         return NextResponse.json(formattedProducts);
 
     } catch (error: any) {
-        console.error('Fatal API Crash:', error.message);
         return NextResponse.json({ 
             success: false, 
             error: "حدث خطأ في الاتصال الداخلي بسيرفر النشر.",
