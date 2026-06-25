@@ -47,25 +47,25 @@ export function DesktopHeader() {
   const pathname = usePathname();
   
   const links = [
-    { label: "Dashboard", href: "/dashboard" },
-    { label: "Wallet", href: "/wallet" },
-    { label: "Payments", href: "/payments" },
-    { label: "Transactions", href: "/history" },
-    { label: "Centers", href: "/centers" },
-    { label: "Smart Support", href: "/support" },
+    { label: "لوحة التحكم", href: "/dashboard" },
+    { label: "المحفظة", href: "/wallet" },
+    { label: "المدفوعات", href: "/payments" },
+    { label: "السجل", href: "/history" },
+    { label: "المراكز", href: "/centers" },
+    { label: "الدعم الذكي", href: "/support" },
   ];
 
   return (
-    <header className="hidden md:flex sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md px-6 h-16 items-center justify-between">
+    <header className="hidden md:flex sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md px-6 h-16 items-center justify-between" dir="rtl">
       <div className="flex items-center gap-8">
-        <Link href="/dashboard" className="text-xl font-bold text-primary font-headline">Shabik Labik</Link>
+        <Link href="/dashboard" className="text-xl font-bold text-primary font-headline">شبك لبيك الرقمي</Link>
         <nav className="flex items-center gap-6">
           {links.map(link => (
             <Link 
               key={link.href} 
               href={link.href} 
               className={cn(
-                "text-sm font-medium transition-colors hover:text-primary",
+                "text-sm font-bold transition-colors hover:text-primary",
                 pathname === link.href ? "text-primary border-b-2 border-primary pb-1" : "text-muted-foreground"
               )}
             >
@@ -73,9 +73,6 @@ export function DesktopHeader() {
             </Link>
           ))}
         </nav>
-      </div>
-      <div className="flex items-center gap-4">
-        {/* User profile / Logout placeholder */}
       </div>
     </header>
   );

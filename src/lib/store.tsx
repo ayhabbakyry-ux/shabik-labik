@@ -119,7 +119,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const exists = allUsers.some(u => u.phone === phone);
     if (exists || phone === ADMIN_PHONE) return { success: false, message: "هذا الرقم مسجل مسبقاً" };
     
-    // الرصيد الافتراضي هو 0 تماماً
+    // تأكيد تصفير الرصيد الافتراضي 100%
     const newUser: AppUser = { phone, name, password: pass, balance: 0 };
     setAllUsers(prev => {
       const updated = [...prev, newUser];

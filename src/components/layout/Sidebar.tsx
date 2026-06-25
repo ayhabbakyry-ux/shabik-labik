@@ -55,7 +55,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <div className="relative mb-4">
              <Avatar className="w-24 h-24 border-4 border-[#1e232d] shadow-2xl">
                 <AvatarImage src={`https://picsum.photos/seed/${userPhone}/200`} />
-                <AvatarFallback className="bg-primary text-2xl font-bold">{userName[0]}</AvatarFallback>
+                <AvatarFallback className="bg-primary text-2xl font-bold">{userName[0] || 'U'}</AvatarFallback>
              </Avatar>
              <div className="absolute -bottom-1 -right-1 bg-yellow-500 rounded-full p-1.5 shadow-lg border-2 border-[#11151d]">
                 <Star className="h-3 w-3 text-[#11151d] fill-current" />

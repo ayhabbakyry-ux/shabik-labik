@@ -4,7 +4,7 @@
 import { useUser } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, X, ShieldAlert, Phone, Trash2, KeyRound, Clock, ArrowRight, UserPlus, Wallet } from "lucide-react";
+import { Check, X, ShieldAlert, Phone, Trash2, KeyRound, Clock, UserPlus, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
