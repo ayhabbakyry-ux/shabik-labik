@@ -1,8 +1,9 @@
+
 "use client";
 
 import { useUser } from "@/lib/store";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, X, ShieldAlert, Phone, User, Hash, Trash2, KeyRound, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,18 +13,20 @@ import { useToast } from "@/hooks/use-toast";
 export function AdminPanel() {
   const { 
     transactions, adminAction, currency, allUsers, deleteUser, 
-    passwordRequests, clearPasswordRequest
+    passwordRequests, clearPasswordRequest 
   } = useUser();
   const { toast } = useToast();
 
   const pendingTxs = transactions.filter(t => t.status === 'Pending');
 
   const handleDelete = (phone: string) => {
-    if (window.confirm(`هل أنت متأكد من حذف الحساب (${phone}) نهائياً؟`)) {
+    // Explicit confirmation
+    const confirmDelete = window.confirm(`هل أنت متأكد من حذف الحساب (${phone}) نهائياً؟ لن يتمكن المستخدم من الدخول مرة أخرى.`);
+    if (confirmDelete) {
       deleteUser(phone);
       toast({
-        title: "تم الحذف",
-        description: "تمت إزالة الحساب من النظام بنجاح.",
+        title: "تم الحذف بنجاح",
+        description: "تمت إزالة الحساب من النظام والذاكرة المحلية.",
       });
     }
   };

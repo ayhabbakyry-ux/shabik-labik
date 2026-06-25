@@ -12,9 +12,9 @@ export async function GET(request: Request) {
   const categoryId = searchParams.get('categoryId');
 
   try {
-    // الاتصال بسيرفر الراغب باستخدام الـ Token الحقيقي
+    // Attempting POST request as required by Al-Ragheb API for categories/products
     const response = await fetch(`${AL_RAGHEB_BASE_URL}/api/products`, {
-      method: 'POST', 
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -28,13 +28,21 @@ export async function GET(request: Request) {
 
     if (!response.ok) {
       console.error(`[ALRAGHEB API ERROR]: Status ${response.status}`);
-      return NextResponse.json([]);
+      // Try GET as a fallback if POST fails
+      const fallbackResponse = await fetch(`${AL_RAGHEB_BASE_URL}/api/products`, {
+        headers: {
+          'Authorization': `Bearer ${API_TOKEN}`,
+          'Accept': 'application/json'
+        }
+      });
+      if (!fallbackResponse.ok) return NextResponse.json([]);
+      const fallbackData = await fallbackResponse.json();
+      return NextResponse.json(fallbackData.data || fallbackData.products || fallbackData || []);
     }
 
     const data = await response.json();
     
-    // استخراج المنتجات حسب هيكلية الراغب الفعلية
-    // غالباً ما تكون في data.data أو مباشرة في المصفوفة
+    // Al-Ragheb structure is usually in 'data' or 'products' key
     const products = data.data || data.products || (Array.isArray(data) ? data : []);
 
     return NextResponse.json(products);
