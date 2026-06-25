@@ -23,8 +23,8 @@ export function AdminPanel() {
     if (window.confirm(`هل أنت متأكد من حذف الحساب (${phone}) نهائياً؟`)) {
       deleteUser(phone);
       toast({
-        title: "تم الحذف بنجاح",
-        description: `تم إزالة المستخدم ذو الرقم ${phone} من النظام.`,
+        title: "تم الحذف",
+        description: `تم إزالة الحساب بنجاح من النظام.`,
       });
     }
   };
@@ -116,13 +116,14 @@ export function AdminPanel() {
                       <TableCell className="text-right"><Badge variant="outline">{user.password || "••••"}</Badge></TableCell>
                       <TableCell className="text-right font-bold text-primary">{user.balance.toLocaleString()} {currency}</TableCell>
                       <TableCell className="text-right">
-                        <button 
+                        <Button 
+                          variant="ghost"
+                          size="icon"
                           onClick={() => handleDelete(user.phone)}
                           className="p-2 text-destructive hover:bg-destructive/10 rounded-full transition-all active:scale-90"
-                          title="حذف الحساب"
                         >
                           <Trash2 className="h-5 w-5" />
-                        </button>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

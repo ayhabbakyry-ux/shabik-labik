@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export type Transaction = {
   id: string;
@@ -63,28 +63,32 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
 
-  // 1. Initial Load
+  // 1. التحميل الأولي
   useEffect(() => {
-    const savedUsers = localStorage.getItem('shabik_users');
-    const savedAuth = localStorage.getItem('shabik_auth');
-    const savedTxs = localStorage.getItem('shabik_txs');
-    const savedPassReqs = localStorage.getItem('shabik_pass_reqs');
+    try {
+      const savedUsers = localStorage.getItem('shabik_users');
+      const savedAuth = localStorage.getItem('shabik_auth');
+      const savedTxs = localStorage.getItem('shabik_txs');
+      const savedPassReqs = localStorage.getItem('shabik_pass_reqs');
 
-    if (savedUsers) setAllUsers(JSON.parse(savedUsers));
-    if (savedTxs) setTransactions(JSON.parse(savedTxs));
-    if (savedPassReqs) setPasswordRequests(JSON.parse(savedPassReqs));
-    
-    if (savedAuth) {
-      const authData = JSON.parse(savedAuth);
-      setIsLoggedIn(true);
-      setUserPhone(authData.phone);
-      setUserName(authData.name);
-      setUserBalance(authData.balance || 0);
+      if (savedUsers) setAllUsers(JSON.parse(savedUsers));
+      if (savedTxs) setTransactions(JSON.parse(savedTxs));
+      if (savedPassReqs) setPasswordRequests(JSON.parse(savedPassReqs));
+      
+      if (savedAuth) {
+        const authData = JSON.parse(savedAuth);
+        setIsLoggedIn(true);
+        setUserPhone(authData.phone);
+        setUserName(authData.name);
+        setUserBalance(authData.balance || 0);
+      }
+    } catch (e) {
+      console.error("Error loading state", e);
     }
     setIsLoaded(true);
   }, []);
 
-  // 2. Persistent Saving
+  // 2. المزامنة التلقائية للذاكرة المحلية (للعمليات العامة)
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem('shabik_users', JSON.stringify(allUsers));
@@ -141,15 +145,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('shabik_auth');
   };
 
+  // دالة الحذف القسري والفوري
   const deleteUser = (phone: string) => {
-    setAllUsers(current => {
-      const filtered = current.filter(u => u.phone !== phone);
-      // تحديث يدوي فوري للذاكرة المحلية لضمان النجاح
-      localStorage.setItem('shabik_users', JSON.stringify(filtered));
-      return [...filtered];
+    // 1. تحديث المصفوفة في الحالة فوراً
+    setAllUsers(prev => {
+      const updated = prev.filter(u => u.phone !== phone);
+      // 2. تحديث الذاكرة المحلية يدوياً وفي نفس اللحظة لضمان القطعية
+      localStorage.setItem('shabik_users', JSON.stringify(updated));
+      return [...updated];
     });
     
-    if (userPhone === phone) logout();
+    // إذا كان المستخدم المحذوف هو المسجل حالياً، يتم تسجيل خروجه
+    if (userPhone === phone) {
+      logout();
+    }
   };
 
   const addBalance = (amount: number) => {
