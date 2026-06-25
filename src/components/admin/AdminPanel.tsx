@@ -29,15 +29,15 @@ export function AdminPanel() {
       return;
     }
 
-    const confirmDelete = window.confirm(`هل أنت متأكد من حذف الحساب ذو الرقم (${phone})؟`);
+    const confirmDelete = window.confirm(`هل أنت متأكد من حذف الحساب ذو الرقم (${phone}) نهائياً؟`);
     
     if (confirmDelete) {
-      // استدعاء دالة الحذف المحدثة
+      // تنفيذ عملية الحذف
       deleteUser(phone);
       
       toast({
         title: "تم الحذف",
-        description: `تم إزالة المستخدم بنجاح.`,
+        description: `تم إزالة المستخدم بنجاح من النظام.`,
       });
     }
   };
@@ -132,7 +132,7 @@ export function AdminPanel() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="text-destructive hover:bg-destructive/10" 
+                          className="text-destructive hover:bg-destructive/10 cursor-pointer" 
                           onClick={() => handleDeleteClick(user.phone)}
                         >
                           <Trash2 className="h-5 w-5" />

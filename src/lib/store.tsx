@@ -63,94 +63,76 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
 
-  // 1. تحميل البيانات عند بدء التشغيل مرة واحدة فقط
+  // 1. تحميل البيانات لمرة واحدة عند بدء التشغيل
   useEffect(() => {
     try {
       const savedUsers = localStorage.getItem('shabik_users');
-      if (savedUsers) {
-        setAllUsers(JSON.parse(savedUsers));
-      }
-
       const savedAuth = localStorage.getItem('shabik_auth');
+      const savedTxs = localStorage.getItem('shabik_txs');
+      const savedPassReqs = localStorage.getItem('shabik_pass_reqs');
+
+      if (savedUsers) setAllUsers(JSON.parse(savedUsers));
+      if (savedTxs) setTransactions(JSON.parse(savedTxs));
+      if (savedPassReqs) setPasswordRequests(JSON.parse(savedPassReqs));
+      
       if (savedAuth) {
         const authData = JSON.parse(savedAuth);
         setIsLoggedIn(true);
         setUserPhone(authData.phone);
         setUserName(authData.name);
-        setUserBalance(authData.balance);
+        setUserBalance(authData.balance || 0);
       }
-
-      const savedTxs = localStorage.getItem('shabik_txs');
-      if (savedTxs) setTransactions(JSON.parse(savedTxs));
-
-      const savedPassReqs = localStorage.getItem('shabik_pass_reqs');
-      if (savedPassReqs) setPasswordRequests(JSON.parse(savedPassReqs));
     } catch (e) {
-      console.error("Error loading data", e);
+      console.error("Failed to load local storage", e);
     } finally {
       setIsLoaded(true);
     }
   }, []);
 
-  // 2. المزامنة التلقائية للبيانات العامة (ما عدا الحذف الذي سنعالجه يدوياً)
+  // 2. مزامنة البيانات عند أي تغيير (باستخدام تأثير واحد للتبسيط)
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem('shabik_users', JSON.stringify(allUsers));
-    }
-  }, [allUsers, isLoaded]);
-
-  useEffect(() => {
-    if (isLoaded) {
       localStorage.setItem('shabik_txs', JSON.stringify(transactions));
-    }
-  }, [transactions, isLoaded]);
-
-  useEffect(() => {
-    if (isLoaded) {
       localStorage.setItem('shabik_pass_reqs', JSON.stringify(passwordRequests));
+      
+      if (isLoggedIn) {
+        localStorage.setItem('shabik_auth', JSON.stringify({
+          phone: userPhone,
+          name: userName,
+          balance: userBalance
+        }));
+      }
     }
-  }, [passwordRequests, isLoaded]);
+  }, [allUsers, transactions, passwordRequests, isLoggedIn, userPhone, userName, userBalance, isLoaded]);
 
   const login = (phone: string, password: string) => {
-    if (phone === ADMIN_PHONE) {
-      if (password === ADMIN_PASS) {
-        const data = { phone, name: "المدير أيهم", balance: userBalance };
-        setIsLoggedIn(true);
-        setUserPhone(phone);
-        setUserName(data.name);
-        localStorage.setItem('shabik_auth', JSON.stringify(data));
-        return { success: true, message: "تم دخول المدير بنجاح" };
-      }
-      return { success: false, message: "كلمة سر المدير خاطئة" };
+    if (phone === ADMIN_PHONE && password === ADMIN_PASS) {
+      const data = { phone, name: "المدير أيهم", balance: userBalance };
+      setIsLoggedIn(true);
+      setUserPhone(phone);
+      setUserName(data.name);
+      return { success: true, message: "تم دخول المدير بنجاح" };
     }
 
     const user = allUsers.find(u => u.phone === phone);
-    if (!user) {
-      return { success: false, message: "عذراً، هذا الرقم غير مسجل لدينا" };
-    }
+    if (!user) return { success: false, message: "عذراً، هذا الرقم غير مسجل" };
+    if (user.password !== password) return { success: false, message: "كلمة السر خاطئة" };
 
-    if (user.password !== password) {
-      return { success: false, message: "كلمة السر غير صحيحة" };
-    }
-
-    const authData = { phone, name: user.name, balance: user.balance };
     setIsLoggedIn(true);
     setUserPhone(phone);
     setUserName(user.name);
     setUserBalance(user.balance);
-    localStorage.setItem('shabik_auth', JSON.stringify(authData));
     return { success: true, message: "تم تسجيل الدخول بنجاح" };
   };
 
   const register = (phone: string, name: string, pass: string) => {
     const exists = allUsers.some(u => u.phone === phone);
-    if (exists) {
-      return { success: false, message: "هذا الرقم مسجل مسبقاً، يرجى تسجيل الدخول" };
-    }
+    if (exists) return { success: false, message: "هذا الرقم مسجل مسبقاً" };
 
     const newUser: AppUser = { phone, name, password: pass, balance: 0 };
     setAllUsers(prev => [...prev, newUser]);
-    return { success: true, message: "تم إنشاء الحساب بنجاح، يمكنك الآن تسجيل الدخول" };
+    return { success: true, message: "تم إنشاء الحساب بنجاح" };
   };
 
   const logout = () => {
@@ -174,7 +156,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       date: new Date().toLocaleString('ar-SY'),
       userName: userName,
       userPhone: userPhone,
-      details: "إثبات الدفع مرفق"
     };
     setTransactions(prev => [newTx, ...prev]);
   };
@@ -183,12 +164,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setTransactions(prev => prev.map(tx => {
       if (tx.id === transactionId) {
         if (action === 'approve' && tx.status !== 'Completed') {
-          setAllUsers(prevUsers => {
-            const updated = prevUsers.map(u => 
-              u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
-            );
-            return updated;
-          });
+          setAllUsers(prevUsers => prevUsers.map(u => 
+            u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
+          ));
           if (tx.userPhone === userPhone) setUserBalance(prev => prev + tx.amount);
           return { ...tx, status: 'Completed' };
         }
@@ -198,22 +176,22 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
-  // وظيفة الحذف النهائية والصارمة - تعتمد على التصفية الفورية والمزامنة اليدوية
-  const deleteUser = useCallback((phone: string) => {
+  const deleteUser = (phone: string) => {
     if (phone === ADMIN_PHONE) return;
 
+    // تحديث الحالة فوراً وبشكل حازم
     setAllUsers(prev => {
       const filtered = prev.filter(u => u.phone !== phone);
-      // مزامنة يدوية فورية لضمان عدم عودة البيانات عند التحديث
+      // التحديث اليدوي للذاكرة لضمان الاستجابة
       localStorage.setItem('shabik_users', JSON.stringify(filtered));
       return filtered;
     });
 
-    // طرد المستخدم فوراً إذا كان هو المحذوف
+    // إذا كان المستخدم المحذوف هو المسجل حالياً، يتم طرده
     if (userPhone === phone) {
       logout();
     }
-  }, [userPhone, ADMIN_PHONE]);
+  };
 
   const requestPasswordReset = (phone: string) => {
     const newReq = { phone, date: new Date().toLocaleString('ar-SY') };
