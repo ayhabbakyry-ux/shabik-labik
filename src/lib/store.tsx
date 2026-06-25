@@ -124,13 +124,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return { success: true, message: "تم إنشاء الحساب بنجاح" };
   };
 
+  // دالة الحذف القسرية
   const deleteUser = useCallback((phone: string) => {
     setAllUsers(current => {
       const updated = current.filter(u => u.phone !== phone);
+      // تحديث مباشر للذاكرة لضمان الشفافية
       localStorage.setItem('shabik_users', JSON.stringify(updated));
       return [...updated];
     });
 
+    // إذا كان المستخدم المحذوف هو المسجل حالياً، سجل خروجه
     if (userPhone === phone) {
       logout();
     }
