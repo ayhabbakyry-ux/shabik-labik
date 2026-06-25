@@ -6,19 +6,15 @@ export const revalidate = 0;
 const ALRAGHEB_API_URL = "https://alragheb-store.com/client/api/products";
 
 export async function GET() {
-  const API_TOKEN = process.env.ALRAGHEB_TOKEN;
-
-  if (!API_TOKEN) {
-    console.error("[ALRAGHEB API ERROR]: Token not found in process.env");
-    return NextResponse.json({ error: "API Token configuration missing" }, { status: 500 });
-  }
+  const API_TOKEN = process.env.ALRAGHEB_TOKEN || '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0';
 
   try {
     const response = await fetch(ALRAGHEB_API_URL, {
       method: 'GET',
       headers: {
+        'api-token': API_TOKEN.trim(),
         'Accept': 'application/json',
-        'api-token': API_TOKEN.trim()
+        'Content-Type': 'application/json'
       },
       cache: 'no-store'
     });
@@ -32,7 +28,6 @@ export async function GET() {
     const data = await response.json();
     
     // استخراج مصفوفة المنتجات بناءً على هيكلية الراغب
-    // الرد غالباً يكون مصفوفة مباشرة أو كائن يحتوي على data
     const products = data.data || data.products || (Array.isArray(data) ? data : []);
 
     return NextResponse.json(products);

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useUser } from "@/lib/store";
@@ -20,13 +19,12 @@ export function AdminPanel() {
   const pendingTxs = transactions.filter(t => t.status === 'Pending');
 
   const handleDelete = (phone: string) => {
-    // Explicit confirmation
-    const confirmDelete = window.confirm(`هل أنت متأكد من حذف الحساب (${phone}) نهائياً؟ لن يتمكن المستخدم من الدخول مرة أخرى.`);
+    const confirmDelete = window.confirm(`هل أنت متأكد من حذف الحساب (${phone}) نهائياً؟`);
     if (confirmDelete) {
       deleteUser(phone);
       toast({
         title: "تم الحذف بنجاح",
-        description: "تمت إزالة الحساب من النظام والذاكرة المحلية.",
+        description: "تمت إزالة الحساب وتحديث القائمة فوراً.",
       });
     }
   };
@@ -104,7 +102,6 @@ export function AdminPanel() {
                   <TableRow>
                     <TableHead className="text-right">الاسم</TableHead>
                     <TableHead className="text-right">رقم الهاتف</TableHead>
-                    <TableHead className="text-right">كلمة السر</TableHead>
                     <TableHead className="text-right">الرصيد</TableHead>
                     <TableHead className="text-right">الإجراء</TableHead>
                   </TableRow>
@@ -114,14 +111,13 @@ export function AdminPanel() {
                     <TableRow key={user.phone}>
                       <TableCell className="text-right font-bold">{user.name}</TableCell>
                       <TableCell className="text-right font-mono">{user.phone}</TableCell>
-                      <TableCell className="text-right"><Badge variant="outline">{user.password || "••••"}</Badge></TableCell>
                       <TableCell className="text-right font-bold text-primary">{user.balance.toLocaleString()} {currency}</TableCell>
                       <TableCell className="text-right">
                         <Button 
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDelete(user.phone)}
-                          className="p-2 text-destructive hover:bg-destructive/10 rounded-full transition-all"
+                          className="text-destructive hover:bg-destructive/10"
                         >
                           <Trash2 className="h-5 w-5" />
                         </Button>
@@ -130,7 +126,7 @@ export function AdminPanel() {
                   ))}
                   {allUsers.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">لا يوجد مستخدمون مسجلون حالياً.</TableCell>
+                      <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">لا يوجد مستخدمون مسجلون.</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -148,7 +144,7 @@ export function AdminPanel() {
             </CardHeader>
             <CardContent className="space-y-4">
               {passwordRequests.length === 0 ? (
-                <p className="text-center py-10 text-muted-foreground">لا توجد طلبات جديدة حالياً.</p>
+                <p className="text-center py-10 text-muted-foreground">لا توجد طلبات جديدة.</p>
               ) : (
                 passwordRequests.map((req) => (
                   <div key={req.phone} className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border">

@@ -69,7 +69,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('shabik_auth');
   }, []);
 
-  // تحميل البيانات عند بدء التشغيل
   useEffect(() => {
     const savedUsers = localStorage.getItem('shabik_users');
     const savedAuth = localStorage.getItem('shabik_auth');
@@ -117,21 +116,21 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (exists || phone === ADMIN_PHONE) return { success: false, message: "هذا الرقم مسجل مسبقاً" };
     
     const newUser: AppUser = { phone, name, password: pass, balance: 0 };
-    const updated = [...allUsers, newUser];
-    setAllUsers(updated);
-    localStorage.setItem('shabik_users', JSON.stringify(updated));
+    setAllUsers(prev => {
+      const updated = [...prev, newUser];
+      localStorage.setItem('shabik_users', JSON.stringify(updated));
+      return updated;
+    });
     return { success: true, message: "تم إنشاء الحساب بنجاح" };
   };
 
   const deleteUser = useCallback((phone: string) => {
-    // تحديث الحالة فوراً لضمان اختفاء العنصر من الواجهة
-    setAllUsers(currentUsers => {
-      const updated = currentUsers.filter(u => u.phone !== phone);
+    setAllUsers(current => {
+      const updated = current.filter(u => u.phone !== phone);
       localStorage.setItem('shabik_users', JSON.stringify(updated));
       return [...updated];
     });
 
-    // إذا كان المستخدم المحذوف هو المسجل حالياً، سجل خروجه
     if (userPhone === phone) {
       logout();
     }
