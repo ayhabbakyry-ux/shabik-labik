@@ -9,7 +9,7 @@ export async function GET() {
   const API_TOKEN = process.env.ALRAGHEB_TOKEN;
 
   if (!API_TOKEN) {
-    console.error("[ALRAGHEB API ERROR]: Token not found in .env");
+    console.error("[ALRAGHEB API ERROR]: Token not found in process.env");
     return NextResponse.json({ error: "API Token configuration missing" }, { status: 500 });
   }
 
@@ -18,7 +18,7 @@ export async function GET() {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'api-token': API_TOKEN
+        'api-token': API_TOKEN.trim()
       },
       cache: 'no-store'
     });
@@ -31,7 +31,8 @@ export async function GET() {
 
     const data = await response.json();
     
-    // استخراج مصفوفة المنتجات بناءً على هيكلية الراغب (data أو products أو مصفوفة مباشرة)
+    // استخراج مصفوفة المنتجات بناءً على هيكلية الراغب
+    // الرد غالباً يكون مصفوفة مباشرة أو كائن يحتوي على data
     const products = data.data || data.products || (Array.isArray(data) ? data : []);
 
     return NextResponse.json(products);
