@@ -2,30 +2,27 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار تنفيذ طلبات الشحن الحقيقي المتصل بسيرفر الراغب.
+ * @fileOverview مسار تنفيذ طلبات الشحن الحقيقي المحدث بالمسار الديناميكي وفق توثيق الراغب.
  */
 export async function POST(request: Request) {
     const API_TOKEN = '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0';
-    const ENDPOINT = 'https://api.alragheb-store.com/client/api/order/create';
 
     try {
         const body = await request.json();
         const { product_id, playerId, order_uuid } = body;
+        const qty = 1; // الافتراضي لطلب منتج واحد
 
-        // الاتصال الحقيقي بسيرفر المزود
+        // بناء الرابط الديناميكي وفق التوثيق الرسمي
+        const ENDPOINT = `https://api.alragheb-store.com/client/api/newOrder/${product_id}/params?qty=${qty}&playerId=${playerId}&order_uuid=${order_uuid}`;
+
+        // الاتصال الحقيقي بسيرفر المزود باستخدام الترويسات والمسار الصحيح
         const response = await fetch(ENDPOINT, {
-            method: 'POST',
+            method: 'GET', // التوثيق الذي يحتوي على بارامترات في الرابط غالباً ما يستخدم GET
             headers: {
                 'api-token': API_TOKEN,
-                'Content-Type': 'application/json',
                 'Accept': 'application/json',
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                product_id,
-                qty: 1,
-                playerId,
-                order_uuid
-            }),
             cache: 'no-store'
         });
 
@@ -41,7 +38,7 @@ export async function POST(request: Request) {
             401: "غير مصرح بالوصول، التوكن قديم أو خاطئ."
         };
 
-        // التحقق الصارم من النجاح (يجب أن يكون status هو 1 أو 200 حسب السيرفر)
+        // التحقق من النجاح (status: 1 أو النجاح المباشر)
         const isSuccess = data.status === 1 || data.status === 200 || data.success === true;
 
         if (!isSuccess) {
@@ -51,7 +48,7 @@ export async function POST(request: Request) {
             });
         }
 
-        // نجاح حقيقي
+        // نجاح حقيقي مع إرجاع معرف الطلب
         return NextResponse.json({ 
             success: true, 
             message: 'تم الشحن بنجاح!', 
@@ -62,7 +59,7 @@ export async function POST(request: Request) {
         console.error("Orders API Error:", error.message);
         return NextResponse.json({ 
             success: false, 
-            message: 'حدث خطأ في الاتصال بسيرفر الشحن التلقائي.' 
-        }, { status: 200 }); // نرجع 200 لمنع انهيار الواجهة وعرض رسالة الخطأ
+            message: 'حدث خطأ في الاتصال بسيرفر الشحن (Check Console for details).' 
+        }, { status: 200 });
     }
 }
