@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { Send, Landmark, Image as ImageIcon, AlertCircle, Copy, CheckCircle2, Smartphone, Wallet } from "lucide-react";
+import { Send, Landmark, Image as ImageIcon, AlertCircle, Copy, CheckCircle2, Smartphone, Wallet, ArrowUpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/store";
 import {
@@ -63,29 +63,29 @@ export function WalletCard() {
   ];
 
   return (
-    <div className="bg-[#1c232d] p-8 rounded-[32px] shadow-2xl flex flex-col items-center text-center relative overflow-hidden border border-white/5">
-      <div className="absolute top-0 left-0 w-24 h-24 bg-primary/10 rounded-full -ml-12 -mt-12 blur-2xl"></div>
+    <div className="bg-gradient-to-br from-[#1c232d] to-[#11151d] p-8 rounded-[32px] shadow-2xl flex flex-col items-center text-center relative overflow-hidden border border-white/5">
+      <div className="absolute top-0 left-0 w-32 h-32 bg-primary/10 rounded-full -ml-16 -mt-16 blur-[60px]"></div>
       
-      <div className="bg-primary/20 p-4 rounded-2xl mb-4">
+      <div className="bg-primary/20 p-4 rounded-2xl mb-4 backdrop-blur-md border border-white/5">
         <Wallet className="h-8 w-8 text-primary" />
       </div>
       
-      <div className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">الرصيد المتاح</div>
-      <div className="text-white text-4xl font-black mb-6">{userBalance.toLocaleString()} <span className="text-xs font-medium text-gray-500">{currency}</span></div>
+      <div className="text-gray-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">الرصيد المتاح حالياً</div>
+      <div className="text-white text-5xl font-black mb-8 tracking-tighter">
+        {(userBalance || 0).toLocaleString()} <span className="text-xs font-medium text-gray-500">{currency}</span>
+      </div>
       
       <div className="flex gap-3 w-full">
-        <button 
-          onClick={() => setOpen(true)}
-          className="flex-1 bg-primary py-4 rounded-2xl text-white font-black text-sm shadow-xl shadow-primary/20 active:scale-95 transition-all"
-        >
-          إيداع رصيد
-        </button>
-        
         <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <button className="flex-1 bg-primary hover:bg-primary/90 py-5 rounded-2xl text-white font-black text-sm shadow-xl shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2">
+              <ArrowUpCircle className="h-5 w-5" /> إيداع رصيد جديد
+            </button>
+          </DialogTrigger>
           <DialogContent className="sm:max-w-[425px] overflow-hidden bg-[#11151d] border-gray-800 text-white" dir="rtl">
             <DialogHeader>
               <DialogTitle className="text-right font-headline text-xl">شحن المحفظة</DialogTitle>
-              <DialogDescription className="text-right text-gray-400">حول المبلغ وارفع صورة الإشعار.</DialogDescription>
+              <DialogDescription className="text-right text-gray-400">حول المبلغ وارفع صورة الإشعار للمراجعة.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="bg-[#1c232d] p-4 rounded-2xl border border-gray-800 space-y-4">
@@ -94,7 +94,7 @@ export function WalletCard() {
                     <span className="flex items-center gap-2 text-[10px] font-bold text-gray-400">{acc.icon} {acc.label}</span>
                     <div className="flex items-center gap-2 bg-black/40 p-3 rounded-xl border border-white/5">
                       <span className={`flex-1 text-right font-bold truncate ${acc.isMono ? 'font-mono text-[10px]' : 'text-md'}`}>{acc.value}</span>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => copyToClipboard(acc.value, acc.id)}>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-primary hover:bg-primary/10" onClick={() => copyToClipboard(acc.value, acc.id)}>
                         {copiedId === acc.id ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>
@@ -102,16 +102,17 @@ export function WalletCard() {
                 ))}
               </div>
               <div className="grid gap-2 text-right">
-                <Label className="font-bold text-xs text-gray-400">المبلغ المطلوب ( {currency} )</Label>
-                <Input type="number" placeholder="مثال: 50000" className="bg-[#1c232d] border-gray-800 h-12 text-right text-white" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                <Label className="font-bold text-xs text-gray-400">المبلغ المطلوب شحنه ( {currency} )</Label>
+                <Input type="number" placeholder="مثال: 50000" className="bg-[#1c232d] border-gray-800 h-12 text-right text-white rounded-xl focus:ring-primary" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                {error && <p className="text-xs text-destructive mt-1 font-bold">{error}</p>}
               </div>
               <div className="grid gap-2 text-right">
-                <Label className="font-bold text-xs text-gray-400">صورة الإشعار (إجباري)</Label>
-                <Input type="file" accept="image/*" className="bg-[#1c232d] border-gray-800 h-12 text-right text-white cursor-pointer" onChange={(e) => setImageProof("uploaded")} />
+                <Label className="font-bold text-xs text-gray-400">صورة إشعار التحويل (إجباري)</Label>
+                <Input type="file" accept="image/*" className="bg-[#1c232d] border-gray-800 h-12 text-right text-white cursor-pointer rounded-xl" onChange={(e) => setImageProof("uploaded")} />
               </div>
             </div>
             <DialogFooter>
-              <Button onClick={handleDeposit} className="w-full h-14 text-lg font-black rounded-2xl">إرسال طلب الإيداع</Button>
+              <Button onClick={handleDeposit} className="w-full h-14 text-lg font-black rounded-2xl shadow-xl shadow-primary/20">تأكيد وإرسال الطلب</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

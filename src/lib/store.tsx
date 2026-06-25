@@ -79,8 +79,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     let parsedUsers = savedUsers ? JSON.parse(savedUsers) : [];
     
-    // تصحيح فوري لأي رصيد وهمي قديم موجود في المتصفح
-    parsedUsers = parsedUsers.map((u: any) => u.balance === 1000000 ? { ...u, balance: 0 } : u);
+    // تصحيح فوري لأي رصيد وهمي قديم موجود في المتصفح وتصفيره قسرياً
+    parsedUsers = parsedUsers.map((u: any) => (u.balance >= 1000000 || isNaN(u.balance)) ? { ...u, balance: 0 } : u);
     setAllUsers(parsedUsers);
     localStorage.setItem('shabik_users', JSON.stringify(parsedUsers));
 
@@ -89,12 +89,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     
     if (savedAuth) {
       const authData = JSON.parse(savedAuth);
-      setIsLoggedIn(true);
-      setUserPhone(authData.phone);
-      setUserName(authData.name);
-      
       const currentU = parsedUsers.find((u: any) => u.phone === authData.phone);
-      setUserBalance(currentU?.balance || 0);
+      
+      if (currentU || authData.phone === ADMIN_PHONE) {
+        setIsLoggedIn(true);
+        setUserPhone(authData.phone);
+        setUserName(authData.name);
+        setUserBalance(currentU?.balance || 0);
+      } else {
+        localStorage.removeItem('shabik_auth');
+      }
     }
   }, []);
 
@@ -125,7 +129,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const exists = allUsers.some(u => u.phone === phone);
     if (exists || phone === ADMIN_PHONE) return { success: false, message: "هذا الرقم مسجل مسبقاً" };
     
-    // الرصيد الافتراضي هو 0 حصراً وبشكل قاطع
     const newUser: AppUser = { phone, name, password: pass, balance: 0 };
     setAllUsers(prev => {
       const updated = [...prev, newUser];
@@ -158,11 +161,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const deductBalance = (amount: number, productDetails: string) => {
     setAllUsers(prev => {
-      const updated = prev.map(u => u.phone === userPhone ? { ...u, balance: u.balance - amount } : u);
+      const updated = prev.map(u => u.phone === userPhone ? { ...u, balance: Math.max(0, u.balance - amount) } : u);
       localStorage.setItem('shabik_users', JSON.stringify(updated));
       return updated;
     });
-    setUserBalance(prev => prev - amount);
+    setUserBalance(prev => Math.max(0, prev - amount));
 
     const newTx: Transaction = {
       id: `ORD-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,

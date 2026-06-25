@@ -27,14 +27,10 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen w-full bg-background" dir="rtl">
-      {/* Desktop Header */}
       <DesktopHeader />
-      
-      {/* Sidebar Overlay */}
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       
       <main className="max-w-7xl mx-auto p-4 md:p-8 space-y-6 pb-24 md:pb-8">
-        {/* Mobile Header Area */}
         <div className="md:hidden flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
             <button 
@@ -54,21 +50,21 @@ export default function DashboardPage() {
         </div>
 
         {isAdmin && (
-          <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-2xl flex items-center justify-between">
+          <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-2xl flex items-center justify-between animate-pulse">
             <div className="flex items-center gap-3">
               <div className="bg-destructive p-2 rounded-lg">
                 <ShieldAlert className="h-5 w-5 text-white" />
               </div>
               <div className="text-right">
                 <p className="font-bold text-sm text-destructive">لوحة الإدارة نشطة</p>
-                <p className="text-[10px] text-muted-foreground">لديك طلبات إيداع بانتظار المراجعة</p>
+                <p className="text-[10px] text-muted-foreground">تحقق من طلبات الإيداع المعلقة</p>
               </div>
             </div>
             <Button 
               variant="destructive" 
               size="sm" 
               onClick={() => router.push('/admin')}
-              className="font-bold text-xs"
+              className="font-bold text-xs rounded-xl"
             >
               فتح اللوحة
             </Button>
@@ -79,13 +75,13 @@ export default function DashboardPage() {
 
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-lg font-headline">الخدمات</h3>
+            <h3 className="font-bold text-lg font-headline">الخدمات الرقمية</h3>
             <span className="text-xs text-primary font-bold uppercase tracking-widest cursor-pointer hover:underline">عرض الكل</span>
           </div>
           
           <div className="relative">
             <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input className="pr-10 bg-white border-none shadow-sm h-11 text-right" placeholder="ابحث عن ألعاب، بطاقات شحن..." />
+            <Input className="pr-10 bg-white border-none shadow-sm h-12 text-right rounded-2xl" placeholder="ابحث عن ألعاب، بطاقات شحن..." />
           </div>
 
           <ServiceGrid isAdmin={isAdmin} />
