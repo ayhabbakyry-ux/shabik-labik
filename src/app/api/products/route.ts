@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -48,7 +49,8 @@ const FALLBACK_PRODUCTS = [
 ];
 
 export async function GET() {
-    const TOKEN = process.env.ALRAGHEB_TOKEN || "64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0";
+    // استخدام التوكن الصريح لضمان أعلى مستويات الاستقرار
+    const TOKEN = "64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0";
     const API_URL = "https://alragheb-store.com/client/api/products";
 
     try {
@@ -65,8 +67,8 @@ export async function GET() {
 
         const textData = await response.text();
         
-        // التحقق مما إذا كانت الاستجابة HTML (غالباً صفحة خطأ أو حماية)
-        if (textData.trim().startsWith("<!DOCTYPE") || !response.ok) {
+        // التحقق مما إذا كانت الاستجابة HTML أو فارغة
+        if (!textData || textData.trim().startsWith("<!DOCTYPE") || !response.ok) {
             console.warn("Alragheb API returned HTML or error. Using Fallback Data.");
             return NextResponse.json(FALLBACK_PRODUCTS);
         }
@@ -77,6 +79,7 @@ export async function GET() {
             
             if (productsArray.length === 0) return NextResponse.json(FALLBACK_PRODUCTS);
 
+            // تحويل الحقول العربية إلى الإنجليزية لضمان التوافق مع الواجهة
             const formattedProducts = productsArray.map((prod: any) => ({
                 id: prod.id,
                 name: prod.الاسم || prod.name || '',

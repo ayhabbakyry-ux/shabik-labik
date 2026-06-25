@@ -1,3 +1,4 @@
+
 "use client";
 
 import { AdminPanel } from "@/components/admin/AdminPanel";
@@ -30,20 +31,18 @@ export default function AdminPage() {
 
       {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between p-4 bg-white border-b sticky top-0 z-40">
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => setIsSidebarOpen(true)}
-            className="p-2 hover:bg-gray-100 rounded-full"
-          >
-            <Menu className="h-6 w-6 text-primary" />
-          </button>
-          <h1 className="text-lg font-bold font-headline">لوحة الإدارة</h1>
-        </div>
         <button 
           onClick={() => router.push('/dashboard')}
-          className="p-2 hover:bg-gray-100 rounded-full"
+          className="p-2 hover:bg-gray-100 rounded-full transition active:scale-95"
         >
           <ArrowRight className="h-6 w-6 text-primary" />
+        </button>
+        <h1 className="text-lg font-bold font-headline">لوحة الإدارة</h1>
+        <button 
+          onClick={() => setIsSidebarOpen(true)}
+          className="p-2 hover:bg-gray-100 rounded-full"
+        >
+          <Menu className="h-6 w-6 text-primary" />
         </button>
       </div>
 

@@ -4,15 +4,17 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar, DesktopHeader } from "@/components/layout/Navbar";
+import { Sidebar } from "@/components/layout/Sidebar";
 import { useUser } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Share2, Copy, Users, Gift, CheckCircle2 } from "lucide-react";
+import { Share2, Copy, Users, Gift, CheckCircle2, ArrowRight, Menu } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ReferralPage() {
   const { userPhone, currency, isLoggedIn } = useUser();
   const [copied, setCopied] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -39,6 +41,24 @@ export default function ReferralPage() {
   return (
     <div className="min-h-screen bg-background pb-24" dir="rtl">
       <DesktopHeader />
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      
+      {/* Mobile Header with Back Button */}
+      <div className="md:hidden flex items-center justify-between p-4 bg-white border-b sticky top-0 z-40">
+        <button 
+          onClick={() => router.push('/dashboard')}
+          className="p-2 hover:bg-gray-100 rounded-full transition active:scale-95"
+        >
+          <ArrowRight className="h-6 w-6 text-primary" />
+        </button>
+        <h1 className="text-lg font-bold font-headline">ادعُ واربح</h1>
+        <button 
+          onClick={() => setIsSidebarOpen(true)}
+          className="p-2 hover:bg-gray-100 rounded-full"
+        >
+          <Menu className="h-6 w-6 text-primary" />
+        </button>
+      </div>
       
       <main className="max-w-md mx-auto p-4 space-y-6 pt-6">
         <div className="text-center space-y-2">
