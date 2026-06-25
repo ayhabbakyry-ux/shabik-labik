@@ -154,6 +154,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const addBalance = (amount: number) => {
     setUserBalance(prev => prev + amount);
+    // Update the balance in allUsers array too
+    setAllUsers(prev => prev.map(u => u.phone === userPhone ? { ...u, balance: u.balance + amount } : u));
   };
 
   const requestDeposit = (amount: number, proofImage: string) => {
@@ -171,14 +173,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const adminAction = (transactionId: string, action: 'approve' | 'reject') => {
     setTransactions(prevTxs => {
-      return prevTxs.map(tx => {
+      const updated = prevTxs.map(tx => {
         if (tx.id === transactionId && tx.status === 'Pending') {
           if (action === 'approve') {
             setAllUsers(prevUsers => {
-              return prevUsers.map(u => 
+              const updatedUsers = prevUsers.map(u => 
                 u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
               );
+              return updatedUsers;
             });
+            // If the admin is approving their own transaction (simulation)
             if (tx.userPhone === userPhone) setUserBalance(prev => prev + tx.amount);
             return { ...tx, status: 'Completed' as const };
           }
@@ -186,19 +190,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }
         return tx;
       });
+      return updated;
     });
   };
 
   const deleteUser = (phone: string) => {
-    // تحديث الحالة فوراً وبشكل قسري
-    setAllUsers(prev => {
-      const filtered = prev.filter(u => u.phone !== phone);
-      // تحديث الذاكرة المحلية في نفس اللحظة لضمان الاستقرار
-      localStorage.setItem('shabik_users', JSON.stringify(filtered));
-      return [...filtered];
-    });
+    // Functional update ensures we work with the latest array
+    setAllUsers(prev => prev.filter(u => u.phone !== phone));
+    
+    // Force immediate localStorage update for robustness
+    const currentUsers = JSON.parse(localStorage.getItem('shabik_users') || '[]');
+    const filtered = currentUsers.filter((u: any) => u.phone !== phone);
+    localStorage.setItem('shabik_users', JSON.stringify(filtered));
 
-    // طرد المستخدم إذا كان هو من يتم حذفه
+    // If deleting the current logged-in user
     if (userPhone === phone) {
       logout();
     }

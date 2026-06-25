@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   try {
     const targetEndpoint = `${AL_RAGHEB_BASE_URL}/client/api/products`;
     
-    // إعداد البيانات المطلوبة من قبل API الراغب
+    // Al-Ragheb API parameters
     const bodyData = {
       email: "ayhmbakyr213@gmail.com",
       username: "ayhmbakyr213@gmail.com",
@@ -31,7 +31,6 @@ export async function GET(request: Request) {
       },
       body: JSON.stringify(bodyData),
       cache: 'no-store',
-      signal: AbortSignal.timeout(8000) 
     });
 
     if (!response.ok) {
@@ -40,27 +39,44 @@ export async function GET(request: Request) {
 
     const data = await response.json();
     
-    // تنظيف البيانات لضمان توافقها مع واجهة المستخدم
-    const products = Array.isArray(data) ? data : (data.data || data.products || []);
-    
+    // Al-Ragheb returns data in different shapes sometimes
+    let products = [];
+    if (Array.isArray(data)) {
+      products = data;
+    } else if (data.data && Array.isArray(data.data)) {
+      products = data.data;
+    } else if (data.products && Array.isArray(data.products)) {
+      products = data.products;
+    }
+
     return NextResponse.json(products);
 
   } catch (error: any) {
-    console.error("[API ERROR]:", error.message);
+    console.error("[AL-RAGHEB API PROXY ERROR]:", error.message);
     
-    // بيانات وهمية احتياطية في حال فشل الاتصال الحقيقي
-    const MOCK_DATA: any = {
+    // Robust Mock Data in case of failure
+    const MOCK_DATA: Record<string, any[]> = {
       "2": [
-        { id: 101, name: "PUBG Mobile 60 UC", price: 15000 },
-        { id: 102, name: "PUBG Mobile 325 UC", price: 65000 }
+        { id: 101, name: "ببجي موبايل 60 UC", price: 15000 },
+        { id: 102, name: "ببجي موبايل 325 UC", price: 65000 },
+        { id: 103, name: "ببجي موبايل 660 UC", price: 125000 }
       ],
       "6": [
         { id: 201, name: "سيريتل 500 وحدة", price: 6500 },
-        { id: 202, name: "سيريتل 1000 وحدة", price: 13000 }
+        { id: 202, name: "سيريتل 1000 وحدة", price: 13000 },
+        { id: 203, name: "MTN 500 وحدة", price: 6500 }
+      ],
+      "1": [
+        { id: 301, name: "لايكي 100 ماسة", price: 20000 },
+        { id: 302, name: "تيك توك 70 عملة", price: 18000 }
+      ],
+      "5": [
+        { id: 401, name: "جوجل بلاي 5$", price: 45000 },
+        { id: 402, name: "نتفليكس شهر", price: 35000 }
       ]
     };
 
     const fallback = categoryId ? (MOCK_DATA[categoryId] || []) : [];
-    return NextResponse.json(fallback, { status: 200 });
+    return NextResponse.json(fallback);
   }
 }

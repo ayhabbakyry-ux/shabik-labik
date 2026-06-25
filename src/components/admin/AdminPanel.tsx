@@ -20,17 +20,11 @@ export function AdminPanel() {
   const pendingTxs = transactions.filter(t => t.status === 'Pending');
 
   const handleDelete = (phone: string) => {
-    // تأكيد الحذف
-    const isConfirmed = window.confirm(`هل أنت متأكد من حذف الحساب (${phone}) نهائياً؟`);
-    
-    if (isConfirmed) {
-      // تنفيذ الحذف فوراً
+    if (window.confirm(`هل أنت متأكد من حذف الحساب (${phone}) نهائياً؟`)) {
       deleteUser(phone);
-      
-      // إشعار بالنجاح
       toast({
-        title: "تم الحذف",
-        description: `تم إزالة الرقم ${phone} من النظام بنجاح.`,
+        title: "تم الحذف بنجاح",
+        description: `تم إزالة المستخدم ذو الرقم ${phone} من النظام.`,
       });
     }
   };
@@ -124,7 +118,8 @@ export function AdminPanel() {
                       <TableCell className="text-right">
                         <button 
                           onClick={() => handleDelete(user.phone)}
-                          className="p-2 text-destructive hover:bg-destructive/10 rounded-full transition-colors"
+                          className="p-2 text-destructive hover:bg-destructive/10 rounded-full transition-all active:scale-90"
+                          title="حذف الحساب"
                         >
                           <Trash2 className="h-5 w-5" />
                         </button>

@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PackageX, RefreshCw, ShoppingCart, Zap, User } from "lucide-react";
+import { Loader2, PackageX, RefreshCw, ShoppingCart, Zap, User as UserIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useUser } from "@/lib/store";
 import { Input } from "@/components/ui/input";
@@ -49,19 +49,20 @@ export function ProductSheet({
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const [targetIds, setTargetIds] = useState<Record<string, string>>({});
   const { toast } = useToast();
-  const { currency } = useUser();
+  const { currency, userBalance } = useUser();
 
   const fetchProducts = useCallback(async () => {
     if (!activeCategoryId) return;
     setFetching(true);
     try {
       const response = await fetch(`/api/products?categoryId=${activeCategoryId}`);
+      if (!response.ok) throw new Error("Connection failed");
       const data = await response.json();
       setAllProducts(Array.isArray(data) ? data : []);
     } catch (error: any) {
       toast({
         title: "خطأ في الاتصال",
-        description: "فشل جلب المنتجات من الراغب.",
+        description: "فشل جلب المنتجات. يرجى التأكد من اتصال الإنترنت.",
         variant: "destructive",
       });
     } finally {
@@ -72,7 +73,7 @@ export function ProductSheet({
   const groupedServices = useMemo(() => {
     if (!allProducts.length) return [];
 
-    // تصفية المنتجات بناءً على اسم الخدمة (مثل "ببجي")
+    // Simple search filtering
     const searchTerms = serviceName.toLowerCase().split(' ').filter(k => k.length > 2);
     let filtered = allProducts;
 
@@ -83,7 +84,6 @@ export function ProductSheet({
       });
     }
 
-    // إذا لم يتم العثور على تصفية دقيقة، نعرض الفئة كاملة
     if (filtered.length === 0) filtered = allProducts;
 
     return filtered.map(item => {
@@ -120,6 +120,7 @@ export function ProductSheet({
 
   const handleOrder = (groupId: string, variation: any) => {
     const targetId = targetIds[groupId];
+    const price = Number(variation.customerPrice);
 
     if (!targetId || !targetId.trim()) {
       toast({
@@ -130,9 +131,18 @@ export function ProductSheet({
       return;
     }
 
+    if (userBalance < price) {
+      toast({
+        title: "رصيد غير كافٍ",
+        description: "عذراً، رصيدك الحالي لا يغطي قيمة هذا المنتج.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     toast({
       title: "تم استلام طلبك",
-      description: `طلب ${variation.name} للحساب ${targetId} قيد المعالجة.`,
+      description: `طلب ${variation.name} للحساب ${targetId} قيد المعالجة الآن.`,
     });
     setTargetIds(prev => ({ ...prev, [groupId]: "" }));
   };
@@ -149,7 +159,7 @@ export function ProductSheet({
                 <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
               </Button>
             </div>
-            <SheetDescription className="text-right text-xs">مزامنة البيانات الحية من مزود الراغب.</SheetDescription>
+            <SheetDescription className="text-right text-xs">مزامنة البيانات الحية من مزود الراغب (سعر +4%).</SheetDescription>
           </SheetHeader>
         </div>
 
@@ -195,7 +205,7 @@ export function ProductSheet({
 
                           <div className="space-y-1.5">
                             <label className="text-[11px] font-bold text-muted-foreground pr-1 flex items-center gap-1">
-                              <User className="h-3 w-3" /> الآي دي أو الرقم المطلوب
+                              <UserIcon className="h-3 w-3" /> الآي دي أو الرقم المطلوب
                             </label>
                             <Input 
                               placeholder="أدخل الـ ID أو الرقم هنا..." 
@@ -211,7 +221,7 @@ export function ProductSheet({
                             </p>
                             <Button 
                               onClick={() => handleOrder(group.id, currentItem)}
-                              className="rounded-full bg-primary font-bold px-6"
+                              className="rounded-full bg-primary font-bold px-6 shadow-lg active:scale-95"
                             >
                               <ShoppingCart className="ml-2 h-4 w-4" /> اطلب
                             </Button>
@@ -224,7 +234,7 @@ export function ProductSheet({
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
                   <PackageX className="h-10 w-10 opacity-30" />
-                  <p className="text-sm font-bold">لا توجد منتجات حالياً.</p>
+                  <p className="text-sm font-bold">لا توجد منتجات حالياً لهذه الفئة.</p>
                 </div>
               )}
             </ScrollArea>
