@@ -2,13 +2,13 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  /* خيارات التكوين لبيئة الإنتاج */
   typescript: {
-    // يتجاهل أخطاء التايب سكريبت البسيطة لضمان نجاح البناء في Vercel
+    // يتجاهل أخطاء التايب سكريبت لضمان نجاح البناء في Vercel
     ignoreBuildErrors: true,
   },
   eslint: {
-    // يتجاهل أخطاء الـ Lint أثناء الرفع لسرعة الاستجابة
+    // يتجاهل أخطاء الـ Lint لسرعة النشر
     ignoreDuringBuilds: true,
   },
   images: {
@@ -16,29 +16,22 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'placehold.co',
-        port: '',
-        pathname: '/**',
       },
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
-        port: '',
-        pathname: '/**',
       },
       {
         protocol: 'https',
         hostname: 'picsum.photos',
-        port: '',
-        pathname: '/**',
       },
       {
         protocol: 'https',
         hostname: 'alragheb-store.com',
-        port: '',
-        pathname: '/**',
       },
     ],
   },
+  // تأكد من عدم وجود output: 'export' هنا لضمان عمل الـ API Routes
 };
 
 export default nextConfig;

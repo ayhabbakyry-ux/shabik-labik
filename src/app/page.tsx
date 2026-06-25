@@ -12,6 +12,11 @@ import { useUser } from "@/lib/store";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 
+/**
+ * @fileOverview صفحة الدخول الرئيسية للمنصة (Auth Page)
+ * تم استعادتها لضمان عمل التطبيق من المسار الرئيسي /
+ */
+
 export default function AuthPage() {
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
@@ -37,7 +42,6 @@ export default function AuthPage() {
     }
 
     if (isLogin) {
-      // عملية تسجيل الدخول
       const result = login(phone, password);
       if (result.success) {
         toast({ title: "مرحباً بك", description: result.message });
@@ -46,7 +50,6 @@ export default function AuthPage() {
         toast({ variant: "destructive", title: "فشل الدخول", description: result.message });
       }
     } else {
-      // عملية إنشاء حساب
       if (!name) {
         toast({ variant: "destructive", title: "خطأ", description: "يرجى إدخال اسمك لإنشاء الحساب" });
         return;
@@ -54,7 +57,7 @@ export default function AuthPage() {
       const result = register(phone, name, password);
       if (result.success) {
         toast({ title: "تم التسجيل", description: result.message });
-        setIsLogin(true); // التحويل لتبويب تسجيل الدخول بعد النجاح
+        setIsLogin(true);
       } else {
         toast({ variant: "destructive", title: "فشل التسجيل", description: result.message });
       }
