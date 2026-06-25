@@ -20,6 +20,8 @@ export function AdminPanel() {
   const pendingTxs = transactions.filter(t => t.status === 'Pending');
 
   const handleDeleteClick = (phone: string) => {
+    console.log("UI: Clicked delete for", phone);
+    
     if (phone === adminCurrentPhone) {
       toast({
         title: "خطأ",
@@ -131,7 +133,7 @@ export function AdminPanel() {
                           className="text-destructive hover:bg-destructive/10" 
                           onClick={() => handleDeleteClick(user.phone)}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-5 w-5" />
                         </Button>
                       </TableCell>
                     </TableRow>

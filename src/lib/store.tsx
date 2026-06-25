@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export type Transaction = {
   id: string;
@@ -61,36 +61,40 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const currency = "ل.س.ج";
   const ADMIN_PHONE = "0939549573";
 
-  // 1. تحميل البيانات عند بدء التشغيل مرة واحدة فقط
+  // 1. تحميل البيانات عند بدء التشغيل
   useEffect(() => {
-    const savedAuth = localStorage.getItem('shabik_auth');
-    if (savedAuth) {
-      const data = JSON.parse(savedAuth);
-      setIsLoggedIn(true);
-      setUserPhone(data.phone);
-      setUserName(data.name || "مستخدم");
-      setUserBalance(data.balance || 0);
-    }
+    try {
+      const savedAuth = localStorage.getItem('shabik_auth');
+      if (savedAuth) {
+        const data = JSON.parse(savedAuth);
+        setIsLoggedIn(true);
+        setUserPhone(data.phone);
+        setUserName(data.name || "مستخدم");
+        setUserBalance(data.balance || 0);
+      }
 
-    const savedUsers = localStorage.getItem('shabik_users');
-    if (savedUsers) {
-      setAllUsers(JSON.parse(savedUsers));
-    }
+      const savedUsers = localStorage.getItem('shabik_users');
+      if (savedUsers) {
+        setAllUsers(JSON.parse(savedUsers));
+      }
 
-    const savedTxs = localStorage.getItem('shabik_txs');
-    if (savedTxs) {
-      setTransactions(JSON.parse(savedTxs));
-    }
+      const savedTxs = localStorage.getItem('shabik_txs');
+      if (savedTxs) {
+        setTransactions(JSON.parse(savedTxs));
+      }
 
-    const savedPassReqs = localStorage.getItem('shabik_pass_reqs');
-    if (savedPassReqs) {
-      setPasswordRequests(JSON.parse(savedPassReqs));
+      const savedPassReqs = localStorage.getItem('shabik_pass_reqs');
+      if (savedPassReqs) {
+        setPasswordRequests(JSON.parse(savedPassReqs));
+      }
+    } catch (e) {
+      console.error("Error loading data from localStorage", e);
+    } finally {
+      setIsLoaded(true);
     }
-    
-    setIsLoaded(true);
   }, []);
 
-  // 2. مزامنة التغييرات مع الذاكرة المحلية فقط بعد التحميل الأولي
+  // 2. مزامنة التغييرات مع الذاكرة المحلية
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem('shabik_users', JSON.stringify(allUsers));
@@ -117,7 +121,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         balance: userBalance
       }));
       
-      // تحديث بيانات المستخدم في القائمة الكبيرة لضمان الاتساق
+      // مزامنة رصيد المستخدم الحالي في قائمة الكل
       setAllUsers(prev => prev.map(u => 
         u.phone === userPhone ? { ...u, balance: userBalance, name: userName } : u
       ));
@@ -187,11 +191,21 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteUser = (phone: string) => {
-    // تحديث الحالة بآلية وظيفية لضمان الدقة
-    setAllUsers(prev => prev.filter(u => u.phone !== phone));
-    setPasswordRequests(prev => prev.filter(r => r.phone !== phone));
+    console.log("Store: Deleting user", phone);
+    // تحديث الحالة فوراً
+    setAllUsers(prev => {
+      const newList = prev.filter(u => u.phone !== phone);
+      // تحديث الذاكرة المحلية يدوياً للتأكد من المزامنة
+      localStorage.setItem('shabik_users', JSON.stringify(newList));
+      return newList;
+    });
     
-    // إذا كان المستخدم المحذوف هو المسجل حالياً، نخرجه
+    setPasswordRequests(prev => {
+      const newList = prev.filter(r => r.phone !== phone);
+      localStorage.setItem('shabik_pass_reqs', JSON.stringify(newList));
+      return newList;
+    });
+    
     if (phone === userPhone) {
       logout();
     }
