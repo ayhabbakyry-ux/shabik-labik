@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 export type Transaction = {
   id: string;
@@ -50,46 +50,41 @@ type UserContextType = {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
+  const [allUsers, setAllUsers] = useState<AppUser[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [passwordRequests, setPasswordRequests] = useState<PasswordRequest[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userPhone, setUserPhone] = useState("");
   const [userName, setUserName] = useState("");
   const [userBalance, setUserBalance] = useState(0);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [allUsers, setAllUsers] = useState<AppUser[]>([]);
-  const [passwordRequests, setPasswordRequests] = useState<PasswordRequest[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   
   const currency = "ل.س.ج";
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
 
-  // Load initial data
+  // 1. Initial Load
   useEffect(() => {
-    try {
-      const savedUsers = localStorage.getItem('shabik_users');
-      const savedAuth = localStorage.getItem('shabik_auth');
-      const savedTxs = localStorage.getItem('shabik_txs');
-      const savedPassReqs = localStorage.getItem('shabik_pass_reqs');
+    const savedUsers = localStorage.getItem('shabik_users');
+    const savedAuth = localStorage.getItem('shabik_auth');
+    const savedTxs = localStorage.getItem('shabik_txs');
+    const savedPassReqs = localStorage.getItem('shabik_pass_reqs');
 
-      if (savedUsers) setAllUsers(JSON.parse(savedUsers));
-      if (savedTxs) setTransactions(JSON.parse(savedTxs));
-      if (savedPassReqs) setPasswordRequests(JSON.parse(savedPassReqs));
-      
-      if (savedAuth) {
-        const authData = JSON.parse(savedAuth);
-        setIsLoggedIn(true);
-        setUserPhone(authData.phone);
-        setUserName(authData.name);
-        setUserBalance(authData.balance || 0);
-      }
-    } catch (e) {
-      console.error("Failed to load local storage", e);
-    } finally {
-      setIsLoaded(true);
+    if (savedUsers) setAllUsers(JSON.parse(savedUsers));
+    if (savedTxs) setTransactions(JSON.parse(savedTxs));
+    if (savedPassReqs) setPasswordRequests(JSON.parse(savedPassReqs));
+    
+    if (savedAuth) {
+      const authData = JSON.parse(savedAuth);
+      setIsLoggedIn(true);
+      setUserPhone(authData.phone);
+      setUserName(authData.name);
+      setUserBalance(authData.balance || 0);
     }
+    setIsLoaded(true);
   }, []);
 
-  // Sync state changes to localStorage
+  // 2. Persistent Saving
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem('shabik_users', JSON.stringify(allUsers));
@@ -114,8 +109,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setUserPhone(phone);
       setUserName("المدير أيهم");
       setUserBalance(0);
-      const authData = { phone, name: "المدير أيهم", balance: 0 };
-      localStorage.setItem('shabik_auth', JSON.stringify(authData));
+      localStorage.setItem('shabik_auth', JSON.stringify({ phone, name: "المدير أيهم", balance: 0 }));
       return { success: true, message: "تم دخول المدير بنجاح" };
     }
 
@@ -127,18 +121,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setUserPhone(phone);
     setUserName(user.name);
     setUserBalance(user.balance);
-    localStorage.setItem('shabik_auth', JSON.stringify({
-      phone: user.phone,
-      name: user.name,
-      balance: user.balance
-    }));
+    localStorage.setItem('shabik_auth', JSON.stringify({ phone: user.phone, name: user.name, balance: user.balance }));
     return { success: true, message: "تم تسجيل الدخول بنجاح" };
   };
 
   const register = (phone: string, name: string, pass: string) => {
     const exists = allUsers.some(u => u.phone === phone);
     if (exists || phone === ADMIN_PHONE) return { success: false, message: "هذا الرقم مسجل مسبقاً" };
-
     const newUser: AppUser = { phone, name, password: pass, balance: 0 };
     setAllUsers(prev => [...prev, newUser]);
     return { success: true, message: "تم إنشاء الحساب بنجاح" };
@@ -152,9 +141,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('shabik_auth');
   };
 
+  const deleteUser = (phone: string) => {
+    setAllUsers(current => {
+      const filtered = current.filter(u => u.phone !== phone);
+      // تحديث يدوي فوري للذاكرة المحلية لضمان النجاح
+      localStorage.setItem('shabik_users', JSON.stringify(filtered));
+      return [...filtered];
+    });
+    
+    if (userPhone === phone) logout();
+  };
+
   const addBalance = (amount: number) => {
     setUserBalance(prev => prev + amount);
-    // Update the balance in allUsers array too
     setAllUsers(prev => prev.map(u => u.phone === userPhone ? { ...u, balance: u.balance + amount } : u));
   };
 
@@ -172,41 +171,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const adminAction = (transactionId: string, action: 'approve' | 'reject') => {
-    setTransactions(prevTxs => {
-      const updated = prevTxs.map(tx => {
-        if (tx.id === transactionId && tx.status === 'Pending') {
-          if (action === 'approve') {
-            setAllUsers(prevUsers => {
-              const updatedUsers = prevUsers.map(u => 
-                u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
-              );
-              return updatedUsers;
-            });
-            // If the admin is approving their own transaction (simulation)
-            if (tx.userPhone === userPhone) setUserBalance(prev => prev + tx.amount);
-            return { ...tx, status: 'Completed' as const };
-          }
-          return { ...tx, status: 'Rejected' as const };
+    setTransactions(prevTxs => prevTxs.map(tx => {
+      if (tx.id === transactionId && tx.status === 'Pending') {
+        if (action === 'approve') {
+          setAllUsers(prevUsers => prevUsers.map(u => u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u));
+          if (tx.userPhone === userPhone) setUserBalance(prev => prev + tx.amount);
+          return { ...tx, status: 'Completed' as const };
         }
-        return tx;
-      });
-      return updated;
-    });
-  };
-
-  const deleteUser = (phone: string) => {
-    // Functional update ensures we work with the latest array
-    setAllUsers(prev => prev.filter(u => u.phone !== phone));
-    
-    // Force immediate localStorage update for robustness
-    const currentUsers = JSON.parse(localStorage.getItem('shabik_users') || '[]');
-    const filtered = currentUsers.filter((u: any) => u.phone !== phone);
-    localStorage.setItem('shabik_users', JSON.stringify(filtered));
-
-    // If deleting the current logged-in user
-    if (userPhone === phone) {
-      logout();
-    }
+        return { ...tx, status: 'Rejected' as const };
+      }
+      return tx;
+    }));
   };
 
   const requestPasswordReset = (phone: string) => {

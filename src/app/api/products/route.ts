@@ -11,23 +11,21 @@ export async function GET(request: Request) {
   const categoryId = searchParams.get('categoryId');
 
   try {
-    const targetEndpoint = `${AL_RAGHEB_BASE_URL}/client/api/products`;
-    
-    // Al-Ragheb API parameters
+    // هذه البيانات يجب تحديثها بالمفاتيح التي ستزودني بها
     const bodyData = {
       email: "ayhmbakyr213@gmail.com",
       username: "ayhmbakyr213@gmail.com",
       name: "ايهم باكير",
       user_id: 2225,
+      // أضف الـ Token هنا بمجرد إرساله
       category_id: categoryId ? Number(categoryId) : undefined
     };
 
-    const response = await fetch(targetEndpoint, {
+    const response = await fetch(`${AL_RAGHEB_BASE_URL}/client/api/products`, {
       method: 'POST', 
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       },
       body: JSON.stringify(bodyData),
       cache: 'no-store',
@@ -39,22 +37,20 @@ export async function GET(request: Request) {
 
     const data = await response.json();
     
-    // Al-Ragheb returns data in different shapes sometimes
+    // معالجة استجابة الراغب القياسية
     let products = [];
-    if (Array.isArray(data)) {
-      products = data;
-    } else if (data.data && Array.isArray(data.data)) {
-      products = data.data;
-    } else if (data.products && Array.isArray(data.products)) {
-      products = data.products;
+    if (data.status === "success" || data.data) {
+      products = data.data || data.products || data;
+    } else {
+      products = Array.isArray(data) ? data : (data.products || []);
     }
 
     return NextResponse.json(products);
 
   } catch (error: any) {
-    console.error("[AL-RAGHEB API PROXY ERROR]:", error.message);
+    console.error("[AL-RAGHEB PROXY ERROR]:", error.message);
     
-    // Robust Mock Data in case of failure
+    // بيانات وهمية متطورة في حال فشل الـ API (لحين وضع المفاتيح)
     const MOCK_DATA: Record<string, any[]> = {
       "2": [
         { id: 101, name: "ببجي موبايل 60 UC", price: 15000 },
@@ -65,18 +61,9 @@ export async function GET(request: Request) {
         { id: 201, name: "سيريتل 500 وحدة", price: 6500 },
         { id: 202, name: "سيريتل 1000 وحدة", price: 13000 },
         { id: 203, name: "MTN 500 وحدة", price: 6500 }
-      ],
-      "1": [
-        { id: 301, name: "لايكي 100 ماسة", price: 20000 },
-        { id: 302, name: "تيك توك 70 عملة", price: 18000 }
-      ],
-      "5": [
-        { id: 401, name: "جوجل بلاي 5$", price: 45000 },
-        { id: 402, name: "نتفليكس شهر", price: 35000 }
       ]
     };
 
-    const fallback = categoryId ? (MOCK_DATA[categoryId] || []) : [];
-    return NextResponse.json(fallback);
+    return NextResponse.json(categoryId ? (MOCK_DATA[categoryId] || []) : []);
   }
 }
