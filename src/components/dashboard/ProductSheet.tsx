@@ -50,7 +50,7 @@ export function ProductSheet({
     } catch (error: any) {
       toast({
         title: "خطأ في الاتصال",
-        description: "تأكد من الـ API Token في ملف .env ومن اتصال الإنترنت.",
+        description: "تأكد من الـ ALRAGHEB_TOKEN في ملف .env ومن اتصال الإنترنت.",
         variant: "destructive",
       });
     } finally {
@@ -61,14 +61,13 @@ export function ProductSheet({
   const filteredProducts = useMemo(() => {
     if (!allProducts.length) return [];
     
-    // فلترة ذكية ديناميكية: تبحث عن الكلمة المفتاحية في اسم المنتج أو اسم القسم
-    // يتم تحويل الكلمة المفتاحية (مثل PUBG) لتبحث في البيانات القادمة من الراغب بالإنجليزية
     const searchKey = filterValue.toLowerCase();
     
     return allProducts.filter(p => {
       const prodName = (p.name || "").toLowerCase();
       const catName = (p.category_name || "").toLowerCase();
       
+      // فلترة ذكية: تبحث عن الكلمة المفتاحية (مثلاً PUBG) في اسم المنتج أو اسم القسم
       return prodName.includes(searchKey) || catName.includes(searchKey);
     }).map(p => ({
       ...p,
@@ -118,7 +117,7 @@ export function ProductSheet({
               </Button>
             </div>
             <SheetDescription className="text-right text-xs">
-              أسعار مباشرة من الراغب + 4% عمولة
+              أسعار مباشرة من متجر الراغب + 4% عمولة
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -184,7 +183,7 @@ export function ProductSheet({
                   </div>
                   <div className="text-center px-6">
                     <p className="text-sm font-bold text-foreground">عذراً، لا توجد منتجات حالياً لهذا القسم</p>
-                    <p className="text-[10px] mt-1 opacity-70">تأكد من وجود رصيد في حسابك لدى الراغب، أو تأكد من الـ Token في ملف .env.</p>
+                    <p className="text-[10px] mt-1 opacity-70">تأكد من وضع التوكن الصحيح في ملف .env.</p>
                   </div>
                 </div>
               )}

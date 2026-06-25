@@ -61,6 +61,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
 
+  const logout = useCallback(() => {
+    setIsLoggedIn(false);
+    setUserPhone("");
+    setUserName("");
+    setUserBalance(0);
+    localStorage.removeItem('shabik_auth');
+  }, []);
+
   // تحميل البيانات عند بدء التشغيل
   useEffect(() => {
     const savedUsers = localStorage.getItem('shabik_users');
@@ -115,27 +123,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return { success: true, message: "تم إنشاء الحساب بنجاح" };
   };
 
-  const logout = () => {
-    setIsLoggedIn(false);
-    setUserPhone("");
-    setUserName("");
-    setUserBalance(0);
-    localStorage.removeItem('shabik_auth');
-  };
-
   // دالة الحذف القسرية والفورية
   const deleteUser = useCallback((phone: string) => {
     setAllUsers(currentUsers => {
       const updated = currentUsers.filter(u => u.phone !== phone);
-      // تحديث الذاكرة المحلية فوراً
       localStorage.setItem('shabik_users', JSON.stringify(updated));
-      return [...updated]; // ضمان تحديث الواجهة بمصفوفة جديدة
+      return [...updated];
     });
 
     if (userPhone === phone) {
       logout();
     }
-  }, [userPhone]);
+  }, [userPhone, logout]);
 
   const addBalance = (amount: number) => {
     setAllUsers(prev => {
@@ -171,7 +170,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             setAllUsers(prevUsers => {
               const newUsers = prevUsers.map(u => u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u);
               localStorage.setItem('shabik_users', JSON.stringify(newUsers));
-              // تحديث رصيد المستخدم الحالي إذا كان هو صاحب العملية
               if (tx.userPhone === userPhone) {
                 setUserBalance(prev => prev + tx.amount);
               }
