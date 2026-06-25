@@ -62,7 +62,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
 
-  // Initial Load
   useEffect(() => {
     const savedUsers = localStorage.getItem('shabik_users');
     const savedAuth = localStorage.getItem('shabik_auth');
@@ -124,15 +123,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('shabik_auth');
   };
 
-  // Improved Delete User - Immediate and Force Sync
+  // دالة حذف المستخدم الفورية والقسرية
   const deleteUser = (phone: string) => {
-    setAllUsers(prev => {
-      const updated = prev.filter(u => u.phone !== phone);
-      // Sync LocalStorage IMMEDIATELY
-      localStorage.setItem('shabik_users', JSON.stringify(updated));
-      return updated;
-    });
+    // 1. تحديث المصفوفة محلياً
+    const updatedUsers = allUsers.filter(u => u.phone !== phone);
+    
+    // 2. تحديث الحالة فوراً لإخفائه من الجدول
+    setAllUsers(updatedUsers);
+    
+    // 3. تحديث الذاكرة المحلية فوراً لمنع عودته
+    localStorage.setItem('shabik_users', JSON.stringify(updatedUsers));
 
+    // 4. إذا كان المستخدم المحذوف هو نفسه الحالي، قم بتسجيل الخروج
     if (userPhone === phone) {
       logout();
     }
@@ -164,7 +166,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const updatedTxs = transactions.map(tx => {
       if (tx.id === transactionId && tx.status === 'Pending') {
         if (action === 'approve') {
-          // Update user balance in allUsers and current state
           setAllUsers(prevUsers => {
             const newUsers = prevUsers.map(u => u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u);
             localStorage.setItem('shabik_users', JSON.stringify(newUsers));
