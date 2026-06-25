@@ -51,9 +51,10 @@ export default function PaymentsPage() {
       <header className="flex items-center justify-between p-4 bg-[#161a23] border-b border-gray-800 sticky top-0 z-40">
         <button 
           onClick={() => router.push('/dashboard')}
-          className="p-2 hover:bg-gray-800 rounded-full transition active:scale-90"
+          className="p-2 hover:bg-gray-800 rounded-full transition active:scale-90 flex items-center gap-1"
         >
           <ArrowRight className="h-6 w-6" />
+          <span className="text-[10px] font-bold">الرئيسية</span>
         </button>
         <h1 className="text-xl font-bold font-headline">دفعاتي المالية</h1>
         <div className="flex items-center gap-3">
