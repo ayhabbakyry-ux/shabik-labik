@@ -1,7 +1,6 @@
-
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 export type Transaction = {
   id: string;
@@ -62,6 +61,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
 
+  // تحميل البيانات عند بدء التشغيل
   useEffect(() => {
     const savedUsers = localStorage.getItem('shabik_users');
     const savedAuth = localStorage.getItem('shabik_auth');
@@ -123,27 +123,26 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('shabik_auth');
   };
 
-  // دالة حذف المستخدم الفورية والقسرية
-  const deleteUser = (phone: string) => {
-    // 1. تحديث المصفوفة محلياً
-    const updatedUsers = allUsers.filter(u => u.phone !== phone);
-    
-    // 2. تحديث الحالة فوراً لإخفائه من الجدول
-    setAllUsers(updatedUsers);
-    
-    // 3. تحديث الذاكرة المحلية فوراً لمنع عودته
-    localStorage.setItem('shabik_users', JSON.stringify(updatedUsers));
+  // دالة الحذف القسرية والفورية
+  const deleteUser = useCallback((phone: string) => {
+    setAllUsers(prevUsers => {
+      const updated = prevUsers.filter(u => u.phone !== phone);
+      // تحديث الذاكرة المحلية فوراً لمنع استعادة البيانات
+      localStorage.setItem('shabik_users', JSON.stringify(updated));
+      return updated;
+    });
 
-    // 4. إذا كان المستخدم المحذوف هو نفسه الحالي، قم بتسجيل الخروج
     if (userPhone === phone) {
       logout();
     }
-  };
+  }, [userPhone]);
 
   const addBalance = (amount: number) => {
-    const updatedUsers = allUsers.map(u => u.phone === userPhone ? { ...u, balance: u.balance + amount } : u);
-    setAllUsers(updatedUsers);
-    localStorage.setItem('shabik_users', JSON.stringify(updatedUsers));
+    setAllUsers(prev => {
+      const updated = prev.map(u => u.phone === userPhone ? { ...u, balance: u.balance + amount } : u);
+      localStorage.setItem('shabik_users', JSON.stringify(updated));
+      return updated;
+    });
     setUserBalance(prev => prev + amount);
   };
 
