@@ -62,9 +62,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
 
-  // 1. التحميل الأولي من الذاكرة المحلية
   useEffect(() => {
-    try {
+    const loadData = () => {
       const savedUsers = localStorage.getItem('shabik_users');
       const savedAuth = localStorage.getItem('shabik_auth');
       const savedTxs = localStorage.getItem('shabik_txs');
@@ -81,13 +80,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setUserName(authData.name);
         setUserBalance(authData.balance || 0);
       }
-    } catch (e) {
-      console.error("Error loading state", e);
-    }
-    setIsLoaded(true);
+      setIsLoaded(true);
+    };
+    loadData();
   }, []);
 
-  // 2. المزامنة المستمرة مع الذاكرة المحلية
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem('shabik_users', JSON.stringify(allUsers));
@@ -100,24 +97,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [transactions, isLoaded]);
 
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem('shabik_pass_reqs', JSON.stringify(passwordRequests));
-    }
-  }, [passwordRequests, isLoaded]);
-
   const login = (phone: string, password: string) => {
-    // دخول المدير
     if (phone === ADMIN_PHONE && password === ADMIN_PASS) {
+      const adminData = { phone, name: "المدير أيهم", balance: 0 };
       setIsLoggedIn(true);
       setUserPhone(phone);
       setUserName("المدير أيهم");
       setUserBalance(0);
-      localStorage.setItem('shabik_auth', JSON.stringify({ phone, name: "المدير أيهم", balance: 0 }));
+      localStorage.setItem('shabik_auth', JSON.stringify(adminData));
       return { success: true, message: "تم دخول المدير بنجاح" };
     }
 
-    // دخول المستخدمين العاديين (يجب أن يكون الحساب موجوداً)
     const user = allUsers.find(u => u.phone === phone);
     if (!user) return { success: false, message: "عذراً، هذا الرقم غير مسجل" };
     if (user.password !== password) return { success: false, message: "كلمة السر خاطئة" };
@@ -126,7 +116,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setUserPhone(phone);
     setUserName(user.name);
     setUserBalance(user.balance);
-    localStorage.setItem('shabik_auth', JSON.stringify({ phone: user.phone, name: user.name, balance: user.balance }));
+    localStorage.setItem('shabik_auth', JSON.stringify(user));
     return { success: true, message: "تم تسجيل الدخول بنجاح" };
   };
 
@@ -146,20 +136,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('shabik_auth');
   };
 
-  // دالة الحذف القهرية والمباشرة
-  const deleteUser = useCallback((phone: string) => {
+  const deleteUser = (phone: string) => {
+    // حذف قاطع وفوري من الحالة ومن الذاكرة المحلية
     setAllUsers(prev => {
-      const updated = prev.filter(u => u.phone !== phone);
-      // تحديث فوري للذاكرة المحلية لضمان القطعية
-      localStorage.setItem('shabik_users', JSON.stringify(updated));
-      return [...updated];
+      const filtered = prev.filter(u => u.phone !== phone);
+      localStorage.setItem('shabik_users', JSON.stringify(filtered));
+      return [...filtered];
     });
 
-    // إذا كان الحساب المحذوف هو المسجل حالياً، يتم تسجيل خروجه
     if (userPhone === phone) {
       logout();
     }
-  }, [userPhone]);
+  };
 
   const addBalance = (amount: number) => {
     setUserBalance(prev => prev + amount);

@@ -19,11 +19,11 @@ export function AdminPanel() {
   const pendingTxs = transactions.filter(t => t.status === 'Pending');
 
   const handleDelete = (phone: string) => {
-    if (window.confirm(`هل أنت متأكد من حذف الحساب (${phone}) نهائياً؟ لن يتمكن من الدخول مرة أخرى.`)) {
+    if (window.confirm(`هل أنت متأكد من حذف الحساب (${phone}) نهائياً؟`)) {
       deleteUser(phone);
       toast({
-        title: "تم الحذف النهائي",
-        description: `تم إزالة الحساب من النظام والذاكرة المحلية بنجاح.`,
+        title: "تم الحذف",
+        description: "تمت إزالة الحساب من النظام بنجاح.",
       });
     }
   };
@@ -94,7 +94,6 @@ export function AdminPanel() {
           <Card>
             <CardHeader>
               <CardTitle className="text-right">قائمة كافة المستخدمين</CardTitle>
-              <CardDescription className="text-right">عرض وحذف الحسابات المسجلة. الحذف هنا يمنع المستخدم من الدخول مرة أخرى.</CardDescription>
             </CardHeader>
             <CardContent>
               <Table dir="rtl">
@@ -119,7 +118,7 @@ export function AdminPanel() {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDelete(user.phone)}
-                          className="p-2 text-destructive hover:bg-destructive/10 rounded-full transition-all active:scale-90"
+                          className="p-2 text-destructive hover:bg-destructive/10 rounded-full transition-all"
                         >
                           <Trash2 className="h-5 w-5" />
                         </Button>

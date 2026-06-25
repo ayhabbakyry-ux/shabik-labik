@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   const categoryId = searchParams.get('categoryId');
 
   try {
-    // الاتصال بسيرفر الراغب باستخدام التوكن الموفر
+    // محاولة جلب المنتجات باستخدام طلب POST (وهو الشائع في أنظمة الراغب)
     const response = await fetch(`${AL_RAGHEB_BASE_URL}/api/products`, {
       method: 'POST', 
       headers: {
@@ -26,38 +26,25 @@ export async function GET(request: Request) {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[AL-RAGHEB API ERROR]:", response.status, errorText);
-      throw new Error(`API Connection Failed: ${response.status}`);
+      throw new Error(`API Error: ${response.status}`);
     }
 
     const data = await response.json();
     
-    // استخلاص المنتجات بناءً على هيكلية استجابة الراغب المتوقعة (data.data)
-    let products = [];
-    if (data.status === "success" || data.data) {
-      products = data.data || data.products || [];
-    } else {
-      products = Array.isArray(data) ? data : (data.products || []);
-    }
+    // استخراج المنتجات حسب هيكلية الراغب (غالباً تكون في data.data أو data)
+    const products = data.data || data.products || (Array.isArray(data) ? data : []);
 
     return NextResponse.json(products);
 
   } catch (error: any) {
-    console.error("[AL-RAGHEB PROXY ERROR]:", error.message);
+    console.error("[API ERROR]:", error.message);
     
-    // بيانات تجريبية في حال فشل الاتصال لضمان عدم توقف الواجهة
-    const MOCK_DATA: Record<string, any[]> = {
-      "2": [
-        { id: 101, name: "ببجي موبايل 60 UC", price: 15000 },
-        { id: 102, name: "ببجي موبايل 325 UC", price: 65000 }
-      ],
-      "6": [
-        { id: 201, name: "سيريتل 500 وحدة", price: 6500 },
-        { id: 202, name: "سيريتل 1000 وحدة", price: 13000 }
-      ]
-    };
-
-    return NextResponse.json(categoryId ? (MOCK_DATA[categoryId] || []) : []);
+    // بيانات احتياطية لضمان عمل الواجهة في حال وجود مشكلة تقنية مؤقتة
+    const fallbackData = [
+      { id: 1, name: "منتج تجريبي 1", price: 1000 },
+      { id: 2, name: "منتج تجريبي 2", price: 2000 }
+    ];
+    
+    return NextResponse.json([]);
   }
 }
