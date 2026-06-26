@@ -64,7 +64,6 @@ export default function WalletPage() {
         
         {/* Card Row */}
         <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 snap-x snap-mandatory">
-          {/* New Balance Card Design */}
           <div className="min-w-[85%] sm:min-w-[300px] flex flex-col items-center justify-center bg-green-500 p-6 rounded-2xl snap-center shadow-xl transition-transform active:scale-95 group">
             <img 
               src={logoImage?.imageUrl} 

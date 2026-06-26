@@ -123,7 +123,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const remoteStatus = String(orderData?.الحالة || orderData?.status || "").trim();
 
         if (remoteStatus !== "" && !remoteStatus.includes("انتظار") && !remoteStatus.includes("معالجة")) {
-          // الشرط الذي طلبته لرصد التغيير في الـ Console
           console.log(`تم رصد تغيير حالة الطلب رقم ${order.external_order_id}، والحالة الجديدة هي ${remoteStatus}`);
           
           if (remoteStatus.includes('مقبول') || remoteStatus.includes('موافق') || remoteStatus.includes('القبول') || remoteStatus.includes('نجاح')) {

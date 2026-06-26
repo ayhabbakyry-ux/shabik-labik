@@ -81,7 +81,7 @@ export function ProductSheet({
     const price = Number(product.customerPrice);
 
     if (!targetId || !targetId.trim()) {
-      toast({ title: "حقل مطلوب", description: "يرجى إدخل المعرف المطلوب.", variant: "destructive" });
+      toast({ title: "حقل مطلوب", description: "يرجى إدخال المعرف المطلوب.", variant: "destructive" });
       return;
     }
 
@@ -108,6 +108,7 @@ export function ProductSheet({
       if (result.success) {
           const isPending = result.status_type === 'pending';
           
+          // خصم الرصيد وحجز العملية برقمها التسلسلي
           deductBalance(
             price, 
             `${product.name} - معرف اللاعب: ${targetId}`, 
@@ -146,7 +147,7 @@ export function ProductSheet({
               <SheetClose asChild>
                 <Button variant="ghost" size="sm" className="flex items-center gap-1 text-primary font-bold">
                   <ArrowRight className="h-4 w-4" />
-                  <span>رجوع</span>
+                  <span>رجوع للخدمات</span>
                 </Button>
               </SheetClose>
               <Button variant="ghost" size="icon" onClick={fetchProducts} disabled={fetching} className="rounded-full">

@@ -15,8 +15,6 @@ export async function POST(request: Request) {
         // بناء الرابط الديناميكي حسب التوثيق
         const ENDPOINT = `https://api.alragheb-store.com/client/api/newOrder/${product_id}/params?qty=${qty}&playerId=${playerId}&order_uuid=${order_uuid}`;
 
-        console.log("Requesting Al-Ragheb API:", ENDPOINT);
-
         const response = await fetch(ENDPOINT, {
             method: 'GET',
             headers: {
@@ -29,14 +27,11 @@ export async function POST(request: Request) {
 
         const data = await response.json();
         
-        // طباعة الرد بالكامل في سجلات السيرفر للتحقق
-        console.log('Raw API Response from Alragheb:', JSON.stringify(data));
-
-        // استخراج الحالة والرسالة وتحويلهما لنصوص
+        // استخراج الحالة والرسالة وتحويلهما لنصوص للفحص
         const statusValue = String(data["الحالة"] || data.status_text || data.status || "");
         const message = String(data["الرسالة"] || data.message || "");
         
-        console.log('Value of status is:', statusValue);
+        console.log('Status received from Alragheb:', statusValue);
 
         // استخدام الفحص الجزئي (includes) لضمان اكتشاف الكلمات في أي جزء من النص
         const isAccepted = statusValue.includes('مقبول') || statusValue.includes('موافق') || statusValue.includes('القبول');
