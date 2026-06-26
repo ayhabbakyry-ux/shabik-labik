@@ -107,7 +107,7 @@ export function ProductSheet({
       if (result.success) {
           const isPending = result.status_type === 'pending';
           
-          // خصم الرصيد مع تحديد الحالة (مكتمل أو معلق) وحفظ رقم الطلب
+          // حجز الرصيد وتخزين رقم الطلب الفعلي
           deductBalance(
             price, 
             `${product.name} - معرف اللاعب: ${targetId}`, 

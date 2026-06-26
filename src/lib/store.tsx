@@ -81,7 +81,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const savedPassReqs = localStorage.getItem('shabik_pass_reqs');
 
     let parsedUsers = savedUsers ? JSON.parse(savedUsers) : [];
-    // Force clear any suspicious balances
     parsedUsers = parsedUsers.map((u: any) => (u.balance >= 999999 || isNaN(u.balance)) ? { ...u, balance: 0 } : u);
     setAllUsers(parsedUsers);
 
@@ -165,22 +164,22 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  // نظام الاسترداد (Refund): يعيد الرصيد للمستخدم ويغير حالة الطلب لمرفوض
   const refundBalance = (transactionId: string) => {
-    const tx = transactions.find(t => t.id === transactionId);
-    if (!tx || tx.status !== 'Pending') return;
+    setTransactions(prevTxs => {
+      const tx = prevTxs.find(t => t.id === transactionId);
+      if (!tx || tx.status !== 'Pending') return prevTxs;
 
-    setAllUsers(prev => {
-      const updated = prev.map(u => u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u);
-      localStorage.setItem('shabik_users', JSON.stringify(updated));
-      return updated;
-    });
-    
-    if (tx.userPhone === userPhone) setUserBalance(prev => prev + tx.amount);
+      setAllUsers(prevUsers => {
+        const updatedUsers = prevUsers.map(u => u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u);
+        localStorage.setItem('shabik_users', JSON.stringify(updatedUsers));
+        if (tx.userPhone === userPhone) setUserBalance(prev => prev + tx.amount);
+        return updatedUsers;
+      });
 
-    setTransactions(prev => {
-      const updated = prev.map(t => t.id === transactionId ? { ...t, status: 'Rejected' as const } : t);
-      localStorage.setItem('shabik_txs', JSON.stringify(updated));
-      return updated;
+      const updatedTxs = prevTxs.map(t => t.id === transactionId ? { ...t, status: 'Rejected' as const } : t);
+      localStorage.setItem('shabik_txs', JSON.stringify(updatedTxs));
+      return updatedTxs;
     });
   };
 

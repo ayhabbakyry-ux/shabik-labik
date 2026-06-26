@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 
 /**
@@ -39,12 +40,12 @@ export async function POST(request: Request) {
         console.log('Value of status is:', statusValue);
 
         // استخدام الفحص الجزئي (includes) لضمان اكتشاف الكلمات في أي جزء من النص
-        // هذا الشرط يغطي: "مقبول", "موافق", "القبول", "انتظار", "معالجة"
         const isAccepted = statusValue.includes('مقبول') || statusValue.includes('موافق') || statusValue.includes('القبول');
         const isWaiting = statusValue.includes('انتظار') || statusValue.includes('معالجة');
         const isMsgSuccess = message.includes('بنجاح') || message.includes('انتظار') || message.includes('مقبول');
 
         if (isAccepted || isWaiting || isMsgSuccess) {
+            // تحديد نوع الحالة بناءً على رد السيرفر
             const finalIsWaiting = isWaiting || message.includes('انتظار');
             
             return NextResponse.json({ 
