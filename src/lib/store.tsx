@@ -80,6 +80,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const tx = prevTxs.find(t => t.id === transactionId);
       if (!tx || tx.status !== 'Pending') return prevTxs;
 
+      // إرجاع الرصيد للمستخدم
       setAllUsers(prevUsers => {
         const updatedUsers = prevUsers.map(u => 
           u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
@@ -91,6 +92,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         return updatedUsers;
       });
 
+      // تحديث حالة المعاملة إلى مرفوض
       const updatedTxs = prevTxs.map(t => 
         t.id === transactionId ? { ...t, status: 'Rejected' as const } : t
       );
@@ -118,10 +120,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         
         // التحقق من الحقل "الحالة" أو "status" من رد الراغب
         const orderData = Array.isArray(data) ? data[0] : (data[order.external_order_id!] || data);
-        const remoteStatus = String(orderData?.الحالة || orderData?.status || "").toLowerCase();
+        const remoteStatus = String(orderData?.الحالة || orderData?.status || "").trim();
 
         if (remoteStatus !== "" && !remoteStatus.includes("انتظار") && !remoteStatus.includes("معالجة")) {
-          // الشرط الذي طلبته لرصد التغيير
+          // الشرط الذي طلبته لرصد التغيير في الـ Console
           console.log(`تم رصد تغيير حالة الطلب رقم ${order.external_order_id}، والحالة الجديدة هي ${remoteStatus}`);
           
           if (remoteStatus.includes('مقبول') || remoteStatus.includes('موافق') || remoteStatus.includes('القبول') || remoteStatus.includes('نجاح')) {
@@ -160,11 +162,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // نظام المراقبة الآلية كل دقيقة
   useEffect(() => {
     if (isLoggedIn && transactions.some(t => t.status === 'Pending' && t.external_order_id)) {
       const interval = setInterval(() => {
         checkPendingOrders();
-      }, 60000); // فحص كل دقيقة واحدة
+      }, 60000); 
       return () => clearInterval(interval);
     }
   }, [isLoggedIn, transactions, checkPendingOrders]);
