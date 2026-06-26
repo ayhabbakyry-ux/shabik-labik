@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار تنفيذ طلبات الشحن الذكي مع معالجة الهيكلية العميقة وتصحيح أخطاء التايب سكريبت.
+ * @fileOverview مسار تنفيذ طلبات الشحن الذكي مع معالجة الهيكلية العميقة الصارمة.
+ * يضمن عدم إظهار خطأ إذا كان الرد الخارجي "موافق"، ويفحص الحالة الداخلية بدقة.
  */
 export async function POST(request: Request) {
     const API_TOKEN = '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0';
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
             }
         }
 
-        // في حال الرفض الصريح
+        // في حال الرفض الصريح أو عدم استيفاء الشروط أعلاه
         return NextResponse.json({ 
             success: false, 
             message: message || `فشل التنفيذ. الحالة: ${innerStatus || outerStatus}`,

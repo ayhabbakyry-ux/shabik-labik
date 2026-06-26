@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار التحقق من حالة الطلبات المحدث للتعامل مع الهيكلية العميقة وتجنب أخطاء التايب سكريبت.
+ * @fileOverview مسار التحقق من حالة الطلبات المحدث للتعامل مع الهيكلية العميقة.
  */
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
