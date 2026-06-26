@@ -35,10 +35,11 @@ export async function POST(request: Request) {
         const statusValue = String(data["الحالة"] || data.status_text || data.status || "");
         const message = String(data["الرسالة"] || data.message || "");
         
-        // طباعة القيمة الدقيقة المطلوبة في سجلات Vercel
+        // طباعة القيمة الدقيقة المطلوبة في سجلات Vercel كما طلبت
         console.log('Value of status is:', statusValue);
 
-        // استخدام الفحص الجزئي (includes) كما طلبت لضمان اكتشاف الكلمات في أي جزء من النص
+        // استخدام الفحص الجزئي (includes) لضمان اكتشاف الكلمات في أي جزء من النص
+        // هذا الشرط يغطي: "مقبول", "موافق", "القبول", "انتظار", "معالجة"
         const isAccepted = statusValue.includes('مقبول') || statusValue.includes('موافق') || statusValue.includes('القبول');
         const isWaiting = statusValue.includes('انتظار') || statusValue.includes('معالجة');
         const isMsgSuccess = message.includes('بنجاح') || message.includes('انتظار') || message.includes('مقبول');
