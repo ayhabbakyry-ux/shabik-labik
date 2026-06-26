@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار تنفيذ طلبات الشحن المطور للتعامل مع حالات النجاح والانتظار باستخدام مصفوفة الحالات.
+ * @fileOverview مسار تنفيذ طلبات الشحن المطور للتعامل مع حالات النجاح والانتظار باستخدام الفحص الجزئي للنصوص لضمان الدقة.
  */
 export async function POST(request: Request) {
     const API_TOKEN = '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0';
@@ -28,26 +28,28 @@ export async function POST(request: Request) {
 
         const data = await response.json();
         
-        // طباعة الرد بالكامل في سجلات السيرفر كما طلبت للتحقق من الكلمة الدقيقة
+        // طباعة الرد بالكامل في سجلات السيرفر للتحقق
         console.log('Raw API Response from Alragheb:', JSON.stringify(data));
 
-        // استخراج الحالة من المفاتيح الممكنة (العربية والإنجليزية)
-        const statusValue = data["الحالة"] || data.status_text || data.status || "";
-        const message = data["الرسالة"] || data.message || "";
+        // استخراج الحالة والرسالة وتحويلهما لنصوص
+        const statusValue = String(data["الحالة"] || data.status_text || data.status || "");
+        const message = String(data["الرسالة"] || data.message || "");
         
-        console.log('Status received from Alragheb:', statusValue);
+        // طباعة القيمة الدقيقة المطلوبة في سجلات Vercel
+        console.log('Value of status is:', statusValue);
 
-        // مصفوفة حالات النجاح (تشمل القبول والانتظار)
-        const successStatuses = ['القبول', 'موافق', 'انتظار', 'معالجة', 'مقبول'];
-        
-        // التحقق من وجود الحالة المستلمة ضمن مصفوفة النجاح
-        if (successStatuses.includes(statusValue) || message.includes("انتظار") || message.includes("بنجاح")) {
-            const isWaiting = statusValue === 'انتظار' || statusValue === 'معالجة' || message.includes("انتظار");
+        // استخدام الفحص الجزئي (includes) كما طلبت لضمان اكتشاف الكلمات في أي جزء من النص
+        const isAccepted = statusValue.includes('مقبول') || statusValue.includes('موافق') || statusValue.includes('القبول');
+        const isWaiting = statusValue.includes('انتظار') || statusValue.includes('معالجة');
+        const isMsgSuccess = message.includes('بنجاح') || message.includes('انتظار') || message.includes('مقبول');
+
+        if (isAccepted || isWaiting || isMsgSuccess) {
+            const finalIsWaiting = isWaiting || message.includes('انتظار');
             
             return NextResponse.json({ 
                 success: true, 
-                status_type: isWaiting ? 'pending' : 'completed',
-                message: isWaiting ? 'تم استلام الطلب بنجاح وهو قيد المعالجة' : 'تم الشحن بنجاح!', 
+                status_type: finalIsWaiting ? 'pending' : 'completed',
+                message: finalIsWaiting ? 'تم استلام الطلب بنجاح وهو قيد المعالجة' : 'تم الشحن بنجاح!', 
                 order_id: data.order_id || data.id || order_uuid,
                 raw_status: statusValue
             });
