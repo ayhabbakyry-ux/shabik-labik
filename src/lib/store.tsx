@@ -116,16 +116,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const response = await fetch(`/api/check-order?order_id=${order.external_order_id}`);
         const data = await response.json();
         
+        // التحقق من الحقل "الحالة" أو "status" من رد الراغب
         const orderData = Array.isArray(data) ? data[0] : (data[order.external_order_id!] || data);
         const remoteStatus = String(orderData?.الحالة || orderData?.status || "").toLowerCase();
 
-        if (remoteStatus !== "" && remoteStatus !== "انتظار") {
-          // تم رصد تغيير حالة الطلب رقم X، والحالة الجديدة هي Y
+        if (remoteStatus !== "" && !remoteStatus.includes("انتظار") && !remoteStatus.includes("معالجة")) {
+          // الشرط الذي طلبته لرصد التغيير
           console.log(`تم رصد تغيير حالة الطلب رقم ${order.external_order_id}، والحالة الجديدة هي ${remoteStatus}`);
           
-          if (remoteStatus.includes('مقبول') || remoteStatus.includes('موافق')) {
+          if (remoteStatus.includes('مقبول') || remoteStatus.includes('موافق') || remoteStatus.includes('القبول') || remoteStatus.includes('نجاح')) {
             updateTransactionStatus(order.id, 'Completed');
-          } else if (remoteStatus.includes('مرفوض') || remoteStatus.includes('فشل')) {
+          } else if (remoteStatus.includes('مرفوض') || remoteStatus.includes('فشل') || remoteStatus.includes('الغاء')) {
             refundBalance(order.id);
           }
         }
@@ -160,10 +161,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (isLoggedIn && transactions.some(t => t.status === 'Pending')) {
+    if (isLoggedIn && transactions.some(t => t.status === 'Pending' && t.external_order_id)) {
       const interval = setInterval(() => {
         checkPendingOrders();
-      }, 60000); // الفحص كل دقيقة واحدة
+      }, 60000); // فحص كل دقيقة واحدة
       return () => clearInterval(interval);
     }
   }, [isLoggedIn, transactions, checkPendingOrders]);

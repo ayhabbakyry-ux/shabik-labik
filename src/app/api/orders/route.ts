@@ -36,7 +36,6 @@ export async function POST(request: Request) {
         const statusValue = String(data["الحالة"] || data.status_text || data.status || "");
         const message = String(data["الرسالة"] || data.message || "");
         
-        // طباعة القيمة الدقيقة المطلوبة في سجلات Vercel كما طلبت
         console.log('Value of status is:', statusValue);
 
         // استخدام الفحص الجزئي (includes) لضمان اكتشاف الكلمات في أي جزء من النص
