@@ -45,9 +45,16 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
     setIsRefreshing(true);
     try {
       await checkPendingOrders();
-      toast({ title: "تم التحديث", description: "تم فحص حالة جميع الطلبات المعلقة." });
+      toast({ 
+        title: "تم التحديث", 
+        description: "تم فحص حالة جميع الطلبات المعلقة وتحديث الأرصدة إذا لزم الأمر." 
+      });
     } catch (error) {
-      toast({ variant: "destructive", title: "فشل التحديث", description: "تعذر الاتصال بسيرفر التحقق." });
+      toast({ 
+        variant: "destructive", 
+        title: "فشل التحديث", 
+        description: "تعذر الاتصال بسيرفر التحقق حالياً." 
+      });
     } finally {
       setIsRefreshing(false);
     }
@@ -62,7 +69,10 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
   };
 
   const filteredTransactions = transactions.filter(tx => 
-    tx.type.includes(searchQuery) || (tx.details || '').includes(searchQuery) || tx.id.includes(searchQuery)
+    tx.type.includes(searchQuery) || 
+    (tx.details || '').includes(searchQuery) || 
+    tx.id.includes(searchQuery) ||
+    (tx.external_order_id || '').includes(searchQuery)
   );
 
   return (
@@ -102,7 +112,7 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
               <div className="flex-1 flex items-center gap-3 bg-[#161a23] border border-gray-800 rounded-full px-4 py-1 shadow-inner">
                 <input
                   type="text"
-                  placeholder="ابحث في سجل طلباتك..."
+                  placeholder="ابحث برقم الطلب أو الخدمة..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="bg-transparent text-right w-full focus:outline-none text-sm text-gray-200 pr-2 h-10"
@@ -123,7 +133,7 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
               {filteredTransactions.length === 0 ? (
                 <div className="flex flex-col items-center justify-center pt-16 space-y-4">
                    <AlertCircle className="h-12 w-12 text-gray-600 opacity-20" />
-                   <p className="text-gray-400 font-bold">لا توجد طلبات تطابق بحثك</p>
+                   <p className="text-gray-400 font-bold">لا توجد طلبات حالياً</p>
                 </div>
               ) : (
                 filteredTransactions.map((tx) => {
@@ -135,10 +145,25 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
                           <p className="font-bold text-sm text-primary">{tx.type}</p>
                           <p className="text-[10px] text-gray-400 font-mono">{tx.date}</p>
                           <p className="text-[11px] text-gray-300 font-medium leading-relaxed">{tx.details}</p>
+                          {tx.external_order_id && (
+                            <p className="text-[9px] text-muted-foreground font-mono mt-1">Provider ID: {tx.external_order_id}</p>
+                          )}
                         </div>
-                        <Badge className={`${status.color} text-white font-bold text-[10px]`}>
-                          {status.icon} <span className="mr-1">{status.text}</span>
-                        </Badge>
+                        <div className="flex flex-col items-end gap-2">
+                          <Badge className={`${status.color} text-white font-bold text-[10px]`}>
+                            {status.icon} <span className="mr-1">{status.text}</span>
+                          </Badge>
+                          {tx.status === 'Pending' && tx.external_order_id && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-7 text-[9px] font-bold text-primary hover:bg-primary/10 rounded-lg border border-primary/20"
+                              onClick={handleManualRefresh}
+                            >
+                              تحديث الحالة
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       <div className="bg-black/20 p-3 px-4 flex justify-between items-center border-t border-gray-800/50">
                         <div className="flex items-center gap-1 text-[10px] text-gray-500 font-mono">

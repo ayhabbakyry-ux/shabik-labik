@@ -35,6 +35,7 @@ export async function GET(request: Request) {
         // سيرفر الراغب قد يرجع مصفوفة أو كائن مفتاحه هو رقم الطلب
         const orderInfo = Array.isArray(data) ? data[0] : (data[orderId] || data);
 
+        // نقوم بتمرير الحالة كما هي ليقوم الـ Store بمعالجتها
         return NextResponse.json({
             success: true,
             order_id: orderId,
@@ -43,6 +44,7 @@ export async function GET(request: Request) {
         });
 
     } catch (error: any) {
+        console.error("Check Order API Crash:", error);
         return NextResponse.json({ success: false, message: 'خطأ في معالجة طلب الفحص' });
     }
 }
