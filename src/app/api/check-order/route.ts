@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار التحقق من حالة الطلبات من سيرفر الراغب.
+ * @fileOverview مسار التحقق من حالة الطلبات من سيرفر الراغب مع دعم CORS والكاش المعطل.
  */
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -14,7 +14,6 @@ export async function GET(request: Request) {
     }
 
     try {
-        // بناء رابط التحقق حسب التوثيق
         const ENDPOINT = `https://api.alragheb-store.com/client/api/check?orders=${orderId}`;
 
         const response = await fetch(ENDPOINT, {
@@ -26,10 +25,11 @@ export async function GET(request: Request) {
             cache: 'no-store'
         });
 
+        if (!response.ok) {
+          return NextResponse.json({ success: false, message: 'فشل السيرفر في الاستجابة' });
+        }
+
         const data = await response.json();
-        
-        // سيرفر الراغب يعيد مصفوفة من الطلبات في حال استخدام ?orders=id1,id2
-        // أو كائن واحد إذا كان طلباً واحداً. سنقوم بمعالجة النتيجة.
         return NextResponse.json(data);
 
     } catch (error: any) {

@@ -75,21 +75,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('shabik_auth');
   }, []);
 
-  // دالة الاسترداد (Refund) التي طلبتها
   const refundBalance = useCallback((transactionId: string) => {
     setTransactions(prevTxs => {
       const tx = prevTxs.find(t => t.id === transactionId);
-      // الاسترداد مسموح فقط للطلبات المعلقة التي تم رفضها من المزود
       if (!tx || tx.status !== 'Pending') return prevTxs;
-
-      console.log(`Issuing refund for transaction ${transactionId} - Amount: ${tx.amount}`);
 
       setAllUsers(prevUsers => {
         const updatedUsers = prevUsers.map(u => 
           u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
         );
         localStorage.setItem('shabik_users', JSON.stringify(updatedUsers));
-        // إذا كان المستخدم الحالي هو صاحب الطلب، نحدث رصيده في الواجهة فوراً
         if (tx.userPhone === userPhone) {
           setUserBalance(prev => prev + tx.amount);
         }
@@ -112,26 +107,27 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // دالة الأتمتة لفحص الطلبات المعلقة
   const checkPendingOrders = useCallback(async () => {
     const pendingOrders = transactions.filter(t => t.status === 'Pending' && t.external_order_id);
     if (pendingOrders.length === 0) return;
-
-    console.log(`Checking status for ${pendingOrders.length} pending orders...`);
 
     for (const order of pendingOrders) {
       try {
         const response = await fetch(`/api/check-order?order_id=${order.external_order_id}`);
         const data = await response.json();
         
-        // معالجة رد الراغب (الرد يكون مصفوفة عادةً)
         const orderData = Array.isArray(data) ? data[0] : (data[order.external_order_id!] || data);
         const remoteStatus = String(orderData?.الحالة || orderData?.status || "").toLowerCase();
 
-        if (remoteStatus.includes('مقبول') || remoteStatus.includes('موافق')) {
-          updateTransactionStatus(order.id, 'Completed');
-        } else if (remoteStatus.includes('مرفوض') || remoteStatus.includes('فشل')) {
-          refundBalance(order.id);
+        if (remoteStatus !== "" && remoteStatus !== "انتظار") {
+          // تم رصد تغيير حالة الطلب رقم X، والحالة الجديدة هي Y
+          console.log(`تم رصد تغيير حالة الطلب رقم ${order.external_order_id}، والحالة الجديدة هي ${remoteStatus}`);
+          
+          if (remoteStatus.includes('مقبول') || remoteStatus.includes('موافق')) {
+            updateTransactionStatus(order.id, 'Completed');
+          } else if (remoteStatus.includes('مرفوض') || remoteStatus.includes('فشل')) {
+            refundBalance(order.id);
+          }
         }
       } catch (error) {
         console.error("Error polling order:", order.id, error);
@@ -163,12 +159,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // تفعيل نظام الأتمتة (كل دقيقتين)
   useEffect(() => {
-    if (isLoggedIn && transactions.length > 0) {
+    if (isLoggedIn && transactions.some(t => t.status === 'Pending')) {
       const interval = setInterval(() => {
         checkPendingOrders();
-      }, 120000); // 120 ثانية
+      }, 60000); // الفحص كل دقيقة واحدة
       return () => clearInterval(interval);
     }
   }, [isLoggedIn, transactions, checkPendingOrders]);
