@@ -2,10 +2,10 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار تنفيذ طلبات الشحن المطور.
+ * @fileOverview مسار تنفيذ طلبات الشحن المطور والذكي.
  * تم تعديل المنطق ليتوافق مع هيكلية الرد العميقة لسيرفر الراغب:
- * - الحالة الخارجية: data["الحالة"] (عادة تكون 'موافق')
- * - الحالة الداخلية: data["بيانات"]["الحالة"] (القبول، انتظار، إلخ)
+ * 1. الحالة الخارجية: data["الحالة"] (إذا كانت 'موافق' ننتقل للفحص الداخلي).
+ * 2. الحالة الداخلية: data["بيانات"]["الحالة"] (القبول، انتظار، إلخ).
  */
 export async function POST(request: Request) {
     const API_TOKEN = '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0';
@@ -29,42 +29,46 @@ export async function POST(request: Request) {
 
         const data = await response.json();
         
-        // طباعة الرد الخام بالكامل للتدقيق في سجلات Vercel
+        // طباعة الرد الخام بالكامل للتدقيق في سجلات الخادم
         console.log('Full Raw Response from Alragheb:', JSON.stringify(data));
 
-        // استخراج الحالات بناءً على التوثيق الجديد
+        // استخراج الحالات بناءً على التوثيق الفني العميق
         const outerStatus = String(data["الحالة"] || "");
         const innerData = data["بيانات"];
         const innerStatus = innerData ? String(innerData["الحالة"] || "") : "";
         const message = String(data["الرسالة"] || "");
         
-        // الحالة الحقيقية التي سنعتمد عليها هي الداخلية، ونعود للخارجية إذا فقدت
-        const actualStatus = innerStatus || outerStatus;
+        console.log(`Processing Order - Outer: [${outerStatus}] | Inner: [${innerStatus}]`);
 
-        console.log('Processing Status - Outer:', outerStatus, '| Inner:', innerStatus);
-
-        // فحص النجاح أو الانتظار بناءً على الكلمات المفتاحية الدقيقة
-        const isAccepted = actualStatus.includes('القبول') || actualStatus.includes('مقبول') || actualStatus.includes('موافق');
-        const isWaiting = actualStatus.includes('انتظار') || actualStatus.includes('ينتظر') || actualStatus.includes('معالجة');
-        const isMsgSuccess = message.includes('بنجاح') || message.includes('استلام');
-
-        if (isAccepted || isWaiting || isMsgSuccess) {
-            const finalStatusType = isWaiting ? 'pending' : 'completed';
+        // المنطق المالي الذكي:
+        // 1. إذا كانت الحالة الخارجية "موافق"، لا نظهر خطأ أبداً وننتقل للفحص الداخلي
+        if (outerStatus.includes('موافق')) {
             
-            return NextResponse.json({ 
-                success: true, 
-                status_type: finalStatusType,
-                message: isWaiting ? 'تم استلام الطلب بنجاح وهو قيد المعالجة' : 'تمت العملية بنجاح!', 
-                order_id: data.order_id || (innerData && innerData.id) || order_uuid,
-                raw_status: actualStatus
-            });
+            // فحص الحالة الداخلية
+            const isAccepted = innerStatus.includes('القبول') || innerStatus.includes('مقبول');
+            const isWaiting = innerStatus.includes('انتظار') || innerStatus.includes('ينتظر') || innerStatus.includes('معالجة');
+            const isMsgSuccess = message.includes('بنجاح') || message.includes('استلام');
+
+            if (isAccepted || isWaiting || isMsgSuccess) {
+                // نحدد إذا كان الطلب مكتملاً أم يحتاج لمراقبة (Pending)
+                // إذا كان 'انتظار' أو 'ينتظر' نضعه في حالة pending
+                const finalStatusType = isWaiting ? 'pending' : 'completed';
+                
+                return NextResponse.json({ 
+                    success: true, 
+                    status_type: finalStatusType,
+                    message: isWaiting ? 'تم استلام الطلب وهو قيد المعالجة (انتظار)' : 'تم تنفيذ الطلب بنجاح!', 
+                    order_id: data.order_id || (innerData && innerData.id) || order_uuid,
+                    raw_status: innerStatus || outerStatus
+                });
+            }
         }
 
-        // فشل حقيقي
+        // في حال وجود حالة رفض صريحة أو فشل الاتصال
         return NextResponse.json({ 
             success: false, 
-            message: message || `فشل التنفيذ. الحالة: ${actualStatus}`,
-            raw_status: actualStatus
+            message: message || `فشل التنفيذ. الحالة: ${innerStatus || outerStatus}`,
+            raw_status: innerStatus || outerStatus
         });
 
     } catch (error: any) {

@@ -27,11 +27,14 @@ export async function GET(request: Request) {
 
         const data = await response.json();
         
-        // سيرفر الراغب قد يرجع مصفوفة أو كائن
+        // سيرفر الراغب قد يرجع مصفوفة أو كائن، نحاول استخراج المعلومات
         const orderInfo = Array.isArray(data) ? data[0] : (data[orderId] || data);
 
-        // استخراج الحالة العميقة
+        // استخراج الحالة العميقة من الرد
+        // نبحث عن "الحالة" داخل الكائن المستخرج
         const status = orderInfo?.["الحالة"] || orderInfo?.status || 'غير معروف';
+
+        console.log(`Polling Order [${orderId}] - Current Status: [${status}]`);
 
         return NextResponse.json({
             success: true,
