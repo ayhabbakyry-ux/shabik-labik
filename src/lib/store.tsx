@@ -48,6 +48,7 @@ type UserContextType = {
   deleteUser: (phone: string) => void;
   requestPasswordReset: (phone: string) => void;
   clearPasswordRequest: (phone: string) => void;
+  checkPendingOrders: () => Promise<void>;
   currency: string;
 };
 
@@ -74,6 +75,70 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('shabik_auth');
   }, []);
 
+  // دالة الاسترداد (Refund) التي طلبتها
+  const refundBalance = useCallback((transactionId: string) => {
+    setTransactions(prevTxs => {
+      const tx = prevTxs.find(t => t.id === transactionId);
+      // الاسترداد مسموح فقط للطلبات المعلقة التي تم رفضها من المزود
+      if (!tx || tx.status !== 'Pending') return prevTxs;
+
+      console.log(`Issuing refund for transaction ${transactionId} - Amount: ${tx.amount}`);
+
+      setAllUsers(prevUsers => {
+        const updatedUsers = prevUsers.map(u => 
+          u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
+        );
+        localStorage.setItem('shabik_users', JSON.stringify(updatedUsers));
+        // إذا كان المستخدم الحالي هو صاحب الطلب، نحدث رصيده في الواجهة فوراً
+        if (tx.userPhone === userPhone) {
+          setUserBalance(prev => prev + tx.amount);
+        }
+        return updatedUsers;
+      });
+
+      const updatedTxs = prevTxs.map(t => 
+        t.id === transactionId ? { ...t, status: 'Rejected' as const } : t
+      );
+      localStorage.setItem('shabik_txs', JSON.stringify(updatedTxs));
+      return updatedTxs;
+    });
+  }, [userPhone]);
+
+  const updateTransactionStatus = useCallback((transactionId: string, status: 'Completed' | 'Rejected', externalId?: string) => {
+    setTransactions(prev => {
+      const updated = prev.map(t => t.id === transactionId ? { ...t, status, external_order_id: externalId || t.external_order_id } : t);
+      localStorage.setItem('shabik_txs', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  // دالة الأتمتة لفحص الطلبات المعلقة
+  const checkPendingOrders = useCallback(async () => {
+    const pendingOrders = transactions.filter(t => t.status === 'Pending' && t.external_order_id);
+    if (pendingOrders.length === 0) return;
+
+    console.log(`Checking status for ${pendingOrders.length} pending orders...`);
+
+    for (const order of pendingOrders) {
+      try {
+        const response = await fetch(`/api/check-order?order_id=${order.external_order_id}`);
+        const data = await response.json();
+        
+        // معالجة رد الراغب (الرد يكون مصفوفة عادةً)
+        const orderData = Array.isArray(data) ? data[0] : (data[order.external_order_id!] || data);
+        const remoteStatus = String(orderData?.الحالة || orderData?.status || "").toLowerCase();
+
+        if (remoteStatus.includes('مقبول') || remoteStatus.includes('موافق')) {
+          updateTransactionStatus(order.id, 'Completed');
+        } else if (remoteStatus.includes('مرفوض') || remoteStatus.includes('فشل')) {
+          refundBalance(order.id);
+        }
+      } catch (error) {
+        console.error("Error polling order:", order.id, error);
+      }
+    }
+  }, [transactions, updateTransactionStatus, refundBalance]);
+
   useEffect(() => {
     const savedUsers = localStorage.getItem('shabik_users');
     const savedAuth = localStorage.getItem('shabik_auth');
@@ -81,7 +146,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const savedPassReqs = localStorage.getItem('shabik_pass_reqs');
 
     let parsedUsers = savedUsers ? JSON.parse(savedUsers) : [];
-    parsedUsers = parsedUsers.map((u: any) => (u.balance >= 999999 || isNaN(u.balance)) ? { ...u, balance: 0 } : u);
     setAllUsers(parsedUsers);
 
     if (savedTxs) setTransactions(JSON.parse(savedTxs));
@@ -98,6 +162,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, []);
+
+  // تفعيل نظام الأتمتة (كل دقيقتين)
+  useEffect(() => {
+    if (isLoggedIn && transactions.length > 0) {
+      const interval = setInterval(() => {
+        checkPendingOrders();
+      }, 120000); // 120 ثانية
+      return () => clearInterval(interval);
+    }
+  }, [isLoggedIn, transactions, checkPendingOrders]);
 
   const login = (phone: string, password: string) => {
     if (phone === ADMIN_PHONE && password === ADMIN_PASS) {
@@ -159,33 +233,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     };
     setTransactions(prev => {
       const updated = [newTx, ...prev];
-      localStorage.setItem('shabik_txs', JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  // نظام الاسترداد (Refund): يعيد الرصيد للمستخدم ويغير حالة الطلب لمرفوض
-  const refundBalance = (transactionId: string) => {
-    setTransactions(prevTxs => {
-      const tx = prevTxs.find(t => t.id === transactionId);
-      if (!tx || tx.status !== 'Pending') return prevTxs;
-
-      setAllUsers(prevUsers => {
-        const updatedUsers = prevUsers.map(u => u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u);
-        localStorage.setItem('shabik_users', JSON.stringify(updatedUsers));
-        if (tx.userPhone === userPhone) setUserBalance(prev => prev + tx.amount);
-        return updatedUsers;
-      });
-
-      const updatedTxs = prevTxs.map(t => t.id === transactionId ? { ...t, status: 'Rejected' as const } : t);
-      localStorage.setItem('shabik_txs', JSON.stringify(updatedTxs));
-      return updatedTxs;
-    });
-  };
-
-  const updateTransactionStatus = (transactionId: string, status: 'Completed' | 'Rejected', externalId?: string) => {
-    setTransactions(prev => {
-      const updated = prev.map(t => t.id === transactionId ? { ...t, status, external_order_id: externalId || t.external_order_id } : t);
       localStorage.setItem('shabik_txs', JSON.stringify(updated));
       return updated;
     });
@@ -260,7 +307,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   return (
     <UserContext.Provider value={{ 
       isLoggedIn, isAdmin, userPhone, userName, userBalance, transactions, allUsers, passwordRequests,
-      login, register, logout, addBalance, deductBalance, refundBalance, updateTransactionStatus, requestDeposit, adminAction, deleteUser, requestPasswordReset, clearPasswordRequest, currency
+      login, register, logout, addBalance, deductBalance, refundBalance, updateTransactionStatus, requestDeposit, adminAction, deleteUser, requestPasswordReset, clearPasswordRequest, checkPendingOrders, currency
     }}>
       {children}
     </UserContext.Provider>

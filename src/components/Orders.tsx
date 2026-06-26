@@ -8,12 +8,20 @@ import {
   ShieldCheck, 
   Search, 
   Bell,
-  Menu
+  Menu,
+  RefreshCw,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Hash,
+  AlertCircle
 } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Button } from '@/components/ui/button';
 import { Navbar } from '@/components/layout/Navbar';
-import { cn } from '@/lib/utils';
+import { useUser } from '@/lib/store';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 
 interface OrdersProps {
   initialTab?: 'orders' | 'notifications';
@@ -22,15 +30,40 @@ interface OrdersProps {
 export default function Orders({ initialTab = 'orders' }: OrdersProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
-  const [fromDate] = useState('2026-06-24');
-  const [toDate] = useState('2026-06-24');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { transactions, currency, checkPendingOrders } = useUser();
+  const { toast } = useToast();
   
   const [currentTab, setCurrentTab] = useState<'orders' | 'notifications'>(initialTab);
 
   useEffect(() => {
     setCurrentTab(initialTab);
   }, [initialTab]);
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await checkPendingOrders();
+      toast({ title: "تم التحديث", description: "تم فحص حالة جميع الطلبات المعلقة." });
+    } catch (error) {
+      toast({ variant: "destructive", title: "فشل التحديث", description: "تعذر الاتصال بسيرفر التحقق." });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case 'Completed': return { color: 'bg-green-600', text: 'مكتمل', icon: <CheckCircle2 className="h-4 w-4" /> };
+      case 'Rejected': return { color: 'bg-red-600', text: 'مرفوض', icon: <XCircle className="h-4 w-4" /> };
+      default: return { color: 'bg-orange-500', text: 'قيد الانتظار', icon: <Clock className="h-4 w-4" /> };
+    }
+  };
+
+  const filteredTransactions = transactions.filter(tx => 
+    tx.type.includes(searchQuery) || (tx.details || '').includes(searchQuery) || tx.id.includes(searchQuery)
+  );
 
   return (
     <div className="min-h-screen bg-[#11151d] text-white flex flex-col" dir="rtl">
@@ -65,58 +98,60 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
         
         {currentTab === 'orders' ? (
           <>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="relative">
-                <label className="absolute -top-2.5 right-4 bg-[#11151d] px-2 text-[10px] text-gray-400 z-10 font-bold">من</label>
-                <div className="bg-[#161a23] border border-gray-800 rounded-full px-4 py-3 flex items-center justify-center">
-                  <span className="text-center w-full font-mono text-sm text-white">{fromDate}</span>
-                </div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 flex items-center gap-3 bg-[#161a23] border border-gray-800 rounded-full px-4 py-1 shadow-inner">
+                <input
+                  type="text"
+                  placeholder="ابحث في سجل طلباتك..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-transparent text-right w-full focus:outline-none text-sm text-gray-200 pr-2 h-10"
+                />
+                <Search className="h-4 w-4 text-gray-500" />
               </div>
-
-              <div className="relative">
-                <label className="absolute -top-2.5 right-4 bg-[#11151d] px-2 text-[10px] text-gray-400 z-10 font-bold">إلى</label>
-                <div className="bg-[#161a23] border border-gray-800 rounded-full px-4 py-3 flex items-center justify-center">
-                  <span className="text-center w-full font-mono text-sm text-white">{toDate}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end">
               <Button 
+                onClick={handleManualRefresh}
+                disabled={isRefreshing}
                 size="icon" 
-                className="bg-[#0091ea] hover:bg-blue-600 h-12 w-12 rounded-full shadow-lg shadow-blue-900/20 active:scale-95 transition-all"
+                className="bg-primary hover:bg-primary/90 h-12 w-12 rounded-full shadow-lg shrink-0"
               >
-                <Search className="h-5 w-5 text-white stroke-[3px]" />
+                <RefreshCw className={`h-5 w-5 text-white ${isRefreshing ? 'animate-spin' : ''}`} />
               </Button>
             </div>
 
-            <div className="flex items-center gap-3 bg-[#161a23] border border-gray-800 rounded-full px-4 py-1 shadow-inner group focus-within:border-blue-500/50 transition-colors">
-              <input
-                type="text"
-                placeholder="بحث"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-transparent text-right w-full focus:outline-none text-sm text-gray-200 pr-2 h-10"
-              />
-              <button className="text-[#0091ea] p-1.5 hover:scale-110 transition-transform">
-                <Search className="h-5 w-5 stroke-[2.5px]" />
-              </button>
-            </div>
-
-            <div className="flex flex-col items-center justify-center pt-16 space-y-4">
-              <div className="relative w-28 h-28 opacity-60">
-                <div className="absolute inset-0 bg-gray-700 rounded-xl transform -rotate-6 border border-gray-600"></div>
-                <div className="absolute inset-0 bg-gray-100 rounded-xl border border-white flex flex-col p-3 shadow-2xl">
-                  <div className="w-10 h-2.5 bg-purple-500 rounded-full self-center -mt-5 mb-4 shadow-md"></div>
-                  <div className="w-full h-2 bg-gray-300 rounded-full mb-2"></div>
-                  <div className="w-full h-2 bg-gray-300 rounded-full mb-2"></div>
-                  <div className="w-2/3 h-2 bg-gray-300 rounded-full"></div>
+            <div className="space-y-4">
+              {filteredTransactions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center pt-16 space-y-4">
+                   <AlertCircle className="h-12 w-12 text-gray-600 opacity-20" />
+                   <p className="text-gray-400 font-bold">لا توجد طلبات تطابق بحثك</p>
                 </div>
-              </div>
-              <div className="text-center">
-                <p className="text-gray-400 font-bold text-lg font-headline">لا توجد عناصر</p>
-                <p className="text-gray-500 text-xs mt-1 font-body">لم يتم العثور على أي طلبات في هذه الفترة.</p>
-              </div>
+              ) : (
+                filteredTransactions.map((tx) => {
+                  const status = getStatusConfig(tx.status);
+                  return (
+                    <div key={tx.id} className="bg-[#1c232d] border border-gray-800 rounded-2xl overflow-hidden shadow-sm animate-in fade-in duration-500">
+                      <div className="p-4 flex justify-between items-start">
+                        <div className="text-right space-y-1">
+                          <p className="font-bold text-sm text-primary">{tx.type}</p>
+                          <p className="text-[10px] text-gray-400 font-mono">{tx.date}</p>
+                          <p className="text-[11px] text-gray-300 font-medium leading-relaxed">{tx.details}</p>
+                        </div>
+                        <Badge className={`${status.color} text-white font-bold text-[10px]`}>
+                          {status.icon} <span className="mr-1">{status.text}</span>
+                        </Badge>
+                      </div>
+                      <div className="bg-black/20 p-3 px-4 flex justify-between items-center border-t border-gray-800/50">
+                        <div className="flex items-center gap-1 text-[10px] text-gray-500 font-mono">
+                          <Hash className="h-3 w-3" /> {tx.id}
+                        </div>
+                        <p className="font-black text-lg">
+                          {tx.amount.toLocaleString()} <span className="text-[10px] font-medium">{currency}</span>
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </>
         ) : (
@@ -135,7 +170,6 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
 
       </main>
 
-      {/* Shared Bottom Navigation */}
       <Navbar />
 
     </div>
