@@ -25,7 +25,7 @@ export async function GET(request: Request) {
             cache: 'no-store'
         });
 
-        const data = await response.json();
+        const data = await response.json() as any;
         
         // استخراج المعلومات من الرد الذي قد يكون مصفوفة أو كائن
         const orderInfo = Array.isArray(data) ? data[0] : (data[orderId] || data);

@@ -27,12 +27,12 @@ export async function POST(request: Request) {
             cache: 'no-store'
         });
 
-        const data = await response.json();
+        const data = await response.json() as any;
         
         // طباعة الرد الخام بالكامل للتدقيق في سجلات الخادم
         console.log('Full Raw Response from Alragheb:', JSON.stringify(data));
 
-        // استخراج الحالات بناءً على التوثيق الفني العميق
+        // استخراج الحالات بناءً على التوثيق الفني العميق مع تحويلها لنصوص لضمان المقارنة
         const outerStatus = String(data["الحالة"] || "");
         const innerData = data["بيانات"];
         const innerStatus = innerData ? String(innerData["الحالة"] || "") : "";
