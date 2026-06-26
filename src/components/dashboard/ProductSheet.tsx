@@ -106,29 +106,31 @@ export function ProductSheet({
 
       if (result.success) {
           const isPending = result.status_type === 'pending';
-          // خصم الرصيد مع تحديد الحالة (مكتمل أو معلق)
+          
+          // خصم الرصيد مع تحديد الحالة (مكتمل أو معلق) وحفظ رقم الطلب
           deductBalance(
             price, 
-            `${product.name} - ID: ${targetId}`, 
+            `${product.name} - معرف اللاعب: ${targetId}`, 
             isPending ? 'Pending' : 'Completed',
             result.order_id
           );
 
           toast({ 
-            title: isPending ? "الطلب قيد المعالجة" : "نجاح العملية", 
+            title: isPending ? "الطلب قيد المعالجة" : "تمت العملية بنجاح", 
             description: result.message,
             className: isPending ? "bg-orange-500 text-white border-none" : "bg-green-600 text-white border-none"
           });
+          
           setTargetIds(prev => ({ ...prev, [product.id]: "" }));
       } else {
           toast({ 
-            title: "فشل الطلب", 
-            description: result.message || "المزود رفض الطلب، لم يتم خصم رصيد.",
+            title: "فشل تنفيذ الطلب", 
+            description: result.message || "المزود رفض الطلب، لم يتم خصم أي رصيد.",
             variant: "destructive" 
           });
       }
     } catch (error) {
-      toast({ title: "خطأ تقني", description: "تعذر الاتصال بسيرفر الشحن.", variant: "destructive" });
+      toast({ title: "خطأ تقني", description: "تعذر الاتصال بسيرفر الشحن حالياً.", variant: "destructive" });
     } finally {
       setOrdering(null);
     }

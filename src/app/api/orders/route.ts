@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار تنفيذ طلبات الشحن المطور لدعم حالات الانتظار واستخراج رقم الطلب.
+ * @fileOverview مسار تنفيذ طلبات الشحن المطور لدعم حالات الانتظار واستخراج رقم الطلب بدقة.
  */
 export async function POST(request: Request) {
     const API_TOKEN = '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0';
@@ -30,28 +30,32 @@ export async function POST(request: Request) {
         console.log("Raw API Response:", JSON.stringify(data));
 
         const statusText = data["الحالة"] || data.status_text || "";
+        const message = data["الرسالة"] || data.message || "";
         
-        // التحقق من النجاح أو الانتظار
+        // التحقق من الحالات المختلفة
         const isAccepted = statusText === "القبول" || statusText === "موافق";
-        const isWaiting = statusText === "انتظار";
+        const isWaiting = statusText === "انتظار" || statusText === "معالجة" || message.includes("انتظار") || message.includes("معالجة");
+        
+        // يعتبر الطلب ناجحاً إذا تم قبوله أو وضعه في الانتظار
         const isSuccess = data.status === 1 || data.status === 200 || data.success === true || isAccepted || isWaiting;
 
         if (!isSuccess) {
             return NextResponse.json({ 
                 success: false, 
-                message: data.message || data["الرسالة"] || "فشل تنفيذ الطلب من قبل المزود."
+                message: message || "فشل تنفيذ الطلب من قبل المزود."
             });
         }
 
         return NextResponse.json({ 
             success: true, 
-            status_type: isWaiting ? 'pending' : 'completed',
+            status_type: (isWaiting && !isAccepted) ? 'pending' : 'completed',
             message: isWaiting ? 'تم إرسال الطلب بنجاح وهو قيد التنفيذ' : 'تم الشحن بنجاح!', 
             order_id: data.order_id || data.id || order_uuid,
             raw_status: statusText
         });
 
     } catch (error: any) {
+        console.error("Order API Crash:", error);
         return NextResponse.json({ 
             success: false, 
             message: 'حدث خطأ في الاتصال بسيرفر الشحن.' 
