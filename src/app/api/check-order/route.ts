@@ -2,7 +2,8 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار التحقق من حالة الطلبات من سيرفر الراغب مع دعم CORS والكاش المعطل.
+ * @fileOverview مسار التحقق من حالة الطلبات من سيرفر الراغب.
+ * يستقبل order_id كمعلمة استعلام ويرجع الحالة الخام من السيرفر.
  */
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -26,13 +27,22 @@ export async function GET(request: Request) {
         });
 
         if (!response.ok) {
-          return NextResponse.json({ success: false, message: 'فشل السيرفر في الاستجابة' });
+            return NextResponse.json({ success: false, message: 'فشل الاتصال بسيرفر المزود' });
         }
 
         const data = await response.json();
-        return NextResponse.json(data);
+        
+        // سيرفر الراغب قد يرجع مصفوفة أو كائن مفتاحه هو رقم الطلب
+        const orderInfo = Array.isArray(data) ? data[0] : (data[orderId] || data);
+
+        return NextResponse.json({
+            success: true,
+            order_id: orderId,
+            status: orderInfo?.الحالة || orderInfo?.status || 'غير معروف',
+            raw: orderInfo
+        });
 
     } catch (error: any) {
-        return NextResponse.json({ success: false, message: 'خطأ في الاتصال بسيرفر التحقق' });
+        return NextResponse.json({ success: false, message: 'خطأ في معالجة طلب الفحص' });
     }
 }

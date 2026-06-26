@@ -67,20 +67,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
 
-  const logout = useCallback(() => {
-    setIsLoggedIn(false);
-    setUserPhone("");
-    setUserName("");
-    setUserBalance(0);
-    localStorage.removeItem('shabik_auth');
-  }, []);
-
+  // استرداد الرصيد المفقود
   const refundBalance = useCallback((transactionId: string) => {
     setTransactions(prevTxs => {
       const tx = prevTxs.find(t => t.id === transactionId);
       if (!tx || tx.status !== 'Pending') return prevTxs;
 
-      // إرجاع الرصيد للمستخدم
       setAllUsers(prevUsers => {
         const updatedUsers = prevUsers.map(u => 
           u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
@@ -92,7 +84,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         return updatedUsers;
       });
 
-      // تحديث حالة المعاملة إلى مرفوض
       const updatedTxs = prevTxs.map(t => 
         t.id === transactionId ? { ...t, status: 'Rejected' as const } : t
       );
@@ -109,6 +100,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // دالة الفحص اليدوي/التلقائي المحسنة
   const checkPendingOrders = useCallback(async () => {
     const pendingOrders = transactions.filter(t => t.status === 'Pending' && t.external_order_id);
     if (pendingOrders.length === 0) return;
@@ -118,21 +110,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const response = await fetch(`/api/check-order?order_id=${order.external_order_id}`);
         const data = await response.json();
         
-        // التحقق من الحقل "الحالة" أو "status" من رد الراغب
-        const orderData = Array.isArray(data) ? data[0] : (data[order.external_order_id!] || data);
-        const remoteStatus = String(orderData?.الحالة || orderData?.status || "").trim();
-
-        if (remoteStatus !== "" && !remoteStatus.includes("انتظار") && !remoteStatus.includes("معالجة")) {
-          console.log(`تم رصد تغيير حالة الطلب رقم ${order.external_order_id}، والحالة الجديدة هي ${remoteStatus}`);
+        if (data.success) {
+          const remoteStatus = String(data.status).trim();
           
-          if (remoteStatus.includes('مقبول') || remoteStatus.includes('موافق') || remoteStatus.includes('القبول') || remoteStatus.includes('نجاح')) {
-            updateTransactionStatus(order.id, 'Completed');
-          } else if (remoteStatus.includes('مرفوض') || remoteStatus.includes('فشل') || remoteStatus.includes('الغاء')) {
-            refundBalance(order.id);
+          if (remoteStatus !== "" && !remoteStatus.includes("انتظار") && !remoteStatus.includes("معالجة")) {
+             if (remoteStatus.includes('مقبول') || remoteStatus.includes('موافق') || remoteStatus.includes('نجاح')) {
+               updateTransactionStatus(order.id, 'Completed');
+             } else if (remoteStatus.includes('مرفوض') || remoteStatus.includes('فشل') || remoteStatus.includes('الغاء')) {
+               refundBalance(order.id);
+             }
           }
         }
       } catch (error) {
-        console.error("Error polling order:", order.id, error);
+        console.error("Error checking order:", order.external_order_id, error);
       }
     }
   }, [transactions, updateTransactionStatus, refundBalance]);
@@ -160,16 +150,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, []);
-
-  // نظام المراقبة الآلية كل دقيقة
-  useEffect(() => {
-    if (isLoggedIn && transactions.some(t => t.status === 'Pending' && t.external_order_id)) {
-      const interval = setInterval(() => {
-        checkPendingOrders();
-      }, 60000); 
-      return () => clearInterval(interval);
-    }
-  }, [isLoggedIn, transactions, checkPendingOrders]);
 
   const login = (phone: string, password: string) => {
     if (phone === ADMIN_PHONE && password === ADMIN_PASS) {
@@ -298,6 +278,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('shabik_pass_reqs', JSON.stringify(updated));
       return updated;
     });
+  };
+
+  const logout = () => {
+    setIsLoggedIn(false);
+    setUserPhone("");
+    setUserName("");
+    setUserBalance(0);
+    localStorage.removeItem('shabik_auth');
   };
 
   const isAdmin = userPhone === ADMIN_PHONE;
