@@ -1,8 +1,7 @@
-
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار التحقق من حالة الطلبات المحدث للتعامل مع الهيكلية العميقة.
+ * @fileOverview مسار التحقق من حالة الطلبات المحدث للتعامل مع الهيكلية العميقة وتجنب أخطاء التايب سكريبت.
  */
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -27,18 +26,18 @@ export async function GET(request: Request) {
 
         const data = await response.json() as any;
         
-        // استخراج المعلومات من الرد الذي قد يكون مصفوفة أو كائن
+        // استخراج المعلومات مع دعم تعدد الطلبات في المصفوفة
         const orderInfo = Array.isArray(data) ? data[0] : (data[orderId] || data);
 
-        // البحث عن الحالة في المسار العميق أو الجذري
-        const status = orderInfo?.["بيانات"]?.["الحالة"] || orderInfo?.["الحالة"] || orderInfo?.status || 'غير معروف';
+        // البحث عن الحالة في المسار العميق مع Casting
+        const deepStatus = orderInfo?.["بيانات"]?.["الحالة"] || orderInfo?.["الحالة"] || orderInfo?.status || 'غير معروف';
 
-        console.log(`Polling Order [${orderId}] - Deep Status: [${status}]`);
+        console.log(`Manual Polling Log - Order [${orderId}] -> Deep Status: [${deepStatus}]`);
 
         return NextResponse.json({
             success: true,
             order_id: orderId,
-            status: status,
+            status: deepStatus,
             raw: orderInfo
         });
 

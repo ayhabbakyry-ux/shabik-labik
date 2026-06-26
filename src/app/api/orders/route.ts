@@ -1,11 +1,7 @@
-
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار تنفيذ طلبات الشحن المطور والذكي.
- * تم تعديل المنطق ليتوافق مع هيكلية الرد العميقة لسيرفر الراغب:
- * 1. الحالة الخارجية: data["الحالة"] (إذا كانت 'موافق' ننتقل للفحص الداخلي).
- * 2. الحالة الداخلية: data["بيانات"]["الحالة"] (القبول، انتظار، إلخ).
+ * @fileOverview مسار تنفيذ طلبات الشحن الذكي مع معالجة الهيكلية العميقة وتصحيح أخطاء التايب سكريبت.
  */
 export async function POST(request: Request) {
     const API_TOKEN = '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0';
@@ -29,22 +25,21 @@ export async function POST(request: Request) {
 
         const data = await response.json() as any;
         
-        // طباعة الرد الخام بالكامل للتدقيق في سجلات الخادم
-        console.log('Full Raw Response from Alragheb:', JSON.stringify(data));
+        // تسجيل الرد الكامل للمراقبة
+        console.log('Alragheb API Raw Response:', JSON.stringify(data));
 
-        // استخراج الحالات بناءً على التوثيق الفني العميق مع تحويلها لنصوص لضمان المقارنة
+        // استخراج الحالات من الهيكلية العميقة مع التحويل لنصوص لتجنب أخطاء النوع
         const outerStatus = String(data["الحالة"] || "");
         const innerData = data["بيانات"];
         const innerStatus = innerData ? String(innerData["الحالة"] || "") : "";
         const message = String(data["الرسالة"] || "");
         
-        console.log(`Processing Order - Outer: [${outerStatus}] | Inner: [${innerStatus}]`);
+        console.log(`Final Decision Logic - Outer: [${outerStatus}] | Inner: [${innerStatus}]`);
 
-        // المنطق المالي الذكي:
-        // إذا كانت الحالة الخارجية "موافق"، لا نظهر خطأ أبداً وننتقل للفحص الداخلي
+        // المنطق المالي الصارم: إذا كانت الحالة الخارجية موافق، لا نرمي خطأ أبداً
         if (outerStatus.includes('موافق')) {
             
-            // فحص الحالة الداخلية (مقبول أو القبول تعني نجاح فوري)
+            // فحص الحالة الداخلية (القبول تعني نجاح فوري)
             const isAccepted = innerStatus.includes('القبول') || innerStatus.includes('مقبول');
             // فحص حالة الانتظار
             const isWaiting = innerStatus.includes('انتظار') || innerStatus.includes('ينتظر') || innerStatus.includes('معالجة');
@@ -52,7 +47,7 @@ export async function POST(request: Request) {
             const isMsgSuccess = message.includes('بنجاح') || message.includes('استلام');
 
             if (isAccepted || isWaiting || isMsgSuccess) {
-                // نحدد إذا كان الطلب مكتملاً أم يحتاج لمراقبة (Pending)
+                // تحديد نوع الحالة المالية: مكتمل أو معلق (حجز)
                 const finalStatusType = (isAccepted || (!isWaiting && isMsgSuccess)) ? 'completed' : 'pending';
                 
                 return NextResponse.json({ 
@@ -65,7 +60,7 @@ export async function POST(request: Request) {
             }
         }
 
-        // في حال وجود حالة رفض صريحة أو فشل الاتصال (عندما لا تكون الحالة موافق)
+        // في حال الرفض الصريح
         return NextResponse.json({ 
             success: false, 
             message: message || `فشل التنفيذ. الحالة: ${innerStatus || outerStatus}`,

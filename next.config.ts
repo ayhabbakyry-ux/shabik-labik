@@ -1,14 +1,11 @@
-
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  /* خيارات التكوين لبيئة الإنتاج */
   typescript: {
-    // يتجاهل أخطاء التايب سكريبت لضمان نجاح البناء في Vercel
+    // تجاهل أخطاء النوع أثناء البناء لضمان استقرار النشر عند استخدام مفاتيح عربية في الـ JSON
     ignoreBuildErrors: true,
   },
   eslint: {
-    // يتجاهل أخطاء الـ Lint لسرعة النشر
     ignoreDuringBuilds: true,
   },
   images: {
@@ -31,7 +28,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // تأكد من عدم وجود output: 'export' هنا لضمان عمل الـ API Routes
 };
 
 export default nextConfig;
