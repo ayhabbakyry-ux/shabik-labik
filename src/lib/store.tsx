@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 
 export type Transaction = {
   id: string;
+  external_order_id?: string;
   type: string;
   amount: number;
   status: 'Pending' | 'Completed' | 'Rejected';
@@ -39,7 +40,9 @@ type UserContextType = {
   register: (phone: string, name: string, pass: string) => { success: boolean; message: string };
   logout: () => void;
   addBalance: (amount: number) => void;
-  deductBalance: (amount: number, productDetails: string) => void;
+  deductBalance: (amount: number, productDetails: string, initialStatus?: 'Pending' | 'Completed', externalId?: string) => void;
+  refundBalance: (transactionId: string) => void;
+  updateTransactionStatus: (transactionId: string, status: 'Completed' | 'Rejected', externalId?: string) => void;
   requestDeposit: (amount: number, proofImage: string) => void;
   adminAction: (transactionId: string, action: 'approve' | 'reject') => void;
   deleteUser: (phone: string) => void;
@@ -78,12 +81,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const savedPassReqs = localStorage.getItem('shabik_pass_reqs');
 
     let parsedUsers = savedUsers ? JSON.parse(savedUsers) : [];
-    
-    // تصفير فوري وقسري لأي مبالغ وهمية قديمة لضمان النزاهة
-    // أي رصيد غير طبيعي سيتم تصفيره فوراً
+    // Force clear any suspicious balances
     parsedUsers = parsedUsers.map((u: any) => (u.balance >= 999999 || isNaN(u.balance)) ? { ...u, balance: 0 } : u);
     setAllUsers(parsedUsers);
-    localStorage.setItem('shabik_users', JSON.stringify(parsedUsers));
 
     if (savedTxs) setTransactions(JSON.parse(savedTxs));
     if (savedPassReqs) setPasswordRequests(JSON.parse(savedPassReqs));
@@ -91,34 +91,26 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (savedAuth) {
       const authData = JSON.parse(savedAuth);
       const currentU = parsedUsers.find((u: any) => u.phone === authData.phone);
-      
       if (currentU || authData.phone === ADMIN_PHONE) {
         setIsLoggedIn(true);
         setUserPhone(authData.phone);
         setUserName(authData.name);
-        // نأخذ الرصيد من قاعدة البيانات المحلية الحقيقية فقط
         setUserBalance(currentU?.balance || 0);
-      } else {
-        localStorage.removeItem('shabik_auth');
       }
     }
   }, []);
 
   const login = (phone: string, password: string) => {
     if (phone === ADMIN_PHONE && password === ADMIN_PASS) {
-      const adminData = { phone, name: "المدير أيهم", balance: 0 };
       setIsLoggedIn(true);
       setUserPhone(phone);
       setUserName("المدير أيهم");
       setUserBalance(0);
-      localStorage.setItem('shabik_auth', JSON.stringify(adminData));
+      localStorage.setItem('shabik_auth', JSON.stringify({ phone, name: "المدير أيهم" }));
       return { success: true, message: "تم دخول المدير بنجاح" };
     }
-
     const user = allUsers.find(u => u.phone === phone);
-    if (!user) return { success: false, message: "عذراً، هذا الرقم غير مسجل" };
-    if (user.password !== password) return { success: false, message: "كلمة السر خاطئة" };
-
+    if (!user || user.password !== password) return { success: false, message: "بيانات الدخول خاطئة" };
     setIsLoggedIn(true);
     setUserPhone(phone);
     setUserName(user.name);
@@ -128,30 +120,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const register = (phone: string, name: string, pass: string) => {
-    const exists = allUsers.some(u => u.phone === phone);
-    if (exists || phone === ADMIN_PHONE) return { success: false, message: "هذا الرقم مسجل مسبقاً" };
-    
-    // الرصيد الافتراضي هو 0 دائماً
+    if (allUsers.some(u => u.phone === phone)) return { success: false, message: "الرقم مسجل مسبقاً" };
     const newUser: AppUser = { phone, name, password: pass, balance: 0 };
     setAllUsers(prev => {
       const updated = [...prev, newUser];
       localStorage.setItem('shabik_users', JSON.stringify(updated));
       return updated;
     });
-    return { success: true, message: "تم إنشاء الحساب بنجاح، رصيدك الحالي 0 ل.س.ج" };
+    return { success: true, message: "تم إنشاء الحساب بنجاح" };
   };
-
-  const deleteUser = useCallback((phone: string) => {
-    setAllUsers(prev => {
-      const updated = prev.filter(u => u.phone !== phone);
-      localStorage.setItem('shabik_users', JSON.stringify(updated));
-      return updated;
-    });
-
-    if (userPhone === phone) {
-      logout();
-    }
-  }, [userPhone, logout]);
 
   const addBalance = (amount: number) => {
     setAllUsers(prev => {
@@ -162,7 +139,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setUserBalance(prev => prev + amount);
   };
 
-  const deductBalance = (amount: number, productDetails: string) => {
+  const deductBalance = (amount: number, productDetails: string, initialStatus: 'Pending' | 'Completed' = 'Completed', externalId?: string) => {
     setAllUsers(prev => {
       const updated = prev.map(u => u.phone === userPhone ? { ...u, balance: Math.max(0, u.balance - amount) } : u);
       localStorage.setItem('shabik_users', JSON.stringify(updated));
@@ -172,16 +149,44 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     const newTx: Transaction = {
       id: `ORD-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+      external_order_id: externalId,
       type: 'شراء منتج',
       amount,
-      status: 'Completed',
+      status: initialStatus,
       date: new Date().toLocaleString('ar-SY'),
-      userName: userName,
-      userPhone: userPhone,
+      userName,
+      userPhone,
       details: productDetails
     };
     setTransactions(prev => {
       const updated = [newTx, ...prev];
+      localStorage.setItem('shabik_txs', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const refundBalance = (transactionId: string) => {
+    const tx = transactions.find(t => t.id === transactionId);
+    if (!tx || tx.status !== 'Pending') return;
+
+    setAllUsers(prev => {
+      const updated = prev.map(u => u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u);
+      localStorage.setItem('shabik_users', JSON.stringify(updated));
+      return updated;
+    });
+    
+    if (tx.userPhone === userPhone) setUserBalance(prev => prev + tx.amount);
+
+    setTransactions(prev => {
+      const updated = prev.map(t => t.id === transactionId ? { ...t, status: 'Rejected' as const } : t);
+      localStorage.setItem('shabik_txs', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const updateTransactionStatus = (transactionId: string, status: 'Completed' | 'Rejected', externalId?: string) => {
+    setTransactions(prev => {
+      const updated = prev.map(t => t.id === transactionId ? { ...t, status, external_order_id: externalId || t.external_order_id } : t);
       localStorage.setItem('shabik_txs', JSON.stringify(updated));
       return updated;
     });
@@ -194,8 +199,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       amount,
       status: 'Pending',
       date: new Date().toLocaleString('ar-SY'),
-      userName: userName,
-      userPhone: userPhone,
+      userName,
+      userPhone,
     };
     setTransactions(prev => {
       const updated = [newTx, ...prev];
@@ -212,9 +217,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             setAllUsers(prevUsers => {
               const newUsers = prevUsers.map(u => u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u);
               localStorage.setItem('shabik_users', JSON.stringify(newUsers));
-              if (tx.userPhone === userPhone) {
-                setUserBalance(prev => prev + tx.amount);
-              }
+              if (tx.userPhone === userPhone) setUserBalance(prev => prev + tx.amount);
               return newUsers;
             });
             return { ...tx, status: 'Completed' as const };
@@ -224,6 +227,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         return tx;
       });
       localStorage.setItem('shabik_txs', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const deleteUser = (phone: string) => {
+    setAllUsers(prev => {
+      const updated = prev.filter(u => u.phone !== phone);
+      localStorage.setItem('shabik_users', JSON.stringify(updated));
       return updated;
     });
   };
@@ -250,7 +261,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   return (
     <UserContext.Provider value={{ 
       isLoggedIn, isAdmin, userPhone, userName, userBalance, transactions, allUsers, passwordRequests,
-      login, register, logout, addBalance, deductBalance, requestDeposit, adminAction, deleteUser, requestPasswordReset, clearPasswordRequest, currency
+      login, register, logout, addBalance, deductBalance, refundBalance, updateTransactionStatus, requestDeposit, adminAction, deleteUser, requestPasswordReset, clearPasswordRequest, currency
     }}>
       {children}
     </UserContext.Provider>

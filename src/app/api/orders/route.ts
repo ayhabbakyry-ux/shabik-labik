@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار تنفيذ طلبات الشحن الحقيقي المحدث لمعالجة الردود العربية من سيرفر الراغب بما يشمل حالة "انتظار".
+ * @fileOverview مسار تنفيذ طلبات الشحن المطور لدعم حالات الانتظار واستخراج رقم الطلب.
  */
 export async function POST(request: Request) {
     const API_TOKEN = '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0';
@@ -12,10 +12,9 @@ export async function POST(request: Request) {
         const { product_id, playerId, order_uuid } = body;
         const qty = 1;
 
-        // بناء الرابط الديناميكي وفق التوثيق الرسمي
         const ENDPOINT = `https://api.alragheb-store.com/client/api/newOrder/${product_id}/params?qty=${qty}&playerId=${playerId}&order_uuid=${order_uuid}`;
 
-        console.log("Initiating request to Al-Ragheb:", ENDPOINT);
+        console.log("Requesting Al-Ragheb API:", ENDPOINT);
 
         const response = await fetch(ENDPOINT, {
             method: 'GET',
@@ -28,57 +27,31 @@ export async function POST(request: Request) {
         });
 
         const data = await response.json();
-        
-        // طباعة الرد الفعلي للمراقبة في الـ Terminal
-        console.log("Al-Ragheb Server Raw Response:", JSON.stringify(data));
+        console.log("Raw API Response:", JSON.stringify(data));
 
-        /**
-         * التحقق من النجاح بناءً على توثيق الراغب المحدث:
-         * 1. الحالة: "موافق"
-         * 2. الحالة: "القبول"
-         * 3. الحالة: "انتظار" (تمت إضافتها)
-         * 4. status: 1 أو 200
-         */
-        const isSuccess = 
-            data.status === 1 || 
-            data.status === 200 || 
-            data.success === true || 
-            data["الحالة"] === "موافق" || 
-            data["الحالة"] === "القبول" ||
-            data["الحالة"] === "انتظار" ||
-            data["status"] === "success";
+        const statusText = data["الحالة"] || data.status_text || "";
+        
+        // التحقق من النجاح أو الانتظار
+        const isAccepted = statusText === "القبول" || statusText === "موافق";
+        const isWaiting = statusText === "انتظار";
+        const isSuccess = data.status === 1 || data.status === 200 || data.success === true || isAccepted || isWaiting;
 
         if (!isSuccess) {
-            const errorCodes: Record<number, string> = {
-                100: "رصيد المتجر غير كافٍ.",
-                101: "المنتج غير متوفر حالياً.",
-                107: "ID اللاعب غير صحيح.",
-                108: "يوجد طلب قيد المعالجة حالياً.",
-                121: "خطأ في التوكن."
-            };
-
             return NextResponse.json({ 
                 success: false, 
-                message: errorCodes[data.status] || data.message || data["الرسالة"] || "فشل تنفيذ الطلب من قبل المزود."
+                message: data.message || data["الرسالة"] || "فشل تنفيذ الطلب من قبل المزود."
             });
         }
 
-        // تحديد رسالة النجاح بناءً على حالة الرد
-        let successMessage = 'تم الشحن بنجاح!';
-        if (data["الحالة"] === "انتظار") {
-            successMessage = 'تم إرسال الطلب بنجاح وهو قيد التنفيذ';
-        }
-
-        // إرجاع نجاح حقيقي للواجهة الأمامية
         return NextResponse.json({ 
             success: true, 
-            message: successMessage, 
+            status_type: isWaiting ? 'pending' : 'completed',
+            message: isWaiting ? 'تم إرسال الطلب بنجاح وهو قيد التنفيذ' : 'تم الشحن بنجاح!', 
             order_id: data.order_id || data.id || order_uuid,
-            raw_data: data
+            raw_status: statusText
         });
 
     } catch (error: any) {
-        console.error("Orders API Critical Error:", error.message);
         return NextResponse.json({ 
             success: false, 
             message: 'حدث خطأ في الاتصال بسيرفر الشحن.' 

@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PackageX, RefreshCw, ShoppingCart, User as UserIcon, AlertCircle } from "lucide-react";
+import { Loader2, PackageX, RefreshCw, ShoppingCart, User as UserIcon, AlertCircle, Clock } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useUser } from "@/lib/store";
 import { Input } from "@/components/ui/input";
@@ -80,7 +80,7 @@ export function ProductSheet({
     const price = Number(product.customerPrice);
 
     if (!targetId || !targetId.trim()) {
-      toast({ title: "حقل مطلوب", description: "يرجى إدخال الآي دي المطلوب.", variant: "destructive" });
+      toast({ title: "حقل مطلوب", description: "يرجى إدخال المعرف المطلوب.", variant: "destructive" });
       return;
     }
 
@@ -105,12 +105,19 @@ export function ProductSheet({
       const result = await response.json();
 
       if (result.success) {
-          // خصم الرصيد المحلي عند نجاح العملية أو وضعها في حالة الانتظار
-          deductBalance(price, `${product.name} - ID: ${targetId}`);
+          const isPending = result.status_type === 'pending';
+          // خصم الرصيد مع تحديد الحالة (مكتمل أو معلق)
+          deductBalance(
+            price, 
+            `${product.name} - ID: ${targetId}`, 
+            isPending ? 'Pending' : 'Completed',
+            result.order_id
+          );
+
           toast({ 
-            title: "نجاح العملية", 
-            description: result.message || `تم تنفيذ طلبك بنجاح للآي دي ${targetId}.`,
-            className: "bg-green-600 text-white border-none"
+            title: isPending ? "الطلب قيد المعالجة" : "نجاح العملية", 
+            description: result.message,
+            className: isPending ? "bg-orange-500 text-white border-none" : "bg-green-600 text-white border-none"
           });
           setTargetIds(prev => ({ ...prev, [product.id]: "" }));
       } else {
@@ -172,7 +179,7 @@ export function ProductSheet({
                           </div>
                         </div>
                         <div className="space-y-1.5">
-                          <label className="text-[11px] font-bold text-muted-foreground pr-1 flex items-center gap-1 justify-end">الآي دي أو رقم الهاتف <UserIcon className="h-3 w-3" /></label>
+                          <label className="text-[11px] font-bold text-muted-foreground pr-1 flex items-center gap-1 justify-end">المعرف المطلوب (ID) <UserIcon className="h-3 w-3" /></label>
                           <Input 
                             placeholder="أدخل المعرف المطلوب..." 
                             className="text-right h-11 bg-muted/50 border-none" 
