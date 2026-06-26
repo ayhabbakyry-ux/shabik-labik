@@ -41,30 +41,31 @@ export async function POST(request: Request) {
         console.log(`Processing Order - Outer: [${outerStatus}] | Inner: [${innerStatus}]`);
 
         // المنطق المالي الذكي:
-        // 1. إذا كانت الحالة الخارجية "موافق"، لا نظهر خطأ أبداً وننتقل للفحص الداخلي
+        // إذا كانت الحالة الخارجية "موافق"، لا نظهر خطأ أبداً وننتقل للفحص الداخلي
         if (outerStatus.includes('موافق')) {
             
-            // فحص الحالة الداخلية
+            // فحص الحالة الداخلية (مقبول أو القبول تعني نجاح فوري)
             const isAccepted = innerStatus.includes('القبول') || innerStatus.includes('مقبول');
+            // فحص حالة الانتظار
             const isWaiting = innerStatus.includes('انتظار') || innerStatus.includes('ينتظر') || innerStatus.includes('معالجة');
+            // فحص رسالة النجاح الاحتياطية
             const isMsgSuccess = message.includes('بنجاح') || message.includes('استلام');
 
             if (isAccepted || isWaiting || isMsgSuccess) {
                 // نحدد إذا كان الطلب مكتملاً أم يحتاج لمراقبة (Pending)
-                // إذا كان 'انتظار' أو 'ينتظر' نضعه في حالة pending
-                const finalStatusType = isWaiting ? 'pending' : 'completed';
+                const finalStatusType = (isAccepted || (!isWaiting && isMsgSuccess)) ? 'completed' : 'pending';
                 
                 return NextResponse.json({ 
                     success: true, 
                     status_type: finalStatusType,
-                    message: isWaiting ? 'تم استلام الطلب وهو قيد المعالجة (انتظار)' : 'تم تنفيذ الطلب بنجاح!', 
+                    message: finalStatusType === 'pending' ? 'تم استلام الطلب وهو قيد المعالجة (انتظار)' : 'تم تنفيذ الطلب بنجاح!', 
                     order_id: data.order_id || (innerData && innerData.id) || order_uuid,
                     raw_status: innerStatus || outerStatus
                 });
             }
         }
 
-        // في حال وجود حالة رفض صريحة أو فشل الاتصال
+        // في حال وجود حالة رفض صريحة أو فشل الاتصال (عندما لا تكون الحالة موافق)
         return NextResponse.json({ 
             success: false, 
             message: message || `فشل التنفيذ. الحالة: ${innerStatus || outerStatus}`,

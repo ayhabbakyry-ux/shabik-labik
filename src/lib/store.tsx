@@ -67,7 +67,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
 
-  // استرداد الرصيد المفقود - يتم استدعاؤه عند رفض الطلب
   const refundBalance = useCallback((transactionId: string) => {
     setTransactions(prevTxs => {
       const tx = prevTxs.find(t => t.id === transactionId);
@@ -100,7 +99,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // وظيفة التحقق اليدوي/التلقائي - تقوم بالمقاصة المالية بناءً على رد الراغب
   const checkPendingOrders = useCallback(async () => {
     const pendingOrders = transactions.filter(t => t.status === 'Pending' && t.external_order_id);
     if (pendingOrders.length === 0) return;
@@ -112,10 +110,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         
         if (data.success) {
           const remoteStatus = String(data.status).trim();
+          console.log(`تم رصد تغيير حالة الطلب رقم ${order.external_order_id}، والحالة الجديدة هي ${remoteStatus}`);
           
-          // إذا لم تعد الحالة "انتظار"، نتخذ إجراءً مالياً
-          if (remoteStatus !== "" && !remoteStatus.includes("انتظار") && !remoteStatus.includes("معالجة")) {
-             if (remoteStatus.includes('مقبول') || remoteStatus.includes('موافق') || remoteStatus.includes('نجاح')) {
+          if (remoteStatus !== "" && !remoteStatus.includes("انتظار") && !remoteStatus.includes("ينتظر") && !remoteStatus.includes("معالجة")) {
+             if (remoteStatus.includes('مقبول') || remoteStatus.includes('موافق') || remoteStatus.includes('القبول') || remoteStatus.includes('نجاح')) {
                updateTransactionStatus(order.id, 'Completed');
              } else if (remoteStatus.includes('مرفوض') || remoteStatus.includes('فشل') || remoteStatus.includes('الغاء')) {
                refundBalance(order.id);

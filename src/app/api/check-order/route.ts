@@ -27,14 +27,13 @@ export async function GET(request: Request) {
 
         const data = await response.json();
         
-        // سيرفر الراغب قد يرجع مصفوفة أو كائن، نحاول استخراج المعلومات
+        // استخراج المعلومات من الرد الذي قد يكون مصفوفة أو كائن
         const orderInfo = Array.isArray(data) ? data[0] : (data[orderId] || data);
 
-        // استخراج الحالة العميقة من الرد
-        // نبحث عن "الحالة" داخل الكائن المستخرج
-        const status = orderInfo?.["الحالة"] || orderInfo?.status || 'غير معروف';
+        // البحث عن الحالة في المسار العميق أو الجذري
+        const status = orderInfo?.["بيانات"]?.["الحالة"] || orderInfo?.["الحالة"] || orderInfo?.status || 'غير معروف';
 
-        console.log(`Polling Order [${orderId}] - Current Status: [${status}]`);
+        console.log(`Polling Order [${orderId}] - Deep Status: [${status}]`);
 
         return NextResponse.json({
             success: true,
