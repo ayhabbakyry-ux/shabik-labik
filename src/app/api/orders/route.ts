@@ -2,7 +2,10 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار تنفيذ طلبات الشحن المطور للتعامل مع حالات النجاح والانتظار باستخدام الفحص الجزئي للنصوص لضمان الدقة.
+ * @fileOverview مسار تنفيذ طلبات الشحن المطور.
+ * تم تعديل المنطق ليتوافق مع هيكلية الرد العميقة لسيرفر الراغب:
+ * - الحالة الخارجية: data["الحالة"] (عادة تكون 'موافق')
+ * - الحالة الداخلية: data["بيانات"]["الحالة"] (القبول، انتظار، إلخ)
  */
 export async function POST(request: Request) {
     const API_TOKEN = '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0';
@@ -12,7 +15,6 @@ export async function POST(request: Request) {
         const { product_id, playerId, order_uuid } = body;
         const qty = 1;
 
-        // بناء الرابط الديناميكي حسب التوثيق
         const ENDPOINT = `https://api.alragheb-store.com/client/api/newOrder/${product_id}/params?qty=${qty}&playerId=${playerId}&order_uuid=${order_uuid}`;
 
         const response = await fetch(ENDPOINT, {
@@ -27,39 +29,46 @@ export async function POST(request: Request) {
 
         const data = await response.json();
         
-        // استخراج الحالة والرسالة وتحويلهما لنصوص للفحص
-        const statusValue = String(data["الحالة"] || data.status_text || data.status || "");
-        const message = String(data["الرسالة"] || data.message || "");
-        
-        console.log('Status received from Alragheb:', statusValue);
+        // طباعة الرد الخام بالكامل للتدقيق في سجلات Vercel
+        console.log('Full Raw Response from Alragheb:', JSON.stringify(data));
 
-        // استخدام الفحص الجزئي (includes) لضمان اكتشاف الكلمات في أي جزء من النص
-        const isAccepted = statusValue.includes('مقبول') || statusValue.includes('موافق') || statusValue.includes('القبول');
-        const isWaiting = statusValue.includes('انتظار') || statusValue.includes('معالجة');
-        const isMsgSuccess = message.includes('بنجاح') || message.includes('انتظار') || message.includes('مقبول');
+        // استخراج الحالات بناءً على التوثيق الجديد
+        const outerStatus = String(data["الحالة"] || "");
+        const innerData = data["بيانات"];
+        const innerStatus = innerData ? String(innerData["الحالة"] || "") : "";
+        const message = String(data["الرسالة"] || "");
+        
+        // الحالة الحقيقية التي سنعتمد عليها هي الداخلية، ونعود للخارجية إذا فقدت
+        const actualStatus = innerStatus || outerStatus;
+
+        console.log('Processing Status - Outer:', outerStatus, '| Inner:', innerStatus);
+
+        // فحص النجاح أو الانتظار بناءً على الكلمات المفتاحية الدقيقة
+        const isAccepted = actualStatus.includes('القبول') || actualStatus.includes('مقبول') || actualStatus.includes('موافق');
+        const isWaiting = actualStatus.includes('انتظار') || actualStatus.includes('ينتظر') || actualStatus.includes('معالجة');
+        const isMsgSuccess = message.includes('بنجاح') || message.includes('استلام');
 
         if (isAccepted || isWaiting || isMsgSuccess) {
-            // تحديد نوع الحالة بناءً على رد السيرفر
-            const finalIsWaiting = isWaiting || message.includes('انتظار');
+            const finalStatusType = isWaiting ? 'pending' : 'completed';
             
             return NextResponse.json({ 
                 success: true, 
-                status_type: finalIsWaiting ? 'pending' : 'completed',
-                message: finalIsWaiting ? 'تم استلام الطلب بنجاح وهو قيد المعالجة' : 'تم الشحن بنجاح!', 
-                order_id: data.order_id || data.id || order_uuid,
-                raw_status: statusValue
+                status_type: finalStatusType,
+                message: isWaiting ? 'تم استلام الطلب بنجاح وهو قيد المعالجة' : 'تمت العملية بنجاح!', 
+                order_id: data.order_id || (innerData && innerData.id) || order_uuid,
+                raw_status: actualStatus
             });
         }
 
-        // في حال عدم مطابقة أي حالة نجاح
+        // فشل حقيقي
         return NextResponse.json({ 
             success: false, 
-            message: message || `فشل تنفيذ الطلب. الحالة المستلمة: ${statusValue}`,
-            raw_status: statusValue
+            message: message || `فشل التنفيذ. الحالة: ${actualStatus}`,
+            raw_status: actualStatus
         });
 
     } catch (error: any) {
-        console.error("Order API Crash:", error);
+        console.error("Critical Order API Error:", error);
         return NextResponse.json({ 
             success: false, 
             message: 'حدث خطأ في الاتصال بسيرفر الشحن.' 

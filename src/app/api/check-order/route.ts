@@ -2,8 +2,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار التحقق من حالة الطلبات من سيرفر الراغب.
- * يستقبل order_id كمعلمة استعلام ويرجع الحالة الخام من السيرفر.
+ * @fileOverview مسار التحقق من حالة الطلبات المحدث للتعامل مع الهيكلية العميقة.
  */
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -26,25 +25,23 @@ export async function GET(request: Request) {
             cache: 'no-store'
         });
 
-        if (!response.ok) {
-            return NextResponse.json({ success: false, message: 'فشل الاتصال بسيرفر المزود' });
-        }
-
         const data = await response.json();
         
-        // سيرفر الراغب قد يرجع مصفوفة أو كائن مفتاحه هو رقم الطلب
+        // سيرفر الراغب قد يرجع مصفوفة أو كائن
         const orderInfo = Array.isArray(data) ? data[0] : (data[orderId] || data);
 
-        // نقوم بتمرير الحالة كما هي ليقوم الـ Store بمعالجتها
+        // استخراج الحالة العميقة
+        const status = orderInfo?.["الحالة"] || orderInfo?.status || 'غير معروف';
+
         return NextResponse.json({
             success: true,
             order_id: orderId,
-            status: orderInfo?.الحالة || orderInfo?.status || 'غير معروف',
+            status: status,
             raw: orderInfo
         });
 
     } catch (error: any) {
-        console.error("Check Order API Crash:", error);
+        console.error("Check Order API Error:", error);
         return NextResponse.json({ success: false, message: 'خطأ في معالجة طلب الفحص' });
     }
 }
