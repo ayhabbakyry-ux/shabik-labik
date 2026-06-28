@@ -40,7 +40,15 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
   useEffect(() => {
     setCurrentTab(initialTab);
   }, [initialTab]);
+// Auto-refresh: تحديث تلقائي للطلبات المعلقة كل 15 ثانية
+useEffect(() => {
+  const interval = setInterval(() => {
+      console.log("🔄 جاري التحديث التلقائي للطلبات...");
+          checkPendingOrders();
+            }, 15000); // 15000 = 15 ثانية
 
+              return () => clearInterval(interval);
+              }, []); // لا تقم بتغيير هذا السطر
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
     try {
