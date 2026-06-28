@@ -39,17 +39,17 @@ export async function POST(request: Request) {
 
         // المنطق المالي الصارم: إذا كانت الحالة الخارجية موافق، لا نرمي خطأ أبداً
         const statusText = (outerStatus + " " + innerStatus + " " + message);
+    // جعل المطابقة مرنة جداً لتشمل أي رد فيه كلمة انتظار
     const isAccepted = statusText.includes('مكتمل') || statusText.includes('نجاح') || statusText.includes('تم التنفيذ') || statusText.includes('مقبول');
-    const isWaiting = statusText.includes('انتظار') || statusText.includes('قيد الانتظار') || statusText.includes('جاري المعالجة');
+    const isWaiting = statusText.includes('انتظار') || statusText.includes('قيد');
 
     if (isAccepted) {
       return NextResponse.json({ success: true, status_type: 'completed', message: 'تم تنفيذ الطلب بنجاح', order_id: data.order_id || (innerData ? innerData['رقم_الطلب'] : ""), raw_status: innerStatus || outerStatus });
     } else if (isWaiting) {
-      return NextResponse.json({ success: true, status_type: 'pending', message: 'الطلب قيد الانتظار، تم حجز الرصيد', order_id: data.order_id || (innerData ? innerData['رقم_الطلب'] : ""), raw_status: innerStatus || outerStatus });
+      return NextResponse.json({ success: true, status_type: 'pending', message: 'الطلب قيد الانتظار', order_id: data.order_id || (innerData ? innerData['رقم_الطلب'] : ""), raw_status: innerStatus || outerStatus });
     } else {
       return NextResponse.json({ success: false, message: message || `تم رفض الطلب. الحالة: ${innerStatus || outerStatus}`, raw_status: innerStatus || outerStatus });
-    }
-    } catch (error: any) {
+    }} catch (error: any) {
         console.error("Critical Order API Error:", error);
         return NextResponse.json({ 
             success: false, 
