@@ -38,20 +38,20 @@ export async function POST(request: Request) {
         console.log(`Final Decision Logic - Outer: [${outerStatus}] | Inner: [${innerStatus}]`);
 
         // المنطق المالي الصارم: إذا كانت الحالة الخارجية موافق، لا نرمي خطأ أبداً
-        const statusText = (outerStatus + " " + innerStatus + " " + message);
-    console.log('--- DEBUG: RAW RESPONSE ---', statusText);
-    // جعل المطابقة مرنة جداً لتشمل أي رد فيه كلمة انتظار
-    const isAccepted = statusText.includes('مكتمل') || statusText.includes('نجاح') || statusText.includes('تم التنفيذ') || statusText.includes('مقبول');
-    const isWaiting = statusText.includes('انتظار') || statusText.includes('قيد');
+        const statusText = String(innerStatus || outerStatus || "").trim();
+    console.log('API_DEBUG -> Final Clean Status:', statusText);
 
-    if (isAccepted) {
-      return NextResponse.json({ success: true, status_type: 'completed', message: 'تم تنفيذ الطلب بنجاح', order_id: data.order_id || (innerData ? innerData['رقم_الطلب'] : ""), raw_status: innerStatus || outerStatus });
-    } else if (isWaiting) {
-      return NextResponse.json({ success: true, status_type: 'pending', message: 'الطلب قيد الانتظار', order_id: data.order_id || (innerData ? innerData['رقم_الطلب'] : ""), raw_status: innerStatus || outerStatus });
+    if (statusText === 'قبول' || statusText === 'موافق' || statusText === 'مكتمل') {
+        return NextResponse.json({ success: true, status_type: 'completed', message: 'تم تنفيذ الطلب بنجاح', order_id: data?.order_id || (innerData ? innerData['رقم_الطلب'] : "") });
+    } else if (statusText === 'انتظار' || statusText === '') {
+        return NextResponse.json({ success: true, status_type: 'pending', message: 'الطلب قيد الانتظار في سيرفر الراغب، تم حجز الرصيد بنجاح', order_id: data?.order_id || (innerData ? innerData['رقم_الطلب'] : "") });
+    } else if (statusText === 'رفض') {
+        return NextResponse.json({ success: false, message: message || 'تم رفض الطلب من السيرفر وعاد الرصيد' });
     } else {
-      return NextResponse.json({ success: false, message: message || `تم رفض الطلب. الحالة: ${innerStatus || outerStatus}`, raw_status: innerStatus || outerStatus });
-        }
- } catch (error: any) {
+        return NextResponse.json({ success: true, status_type: 'pending', message: 'جاري معالجة الطلب (حالة: ' + statusText + ')', order_id: data?.order_id || (innerData ? innerData['رقم_الطلب'] : "") });
+    }
+    
+} catch (error: any) {
         console.error("Critical Order API Error:", error);
         return NextResponse.json({ 
             success: false, 
