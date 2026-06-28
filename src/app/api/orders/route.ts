@@ -39,6 +39,7 @@ export async function POST(request: Request) {
 
         // المنطق المالي الصارم: إذا كانت الحالة الخارجية موافق، لا نرمي خطأ أبداً
         const statusText = (outerStatus + " " + innerStatus + " " + message);
+    console.log('--- DEBUG: RAW RESPONSE ---', statusText);
     // جعل المطابقة مرنة جداً لتشمل أي رد فيه كلمة انتظار
     const isAccepted = statusText.includes('مكتمل') || statusText.includes('نجاح') || statusText.includes('تم التنفيذ') || statusText.includes('مقبول');
     const isWaiting = statusText.includes('انتظار') || statusText.includes('قيد');
