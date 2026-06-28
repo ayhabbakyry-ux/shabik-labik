@@ -1,36 +1,15 @@
 
-    // قراءة الردود بالحرف حسب توثيق الراغب
-    const apiSuccess = data["الحالة"] === "موافق" || (innerData && innerData["الحالة"] === "موافق");
-    const exactStatus = (innerStatus || outerStatus || "").trim();
-
-    console.log('API_DEBUG -> Success:', apiSuccess, 'Status:', exactStatus);
-
-    if (exactStatus === 'قبول') {
-        return NextResponse.json({ 
-            success: true, 
-            status_type: 'completed', 
-            message: 'تم تنفيذ الطلب بنجاح',
-            order_id: data.order_id || (innerData ? innerData['رقم_الطلب'] : "")
-        });
-    } else if (exactStatus === 'انتظار') {
-        return NextResponse.json({ 
-            success: true, 
-            status_type: 'pending', 
-            message: 'الطلب قيد الانتظار، تم حجز الرصيد',
-            order_id: data.order_id || (innerData ? innerData['رقم_الطلب'] : "")
-        });
-    } else if (exactStatus === 'رفض') {
-        return NextResponse.json({ 
-            success: false, 
-            message: message || 'تم رفض الطلب من السيرفر وعاد الرصيد' 
-        });
+    console.log('API_DEBUG: outerStatus=', outerStatus, 'innerStatus=', innerStatus, 'message=', message);
+    
+    // تصنيف الحالة بناءً على ما يصل فعلياً
+    const fullText = (String(outerStatus) + String(innerStatus) + String(message)).toLowerCase();
+    
+    if (fullText.includes('مكتمل') || fullText.includes('نجاح') || fullText.includes('مقبول')) {
+        return NextResponse.json({ success: true, status_type: 'completed', message: 'تم التنفيذ' });
+    } else if (fullText.includes('انتظار') || fullText.includes('قيد')) {
+        return NextResponse.json({ success: true, status_type: 'pending', message: 'قيد الانتظار' });
     } else {
-        // احتياط: إذا كانت الحالة غير معروفة بس الخصم شغال بنعتبرها انتظار عشان ما يضيع الرصيد
-        return NextResponse.json({ 
-            success: true, 
-            status_type: 'pending', 
-            message: 'الطلب قيد المعالجة (حالة غير معروفة: ' + exactStatus + ')'
-        });
+        return NextResponse.json({ success: false, message: 'رفض: ' + (message || 'غير معروف') });
     }
 } catch (error: any) {
         console.error("Critical Order API Error:", error);
