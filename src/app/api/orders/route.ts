@@ -38,36 +38,17 @@ export async function POST(request: Request) {
         console.log(`Final Decision Logic - Outer: [${outerStatus}] | Inner: [${innerStatus}]`);
 
         // المنطق المالي الصارم: إذا كانت الحالة الخارجية موافق، لا نرمي خطأ أبداً
-        if (outerStatus.includes('موافق')) {
-            
-            // فحص الحالة الداخلية (القبول تعني نجاح فوري)
-            const isAccepted = innerStatus.includes('القبول') || innerStatus.includes('مقبول');
-            // فحص حالة الانتظار
-            const isWaiting = innerStatus.includes('انتظار') || innerStatus.includes('ينتظر') || innerStatus.includes('معالجة');
-            // فحص رسالة النجاح الاحتياطية
-            const isMsgSuccess = message.includes('بنجاح') || message.includes('استلام');
+        const statusText = (outerStatus + " " + innerStatus + " " + message);
+    const isAccepted = statusText.includes('مكتمل') || statusText.includes('نجاح') || statusText.includes('تم التنفيذ') || statusText.includes('مقبول');
+    const isWaiting = statusText.includes('انتظار') || statusText.includes('قيد الانتظار') || statusText.includes('جاري المعالجة');
 
-            if (isAccepted || isWaiting || isMsgSuccess) {
-                // تحديد نوع الحالة المالية: مكتمل أو معلق (حجز)
-                const finalStatusType = (isAccepted || (!isWaiting && isMsgSuccess)) ? 'completed' : 'pending';
-                
-                return NextResponse.json({ 
-                    success: true, 
-                    status_type: finalStatusType,
-                    message: finalStatusType === 'pending' ? 'تم استلام الطلب وهو قيد المعالجة (انتظار)' : 'تم تنفيذ الطلب بنجاح!', 
-                    order_id: data.order_id || (innerData && innerData.id) || order_uuid,
-                    raw_status: innerStatus || outerStatus
-                });
-            }
-        }
-
-        // في حال الرفض الصريح أو عدم استيفاء الشروط أعلاه
-        return NextResponse.json({ 
-            success: false, 
-            message: message || `فشل التنفيذ. الحالة: ${innerStatus || outerStatus}`,
-            raw_status: innerStatus || outerStatus
-        });
-
+    if (isAccepted) {
+      return NextResponse.json({ success: true, status_type: 'completed', message: 'تم تنفيذ الطلب بنجاح', order_id: data.order_id || (innerData ? innerData['رقم_الطلب'] : ""), raw_status: innerStatus || outerStatus });
+    } else if (isWaiting) {
+      return NextResponse.json({ success: true, status_type: 'pending', message: 'الطلب قيد الانتظار، تم حجز الرصيد', order_id: data.order_id || (innerData ? innerData['رقم_الطلب'] : ""), raw_status: innerStatus || outerStatus });
+    } else {
+      return NextResponse.json({ success: false, message: message || `تم رفض الطلب. الحالة: ${innerStatus || outerStatus}`, raw_status: innerStatus || outerStatus });
+    }
     } catch (error: any) {
         console.error("Critical Order API Error:", error);
         return NextResponse.json({ 
