@@ -50,7 +50,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, status_type: 'pending', message: 'الطلب قيد الانتظار', order_id: data.order_id || (innerData ? innerData['رقم_الطلب'] : ""), raw_status: innerStatus || outerStatus });
     } else {
       return NextResponse.json({ success: false, message: message || `تم رفض الطلب. الحالة: ${innerStatus || outerStatus}`, raw_status: innerStatus || outerStatus });
-    }} catch (error: any) {
+        }
+ } catch (error: any) {
         console.error("Critical Order API Error:", error);
         return NextResponse.json({ 
             success: false, 
