@@ -14,7 +14,8 @@ import {
   CheckCircle2,
   XCircle,
   Hash,
-  AlertCircle
+  AlertCircle,
+  Calculator
 } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Button } from '@/components/ui/button';
@@ -40,15 +41,16 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
   useEffect(() => {
     setCurrentTab(initialTab);
   }, [initialTab]);
-// Auto-refresh: تحديث تلقائي للطلبات المعلقة كل 15 ثانية
-useEffect(() => {
-  const interval = setInterval(() => {
-      console.log("🔄 جاري التحديث التلقائي للطلبات...");
-          checkPendingOrders();
-            }, 15000); // 15000 = 15 ثانية
 
-              return () => clearInterval(interval);
-              }, []); // لا تقم بتغيير هذا السطر
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log("🔄 جاري التحديث التلقائي للطلبات...");
+      checkPendingOrders();
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [checkPendingOrders]);
+
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -153,6 +155,20 @@ useEffect(() => {
                           <p className="font-bold text-sm text-primary">{tx.type}</p>
                           <p className="text-[10px] text-gray-400 font-mono">{tx.date}</p>
                           <p className="text-[11px] text-gray-300 font-medium leading-relaxed">{tx.details}</p>
+                          
+                          {/* الحسبة المالية الأكاديمية */}
+                          {tx.type === 'شراء منتج' && tx.balanceBefore !== undefined && (
+                            <div className="mt-3 bg-black/30 p-2 rounded-xl border border-white/5 flex items-center gap-2 text-[10px] font-bold">
+                              <Calculator className="h-3 w-3 text-gray-500" />
+                              <span className="text-gray-400">حسبة الرصيد:</span>
+                              <span className="text-green-500">{(tx.balanceBefore).toLocaleString()}</span>
+                              <span className="text-gray-500">-</span>
+                              <span className="text-red-500">{(tx.amount).toLocaleString()}</span>
+                              <span className="text-gray-500">=</span>
+                              <span className="text-primary">{(tx.balanceAfter ?? (tx.balanceBefore - tx.amount)).toLocaleString()}</span>
+                            </div>
+                          )}
+
                           {tx.external_order_id && (
                             <p className="text-[9px] text-muted-foreground font-mono mt-1">Provider ID: {tx.external_order_id}</p>
                           )}

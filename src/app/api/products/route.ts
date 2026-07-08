@@ -1,15 +1,18 @@
-
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * @fileOverview مسار جلب المنتجات المحدث بالتوكن الحقيقي والترويسات الصحيحة.
+ * @fileOverview مسار جلب المنتجات - يعتمد كلياً على متغيرات البيئة للأمان.
  */
 export async function GET() {
-    const API_TOKEN = '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0';
+    const API_TOKEN = process.env.ALRAGHEB_TOKEN;
     const ENDPOINT = 'https://api.alragheb-store.com/client/api/products';
+
+    if (!API_TOKEN) {
+        return NextResponse.json({ success: false, error: "التوكن مفقود في إعدادات البيئة" }, { status: 200 });
+    }
 
     try {
         const response = await fetch(ENDPOINT, {
@@ -23,38 +26,41 @@ export async function GET() {
         });
 
         if (!response.ok) {
-            let errorData;
-            try {
-                errorData = await response.json();
-            } catch (e) {
-                errorData = { message: "فشل السيرفر في إرجاع استجابة JSON" };
-            }
-            return NextResponse.json({ 
-                success: false, 
-                error: errorData,
-                status_code: response.status 
-            }, { status: 200 });
+            return NextResponse.json({ success: false, error: "فشل الاتصال بسيرفر الراغب" }, { status: 200 });
         }
 
-        const data = await response.json();
-        const productsArray = Array.isArray(data) ? data : (data.products || data.data || []);
+        const rawData = await response.json();
         
-        const formattedProducts = productsArray.map((prod: any) => ({
-            id: prod.id,
-            name: prod.الاسم || prod.name || prod.title || 'منتج غير مسمى',
-            price: prod.السعر || prod.price || 0,
-            category_name: prod.اسم_الفئة || prod.category_name || '',
-            category_id: prod.category_id || prod.parent_id,
-            image: prod.image || prod.category_img || ''
-        }));
+        let productsArray = [];
+        if (Array.isArray(rawData)) {
+            productsArray = rawData;
+        } else if (rawData.data && Array.isArray(rawData.data)) {
+            productsArray = rawData.data;
+        } else {
+            const possibleKey = Object.keys(rawData).find(key => Array.isArray(rawData[key]));
+            productsArray = possibleKey ? rawData[possibleKey] : [];
+        }
+
+        const formattedProducts = productsArray.map((prod: any) => {
+            const name = prod.الاسم || prod.name || prod.title || prod.product_name || 'منتج غير مسمى';
+            const price = prod.السعر || prod.price || prod.cost || 0;
+            const categoryName = prod.اسم_الفئة || prod.category_name || prod.category?.name || '';
+            const categoryId = prod.category_id || prod.parent_id || '';
+            const image = prod.image || prod.img || '';
+            
+            return {
+                id: prod.id,
+                name: String(name),
+                price: Number(price),
+                category_name: String(categoryName),
+                category_id: categoryId,
+                image: String(image)
+            };
+        });
 
         return NextResponse.json(formattedProducts);
 
     } catch (error: any) {
-        return NextResponse.json({ 
-            success: false, 
-            error: "حدث خطأ في الاتصال الداخلي بسيرفر النشر.",
-            details: error.message
-        }, { status: 200 });
+        return NextResponse.json({ success: false, error: error.message }, { status: 200 });
     }
 }

@@ -1,14 +1,13 @@
-
 "use client";
 
-import { Smartphone, FileText, Globe, SmartphoneNfc, ShieldCheck, Phone, Gamepad2, CreditCard, ShoppingBag, Tv, Hash, Zap } from "lucide-react";
+import { Smartphone, SmartphoneNfc, Phone, Gamepad2, Zap, Radio, Sword } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ProductSheet } from "./ProductSheet";
 
 type ServiceItem = {
   id: string;
   name: string;
-  filter: string; // القيمة المستخدمة للفلترة في API الراغب
+  filter: string; 
   icon: any;
   color: string;
   bg: string;
@@ -34,20 +33,22 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
       ]
     },
     {
-      title: "قسم الألعاب العالمية",
+      title: "قسم الألعاب العالمية والجواكر",
       colorClass: "text-green-600",
       icon: Gamepad2,
       items: [
         { id: "pubg", name: "ببجي موبايل", filter: "PUBG", icon: Gamepad2, color: "text-green-600", bg: "bg-green-50" },
         { id: "freefire", name: "فري فاير", filter: "Free Fire", icon: Zap, color: "text-orange-600", bg: "bg-orange-50" },
+        { id: "jawaker", name: "الجواكر", filter: "Jawaker", icon: Sword, color: "text-indigo-600", bg: "bg-indigo-50" },
       ]
     },
     {
-      title: "تطبيقات البث المباشر",
+      title: "تطبيقات البث المباشر (أكاديمية)",
       colorClass: "text-pink-600",
       icon: SmartphoneNfc,
       items: [
         { id: "tiktok", name: "تيك توك", filter: "TikTok", icon: SmartphoneNfc, color: "text-pink-600", bg: "bg-pink-50" },
+        { id: "bigo", name: "بيجو لايف", filter: "Bigo", icon: Radio, color: "text-teal-600", bg: "bg-teal-50" },
         { id: "likee", name: "لايكي", filter: "Likee", icon: SmartphoneNfc, color: "text-purple-600", bg: "bg-purple-50" },
       ]
     }

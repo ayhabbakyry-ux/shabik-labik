@@ -14,7 +14,7 @@ export function Navbar() {
     { label: "Wallet", icon: Wallet, href: "/wallet" },
     { label: "Home", icon: Home, href: "/dashboard", center: true },
     { label: "Cart", icon: ShoppingBag, href: "/history" },
-    { label: "Notifs", icon: Bell, href: "/notifications" },
+    { label: "Support", icon: Bell, href: "/support" },
   ];
 
   return (
@@ -52,7 +52,7 @@ export function DesktopHeader() {
     { label: "المدفوعات", href: "/payments" },
     { label: "السجل", href: "/history" },
     { label: "المراكز", href: "/centers" },
-    { label: "الدعم الذكي", href: "/support" },
+    { label: "الدعم الفني", href: "/support" },
   ];
 
   return (

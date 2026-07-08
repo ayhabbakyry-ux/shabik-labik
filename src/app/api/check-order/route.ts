@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار التحقق من حالة الطلبات المحدث للتعامل مع الهيكلية العميقة.
+ * @fileOverview مسار فحص الطلبات - يعتمد كلياً على متغيرات البيئة للأمان.
  */
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const orderId = searchParams.get('order_id');
-    const API_TOKEN = '64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0';
+    const API_TOKEN = process.env.ALRAGHEB_TOKEN;
+
+    if (!API_TOKEN) {
+        return NextResponse.json({ success: false, message: 'إعدادات الأمان مفقودة (API Token)' });
+    }
 
     if (!orderId) {
         return NextResponse.json({ success: false, message: 'رقم الطلب مفقود' });
@@ -24,25 +28,25 @@ export async function GET(request: Request) {
             cache: 'no-store'
         });
 
-        const data = await response.json() as any;
-        
-        // استخراج المعلومات مع دعم تعدد الطلبات في المصفوفة
-        const orderInfo = Array.isArray(data) ? data[0] : (data[orderId] || data);
+        const rawData = await response.json();
+        const orderList = rawData.data || [];
+        const orderInfo = orderList.length > 0 ? orderList[0] : null;
 
-        // البحث عن الحالة في المسار العميق مع Casting
-        const deepStatus = orderInfo?.["بيانات"]?.["الحالة"] || orderInfo?.["الحالة"] || orderInfo?.status || 'غير معروف';
+        if (!orderInfo) {
+            return NextResponse.json({ success: false, message: 'لم يتم العثور على بيانات الطلب' });
+        }
 
-        console.log(`Manual Polling Log - Order [${orderId}] -> Deep Status: [${deepStatus}]`);
+        const remoteStatus = orderInfo.status || orderInfo["الحالة"] || 'wait';
 
         return NextResponse.json({
             success: true,
             order_id: orderId,
-            status: deepStatus,
+            status: remoteStatus,
             raw: orderInfo
         });
 
     } catch (error: any) {
         console.error("Check Order API Error:", error);
-        return NextResponse.json({ success: false, message: 'خطأ في معالجة طلب الفحص' });
+        return NextResponse.json({ success: false, message: 'خطأ في فحص حالة الطلب' });
     }
 }

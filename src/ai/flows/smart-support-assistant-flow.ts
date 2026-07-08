@@ -1,67 +1,85 @@
 'use server';
-/**
- * @fileOverview A smart support assistant AI agent for the Shabik Labik Digital app.
- *
- * - smartSupportAssistant - A function that handles user queries for support.
- * - SmartSupportAssistantInput - The input type for the smartSupportAssistant function.
- * - SmartSupportAssistantOutput - The return type for the smartSupportAssistant function.
- */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
+import { db } from '@/lib/firebase-config';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 const SmartSupportAssistantInputSchema = z.object({
-  userQuery: z.string().describe("The user's natural language query about transfer details, transaction history, or app functionality."),
-  userBalance: z.number().describe("The current balance of the user's wallet in SYP."),
-  userPhone: z.string().describe("The phone number of the logged-in user."),
+  userQuery: z.string().describe("استفسار المستخدم باللغة العربية."),
+  userBalance: z.number().describe("الرصيد الحالي للمستخدم."),
+  userPhone: z.string().describe("رقم هاتف المستخدم."),
+  isAdmin: z.boolean().optional().describe("هل المستخدم هو المدير أيهم؟")
 });
-export type SmartSupportAssistantInput = z.infer<typeof SmartSupportAssistantInputSchema>;
 
 const SmartSupportAssistantOutputSchema = z.object({
-  assistantResponse: z.string().describe("A natural language response providing immediate, relevant assistance to the user's query."),
+  assistantResponse: z.string().describe("رد المساعد بلهجة حلبية شهمة."),
 });
-export type SmartSupportAssistantOutput = z.infer<typeof SmartSupportAssistantOutputSchema>;
 
-export async function smartSupportAssistant(input: SmartSupportAssistantInput): Promise<SmartSupportAssistantOutput> {
-  return smartSupportAssistantFlow(input);
-}
+const searchUserTool = ai.defineTool(
+  {
+    name: 'searchUserTool',
+    description: 'يبحث عن معلومات زبون ويقدم تقريراً بالرصيد.',
+    inputSchema: z.object({
+      phone: z.string().describe('رقم هاتف الزبون للبحث عنه.'),
+    }),
+    outputSchema: z.object({
+      found: z.boolean(),
+      userName: z.string().optional(),
+      currentBalance: z.number(),
+      message: z.string(),
+    }),
+  },
+  async (input) => {
+    try {
+      const phoneClean = input.phone.trim();
+      const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
+      const userSnap = await getDocs(userQ);
+      
+      if (userSnap.empty) {
+        return { found: false, currentBalance: 0, message: "والله يا مدير ما لقيت هاد الرقم بالسيستم." };
+      }
+
+      const userData = userSnap.docs[0].data();
+      return {
+        found: true,
+        userName: userData.name || phoneClean,
+        currentBalance: Number(userData.balance || 0),
+        message: `لقيتلك الزبون ${userData.name || phoneClean} ورصيده ${userData.balance} ليرة.`
+      };
+    } catch (e) {
+      return { found: false, currentBalance: 0, message: "صار عندي ضغط بسيط بالاتصال يا مدير." };
+    }
+  }
+);
 
 const prompt = ai.definePrompt({
   name: 'smartSupportAssistantPrompt',
-  input: {schema: SmartSupportAssistantInputSchema},
-  output: {schema: SmartSupportAssistantOutputSchema},
-  prompt: `You are the smart support assistant for the "Shabik Labik Digital" app. Your goal is to provide immediate, relevant assistance to users regarding their transfer details, transaction history, and general app functionality. Be friendly, helpful, and concise.
+  model: 'googleai/gemini-1.5-flash',
+  input: { schema: SmartSupportAssistantInputSchema },
+  output: { schema: SmartSupportAssistantOutputSchema },
+  tools: [searchUserTool],
+  prompt: `أنت "مساعد تطبيق شبيك لبيك". تتحدث بلهجة حلبية شهمة ومحترمة جداً.
 
-The user's current context is:
-- User Phone Number: {{{userPhone}}}
-- Current Wallet Balance: {{{userBalance}}} SYP
+قواعد الرد:
+1. إذا كان السائل هو المدير أيهم (isAdmin = true) وسأل عن زبون، استخدم أداة searchUserTool فوراً.
+2. أجب بلهجة حلبية محببة (يا غالي، من عيوني، أبشر).
+3. ممنوع نهائياً ذكر أي تفاصيل تقنية أو أكواد.
 
-Here are some hypothetical transaction details and common FAQs that you can reference to answer user queries:
+معلومات السياق:
+- رقم السائل: {{{userPhone}}}
+- رصيد السائل: {{{userBalance}}}
+- الحالة: {{#if isAdmin}}المعلم أيهم شخصياً{{else}}زبون غالي{{/if}}
 
---- Hypothetical Transaction History ---
-1. Date: 2023-10-26, Type: Deposit, Amount: 50000 SYP, Status: Completed, Transaction ID: DEP-12345
-2. Date: 2023-10-27, Type: PUBG 60 UC purchase, Amount: 15000 SYP, Status: Completed, Transaction ID: PUR-67890
-3. Date: 2023-10-28, Type: Deposit, Amount: 75000 SYP, Status: Pending (Waiting for admin verification), Transaction ID: DEP-98765
-4. Date: 2023-10-29, Type: SyrCash Transfer, Amount: 10000 SYP, Status: Completed, Transaction ID: SYR-11223
-
---- FAQ/App Functionality ---
-- To deposit money: Tap on your balance display on the main screen. You will see instructions to transfer money via ShamCash, Syriatel Cash, or MTN Cash, and then you'll upload a notification for admin approval.
-- To view transaction history: Navigate to the "سجل" (History) tab in the bottom navigation bar. (Note: This feature is currently under development and will show your full history soon).
-- Product availability: The app automatically fetches the latest products and prices from providers like Al-Ragheb. You can see these by tapping the "بضاعة ومنتجات الراغب الآلية" button.
-
-Based on the user's query and the context provided, please generate a helpful response. If the user asks about their specific transactions, try to provide details from the hypothetical history above. If they ask about general app features, refer to the FAQ. If you cannot find a direct answer, guide them on how to use the app or where to find information.
-
-User Query: {{{userQuery}}}`
+استفسار المستخدم: {{{userQuery}}}`
 });
 
-const smartSupportAssistantFlow = ai.defineFlow(
-  {
-    name: 'smartSupportAssistantFlow',
-    inputSchema: SmartSupportAssistantInputSchema,
-    outputSchema: SmartSupportAssistantOutputSchema,
-  },
-  async (input) => {
-    const {output} = await prompt(input);
-    return output!;
+export async function smartSupportAssistant(input: z.infer<typeof SmartSupportAssistantInputSchema>) {
+  try {
+    const { output } = await prompt(input);
+    if (!output) throw new Error("AI Empty");
+    return output;
+  } catch (error: any) {
+    return { assistantResponse: "أهلاً بك يا غالي. حالياً عم نحدث النظام لخدمتكم بشكل أفضل، يرجى المحاولة بعد دقيقة وبكون كل شي جاهز بإذن الله." };
   }
-);
+}

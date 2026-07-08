@@ -1,28 +1,41 @@
-
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { smartSupportAssistant } from "@/ai/flows/smart-support-assistant-flow";
 import { useUser } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bot, User, Send, Loader2 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Bot, Send, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Message = {
   role: 'assistant' | 'user';
   content: string;
+  isError?: boolean;
 };
 
 export function AIChat() {
-  const { userBalance, userPhone } = useUser();
+  const { userBalance, userPhone, userName, isAdmin } = useUser();
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: "Hello! I'm your Shabik Labik Assistant. How can I help you with your transfers or app functionality today?" }
+    { role: 'assistant', content: isAdmin 
+      ? `أهلاً بك يا مدير أيهم! أنا مساعدك الخاص. فيك تسألني عن أي زبون بالرقم ورح جردلك حسابه فوراً.` 
+      : `أهلاً بك يا غالي ${userName || 'يا طيب'}! أنا مساعد شبيك لبيك، كيف بقدر أخدمك اليوم؟` 
+    }
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      const scrollArea = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollArea) {
+        scrollArea.scrollTop = scrollArea.scrollHeight;
+      }
+    }
+  }, [messages, loading]);
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
@@ -37,69 +50,100 @@ export function AIChat() {
         userQuery: userMsg,
         userBalance,
         userPhone,
+        isAdmin: !!isAdmin
       });
+      
       setMessages(prev => [...prev, { role: 'assistant', content: result.assistantResponse }]);
-    } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', content: "Sorry, I'm having trouble connecting right now. Please try again later." }]);
+    } catch (error: any) {
+      setMessages(prev => [...prev, { role: 'assistant', content: "أهلاً بك يا غالي. حالياً عم نحدث النظام لخدمتكم بشكل أفضل، يرجى المحاولة بعد دقيقة وبكون كل شي جاهز بإذن الله.", isError: true }]);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Card className="h-[600px] flex flex-col border-none shadow-none bg-transparent">
-      <CardHeader className="border-b bg-white px-6">
-        <CardTitle className="flex items-center gap-2">
-          <Bot className="text-primary h-5 w-5" />
-          Smart Support
+    <Card className="h-full flex flex-col border-none shadow-2xl bg-white/50 backdrop-blur-md rounded-[32px] overflow-hidden">
+      <CardHeader className="border-b bg-primary p-6 text-white shrink-0">
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+             <div className="bg-white/20 p-2 rounded-xl backdrop-blur-sm">
+                <Bot className="h-6 w-6 text-white" />
+             </div>
+             <div className="text-right">
+               <p className="text-lg font-black font-headline leading-tight">مساعد شبيك لبيك الذكي</p>
+               <p className="text-[10px] opacity-70 font-bold">{isAdmin ? "وضع المدير نشط" : "متصل الآن"}</p>
+             </div>
+          </div>
+          <Sparkles className="h-5 w-5 text-yellow-300 animate-pulse" />
         </CardTitle>
       </CardHeader>
+      
       <CardContent className="flex-1 p-0 flex flex-col min-h-0">
-        <ScrollArea className="flex-1 p-6">
-          <div className="space-y-4">
+        <ScrollArea ref={scrollRef} className="flex-1 p-6 bg-slate-50/50">
+          <div className="space-y-6 pb-20">
             {messages.map((m, i) => (
-              <div key={i} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                <Avatar className="h-8 w-8 border">
-                  <AvatarFallback className={m.role === 'assistant' ? 'bg-primary text-white' : 'bg-secondary'}>
-                    {m.role === 'assistant' ? <Bot className="h-4 w-4" /> : <User className="h-4 w-4" />}
-                  </AvatarFallback>
+              <div key={i} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
+                <Avatar className="h-9 w-9 border-2 border-white shadow-sm shrink-0">
+                  {m.role === 'assistant' ? (
+                    <>
+                      <AvatarImage src={`https://picsum.photos/seed/assistant/100`} />
+                      <AvatarFallback className="bg-primary text-white font-bold text-xs">م</AvatarFallback>
+                    </>
+                  ) : (
+                    <>
+                      <AvatarImage src={`https://picsum.photos/seed/${userPhone}/100`} />
+                      <AvatarFallback className="bg-secondary text-white font-bold text-xs">أنت</AvatarFallback>
+                    </>
+                  )}
                 </Avatar>
-                <div className={`p-3 rounded-2xl max-w-[80%] text-sm ${
+                <div className={`p-4 rounded-[22px] max-w-[85%] text-sm leading-relaxed shadow-sm ${
                   m.role === 'assistant' 
-                    ? 'bg-white border rounded-tl-none' 
-                    : 'bg-primary text-white rounded-tr-none shadow-md'
+                    ? m.isError 
+                      ? 'bg-red-50 text-red-700 border border-red-100 rounded-tr-none text-right'
+                      : 'bg-white text-slate-800 rounded-tr-none border border-slate-100 text-right whitespace-pre-wrap' 
+                    : 'bg-primary text-white rounded-tl-none text-right font-medium'
                 }`}>
                   {m.content}
                 </div>
               </div>
             ))}
             {loading && (
-              <div className="flex gap-3">
-                <Avatar className="h-8 w-8 border animate-pulse">
-                  <AvatarFallback className="bg-primary text-white"><Bot className="h-4 w-4" /></AvatarFallback>
+              <div className="flex gap-3 animate-pulse">
+                <Avatar className="h-9 w-9 border-2 border-white shadow-sm shrink-0">
+                  <AvatarFallback className="bg-primary text-white font-bold text-xs">م</AvatarFallback>
                 </Avatar>
-                <div className="p-3 rounded-2xl bg-white border rounded-tl-none">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                <div className="p-4 rounded-[22px] bg-white border border-slate-100 rounded-tr-none flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"></span>
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:0.4s]"></span>
                 </div>
               </div>
             )}
           </div>
         </ScrollArea>
-        <div className="p-4 bg-white border-t">
+        
+        <div className="p-4 pb-60 bg-white border-t shrink-0">
           <form 
             onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-            className="flex gap-2"
+            className="flex gap-2 items-center bg-muted/30 p-1.5 rounded-2xl border border-muted shadow-inner"
           >
             <Input 
-              placeholder="Ask about your balance, deposits, or games..." 
+              placeholder={isAdmin ? "اسأل عن زبون برقم الهاتف..." : "اكتب سؤالك هون يا غالي..."}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              className="bg-muted/50 border-none"
+              className="bg-transparent border-none text-right focus-visible:ring-0 shadow-none h-12"
+              dir="rtl"
             />
-            <Button size="icon" disabled={loading} type="submit">
-              <Send className="h-4 w-4" />
+            <Button 
+              size="icon" 
+              disabled={loading || !input.trim()} 
+              type="submit"
+              className="rounded-xl h-12 w-12 shadow-lg shadow-primary/20 shrink-0"
+            >
+              <Send className="h-5 w-5 rotate-180" />
             </Button>
           </form>
+          <p className="text-[9px] text-center text-muted-foreground mt-2 font-bold opacity-50 tracking-widest uppercase">Shabik Labik AI Assistant v11.0</p>
         </div>
       </CardContent>
     </Card>

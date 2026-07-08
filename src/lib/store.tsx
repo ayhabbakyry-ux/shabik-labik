@@ -1,6 +1,10 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { signInAction, signUpAction } from '@/app/actions/auth';
+import { syncBalanceAction, recordTransactionAction, getUserTransactionsAction } from '@/app/actions/wallet';
+import { getAllUsersAction, deleteUserAction, processAdminAction, updateTransactionStatusServer, getUserDataAction } from '@/app/actions/admin';
 
 export type Transaction = {
   id: string;
@@ -12,18 +16,9 @@ export type Transaction = {
   userName?: string;
   userPhone?: string;
   details?: string;
-};
-
-export type AppUser = {
-  phone: string;
-  name: string;
-  password?: string;
-  balance: number;
-};
-
-export type PasswordRequest = {
-  phone: string;
-  date: string;
+  proofImage?: string;
+  balanceBefore?: number;
+  balanceAfter?: number;
 };
 
 type UserContextType = {
@@ -33,249 +28,193 @@ type UserContextType = {
   userName: string;
   userBalance: number;
   transactions: Transaction[];
-  allUsers: AppUser[];
-  passwordRequests: PasswordRequest[];
-  login: (phone: string, password: string) => { success: boolean; message: string };
-  register: (phone: string, name: string, pass: string) => { success: boolean; message: string };
+  allUsers: any[];
+  passwordRequests: any[];
+  login: (phone: string, password: string) => Promise<{ success: boolean; message: string }>;
+  register: (phone: string, name: string, pass: string, refCode?: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
-  addBalance: (amount: number) => void;
-  deductBalance: (amount: number, productDetails: string, initialStatus?: 'Pending' | 'Completed', externalId?: string) => void;
-  refundBalance: (transactionId: string) => void;
-  updateTransactionStatus: (transactionId: string, status: 'Completed' | 'Rejected', externalId?: string) => void;
-  requestDeposit: (amount: number, proofImage: string) => void;
-  adminAction: (transactionId: string, action: 'approve' | 'reject') => void;
-  deleteUser: (phone: string) => void;
-  requestPasswordReset: (phone: string) => void;
-  clearPasswordRequest: (phone: string) => void;
-  checkPendingOrders: () => Promise<void>;
+  deductBalance: (amount: number, productDetails: string, initialStatus?: 'Pending' | 'Completed', externalId?: string) => Promise<void>;
+  requestDeposit: (amount: number, proofImage: string) => Promise<void>;
+  adminAction: (txId: string, action: 'approve' | 'reject') => Promise<void>;
+  deleteUser: (phone: string) => Promise<void>;
+  clearPasswordRequest: (phone: string) => Promise<void>;
   currency: string;
+  checkPendingOrders: () => Promise<void>;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [allUsers, setAllUsers] = useState<AppUser[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [passwordRequests, setPasswordRequests] = useState<PasswordRequest[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userPhone, setUserPhone] = useState("");
   const [userName, setUserName] = useState("");
   const [userBalance, setUserBalance] = useState(0);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [passwordRequests, setPasswordRequests] = useState<any[]>([]);
+  const [isCheckingOrders, setIsCheckingOrders] = useState(false);
   
   const currency = "ل.س.ج";
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
 
-  const refundBalance = useCallback((transactionId: string) => {
-    setTransactions(prevTxs => {
-      const tx = prevTxs.find(t => t.id === transactionId);
-      if (!tx || tx.status !== 'Pending') return prevTxs;
-
-      setAllUsers(prevUsers => {
-        const updatedUsers = prevUsers.map(u => 
-          u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u
-        );
-        localStorage.setItem('shabik_users', JSON.stringify(updatedUsers));
-        if (tx.userPhone === userPhone) {
-          setUserBalance(prev => prev + tx.amount);
-        }
-        return updatedUsers;
-      });
-
-      const updatedTxs = prevTxs.map(t => 
-        t.id === transactionId ? { ...t, status: 'Rejected' as const } : t
-      );
-      localStorage.setItem('shabik_txs', JSON.stringify(updatedTxs));
-      return updatedTxs;
-    });
-  }, [userPhone]);
-
-  const updateTransactionStatus = useCallback((transactionId: string, status: 'Completed' | 'Rejected', externalId?: string) => {
-    setTransactions(prev => {
-      const updated = prev.map(t => t.id === transactionId ? { ...t, status, external_order_id: externalId || t.external_order_id } : t);
-      localStorage.setItem('shabik_txs', JSON.stringify(updated));
-      return updated;
-    });
-  }, []);
-
-  const checkPendingOrders = useCallback(async () => {
-    const pendingOrders = transactions.filter(t => t.status === 'Pending' && t.external_order_id);
-    if (pendingOrders.length === 0) return;
-
-    for (const order of pendingOrders) {
-      try {
-        const response = await fetch(`/api/check-order?order_id=${order.external_order_id}`);
-        const data = await response.json();
-        
-        if (data.success) {
-          const remoteStatus = String(data.status).trim();
-          console.log(`تم رصد تغيير حالة الطلب رقم ${order.external_order_id}، والحالة الجديدة هي ${remoteStatus}`);
-          
-          if (remoteStatus !== "" && !remoteStatus.includes("انتظار") && !remoteStatus.includes("ينتظر") && !remoteStatus.includes("معالجة")) {
-             if (remoteStatus.includes('مقبول') || remoteStatus.includes('موافق') || remoteStatus.includes('القبول') || remoteStatus.includes('نجاح')) {
-               updateTransactionStatus(order.id, 'Completed');
-             } else if (remoteStatus.includes('مرفوض') || remoteStatus.includes('فشل') || remoteStatus.includes('الغاء')) {
-               refundBalance(order.id);
-             }
-          }
-        }
-      } catch (error) {
-        console.error("Error checking order status:", order.external_order_id, error);
-      }
+  const fetchCloudData = useCallback(async (phone: string) => {
+    const cloudTxs = await getUserTransactionsAction(phone);
+    setTransactions(cloudTxs);
+    
+    const res = await getUserDataAction(phone);
+    if (res.success && res.data) {
+      setUserBalance(res.data.balance || 0);
+      const authData = JSON.parse(localStorage.getItem('shabik_auth') || '{}');
+      localStorage.setItem('shabik_auth', JSON.stringify({ ...authData, balance: res.data.balance }));
     }
-  }, [transactions, updateTransactionStatus, refundBalance]);
+
+    if (phone === ADMIN_PHONE) {
+      const users = await getAllUsersAction();
+      setAllUsers(users);
+    }
+  }, [ADMIN_PHONE]);
 
   useEffect(() => {
-    const savedUsers = localStorage.getItem('shabik_users');
     const savedAuth = localStorage.getItem('shabik_auth');
-    const savedTxs = localStorage.getItem('shabik_txs');
-    const savedPassReqs = localStorage.getItem('shabik_pass_reqs');
-
-    let parsedUsers = savedUsers ? JSON.parse(savedUsers) : [];
-    setAllUsers(parsedUsers);
-
-    if (savedTxs) setTransactions(JSON.parse(savedTxs));
-    if (savedPassReqs) setPasswordRequests(JSON.parse(savedPassReqs));
-    
     if (savedAuth) {
       const authData = JSON.parse(savedAuth);
-      const currentU = parsedUsers.find((u: any) => u.phone === authData.phone);
-      if (currentU || authData.phone === ADMIN_PHONE) {
-        setIsLoggedIn(true);
-        setUserPhone(authData.phone);
-        setUserName(authData.name);
-        setUserBalance(currentU?.balance || 0);
-      }
+      setIsLoggedIn(true);
+      setUserPhone(authData.phone);
+      setUserName(authData.name);
+      setUserBalance(authData.balance || 0);
+      fetchCloudData(authData.phone);
     }
-  }, []);
+  }, [fetchCloudData]);
 
-  const login = (phone: string, password: string) => {
+  const login = async (phone: string, password: string) => {
     if (phone === ADMIN_PHONE && password === ADMIN_PASS) {
+      const adminData = { phone, name: "المدير أيهم", balance: 0 };
       setIsLoggedIn(true);
       setUserPhone(phone);
-      setUserName("المدير أيهم");
-      setUserBalance(0);
-      localStorage.setItem('shabik_auth', JSON.stringify({ phone, name: "المدير أيهم" }));
-      return { success: true, message: "تم دخول المدير بنجاح" };
+      setUserName(adminData.name);
+      localStorage.setItem('shabik_auth', JSON.stringify(adminData));
+      await fetchCloudData(phone);
+      return { success: true, message: "أهلاً بك يا مدير أيهم" };
     }
-    const user = allUsers.find(u => u.phone === phone);
-    if (!user || user.password !== password) return { success: false, message: "بيانات الدخول خاطئة" };
-    setIsLoggedIn(true);
-    setUserPhone(phone);
-    setUserName(user.name);
-    setUserBalance(user.balance);
-    localStorage.setItem('shabik_auth', JSON.stringify(user));
-    return { success: true, message: "تم تسجيل الدخول بنجاح" };
+
+    const result = await signInAction(phone, password);
+    if (result.success && result.user) {
+      setIsLoggedIn(true);
+      setUserPhone(result.user.phone);
+      setUserName(result.user.name);
+      setUserBalance(result.user.balance);
+      localStorage.setItem('shabik_auth', JSON.stringify(result.user));
+      await fetchCloudData(result.user.phone);
+      return { success: true, message: result.message };
+    }
+    return { success: false, message: result.message };
   };
 
-  const register = (phone: string, name: string, pass: string) => {
-    if (allUsers.some(u => u.phone === phone)) return { success: false, message: "الرقم مسجل مسبقاً" };
-    const newUser: AppUser = { phone, name, password: pass, balance: 0 };
-    setAllUsers(prev => {
-      const updated = [...prev, newUser];
-      localStorage.setItem('shabik_users', JSON.stringify(updated));
-      return updated;
-    });
-    return { success: true, message: "تم إنشاء الحساب بنجاح" };
+  const register = async (phone: string, name: string, pass: string, refCode?: string) => {
+    return await signUpAction(phone, name, pass, refCode);
   };
 
-  const addBalance = (amount: number) => {
-    setAllUsers(prev => {
-      const updated = prev.map(u => u.phone === userPhone ? { ...u, balance: u.balance + amount } : u);
-      localStorage.setItem('shabik_users', JSON.stringify(updated));
-      return updated;
-    });
-    setUserBalance(prev => prev + amount);
-  };
+  const deductBalance = async (amount: number, productDetails: string, initialStatus: 'Pending' | 'Completed' = 'Completed', externalId?: string) => {
+    const before = userBalance;
+    const newBalance = Math.max(0, userBalance - amount);
+    setUserBalance(newBalance);
+    await syncBalanceAction(userPhone, newBalance);
+    
+    const authData = JSON.parse(localStorage.getItem('shabik_auth') || '{}');
+    localStorage.setItem('shabik_auth', JSON.stringify({ ...authData, balance: newBalance }));
 
-  const deductBalance = (amount: number, productDetails: string, initialStatus: 'Pending' | 'Completed' = 'Completed', externalId?: string) => {
-    setAllUsers(prev => {
-      const updated = prev.map(u => u.phone === userPhone ? { ...u, balance: Math.max(0, u.balance - amount) } : u);
-      localStorage.setItem('shabik_users', JSON.stringify(updated));
-      return updated;
-    });
-    setUserBalance(prev => Math.max(0, prev - amount));
-
-    const newTx: Transaction = {
-      id: `ORD-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-      external_order_id: externalId,
+    const txData: Omit<Transaction, 'id'> = {
+      external_order_id: externalId || "",
       type: 'شراء منتج',
       amount,
       status: initialStatus,
       date: new Date().toLocaleString('ar-SY'),
       userName,
       userPhone,
-      details: productDetails
+      details: productDetails,
+      balanceBefore: before,
+      balanceAfter: newBalance
     };
-    setTransactions(prev => {
-      const updated = [newTx, ...prev];
-      localStorage.setItem('shabik_txs', JSON.stringify(updated));
-      return updated;
-    });
+    
+    const result = await recordTransactionAction(txData);
+    const newTx: Transaction = { id: result.id || `ORD-${Date.now()}`, ...txData };
+    setTransactions(prev => [newTx, ...prev]);
   };
 
-  const requestDeposit = (amount: number, proofImage: string) => {
-    const newTx: Transaction = {
-      id: `TX-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+  const requestDeposit = async (amount: number, proofImage: string) => {
+    const txData: Omit<Transaction, 'id'> = {
       type: 'إيداع محفظة',
       amount,
       status: 'Pending',
       date: new Date().toLocaleString('ar-SY'),
       userName,
       userPhone,
+      details: "طلب شحن رصيد",
+      proofImage
     };
-    setTransactions(prev => {
-      const updated = [newTx, ...prev];
-      localStorage.setItem('shabik_txs', JSON.stringify(updated));
-      return updated;
-    });
+    const result = await recordTransactionAction(txData);
+    const newTx: Transaction = { id: result.id || `TX-${Date.now()}`, ...txData };
+    setTransactions(prev => [newTx, ...prev]);
   };
 
-  const adminAction = (transactionId: string, action: 'approve' | 'reject') => {
-    setTransactions(prevTxs => {
-      const updated = prevTxs.map(tx => {
-        if (tx.id === transactionId && tx.status === 'Pending') {
-          if (action === 'approve') {
-            setAllUsers(prevUsers => {
-              const newUsers = prevUsers.map(u => u.phone === tx.userPhone ? { ...u, balance: u.balance + tx.amount } : u);
-              localStorage.setItem('shabik_users', JSON.stringify(newUsers));
-              if (tx.userPhone === userPhone) setUserBalance(prev => prev + tx.amount);
-              return newUsers;
-            });
-            return { ...tx, status: 'Completed' as const };
+  const adminAction = async (txId: string, action: 'approve' | 'reject') => {
+    const res = await processAdminAction(txId, action);
+    if (res.success) {
+      await fetchCloudData(userPhone);
+    }
+  };
+
+  const checkPendingOrders = async () => {
+    if (!isLoggedIn || isCheckingOrders) return;
+
+    const pendingOrders = transactions.filter(tx => tx.status === 'Pending' && tx.external_order_id);
+    if (pendingOrders.length === 0) return;
+
+    setIsCheckingOrders(true);
+    for (const order of pendingOrders) {
+      try {
+        const res = await fetch(`/api/check-order?order_id=${order.external_order_id}`);
+        const data = await res.json();
+
+        if (data.success && data.status) {
+          const remoteStatus = String(data.status).toLowerCase().trim();
+          let finalStatus: 'Completed' | 'Rejected' | null = null;
+
+          if (remoteStatus === 'accept' || remoteStatus === 'موافق' || remoteStatus === 'مقبول' || remoteStatus === 'نجاح') {
+            finalStatus = 'Completed';
+          } else if (remoteStatus === 'reject' || remoteStatus === 'رفض') {
+            finalStatus = 'Rejected';
           }
-          return { ...tx, status: 'Rejected' as const };
+
+          if (finalStatus) {
+            const ownerPhone = order.userPhone || userPhone;
+            const updateRes = await updateTransactionStatusServer(order.id, finalStatus, order.amount, ownerPhone);
+            
+            if (updateRes.success) {
+              setTransactions(prev => prev.map(t => t.id === order.id ? { ...t, status: finalStatus! } : t));
+              if (finalStatus === 'Rejected' && ownerPhone === userPhone && updateRes.newBalance !== undefined) {
+                setUserBalance(updateRes.newBalance);
+                const authData = JSON.parse(localStorage.getItem('shabik_auth') || '{}');
+                localStorage.setItem('shabik_auth', JSON.stringify({ ...authData, balance: updateRes.newBalance }));
+              }
+            }
+          }
         }
-        return tx;
-      });
-      localStorage.setItem('shabik_txs', JSON.stringify(updated));
-      return updated;
-    });
+      } catch (err) { console.error("Polling error:", err); }
+    }
+    setIsCheckingOrders(false);
   };
 
-  const deleteUser = (phone: string) => {
-    setAllUsers(prev => {
-      const updated = prev.filter(u => u.phone !== phone);
-      localStorage.setItem('shabik_users', JSON.stringify(updated));
-      return updated;
-    });
+  const deleteUser = async (phone: string) => {
+    const res = await deleteUserAction(phone);
+    if (res.success) {
+      await fetchCloudData(userPhone);
+    }
   };
 
-  const requestPasswordReset = (phone: string) => {
-    const newReq = { phone, date: new Date().toLocaleString('ar-SY') };
-    setPasswordRequests(prev => {
-      const updated = [newReq, ...prev];
-      localStorage.setItem('shabik_pass_reqs', JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  const clearPasswordRequest = (phone: string) => {
-    setPasswordRequests(prev => {
-      const updated = prev.filter(r => r.phone !== phone);
-      localStorage.setItem('shabik_pass_reqs', JSON.stringify(updated));
-      return updated;
-    });
+  const clearPasswordRequest = async (phone: string) => {
+    setPasswordRequests(prev => prev.filter(r => r.phone !== phone));
   };
 
   const logout = () => {
@@ -283,6 +222,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setUserPhone("");
     setUserName("");
     setUserBalance(0);
+    setTransactions([]);
     localStorage.removeItem('shabik_auth');
   };
 
@@ -291,7 +231,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   return (
     <UserContext.Provider value={{ 
       isLoggedIn, isAdmin, userPhone, userName, userBalance, transactions, allUsers, passwordRequests,
-      login, register, logout, addBalance, deductBalance, refundBalance, updateTransactionStatus, requestDeposit, adminAction, deleteUser, requestPasswordReset, clearPasswordRequest, checkPendingOrders, currency
+      login, register, logout, deductBalance, requestDeposit, adminAction, deleteUser, clearPasswordRequest,
+      currency, checkPendingOrders
     }}>
       {children}
     </UserContext.Provider>

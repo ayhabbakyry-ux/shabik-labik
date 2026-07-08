@@ -1,9 +1,8 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, Phone, Lock, User, ArrowRight, HelpCircle, Menu } from "lucide-react";
+import { ShieldCheck, Phone, Lock, User, ArrowRight, HelpCircle, Menu, Gift } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +16,10 @@ export default function AuthPage() {
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
-  const { login, register, isLoggedIn, requestPasswordReset, userBalance, currency } = useUser();
+  const [referralCode, setReferralCode] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const { login, register, isLoggedIn, userBalance, currency } = useUser();
   const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
@@ -30,15 +32,16 @@ export default function AuthPage() {
     }
   }, [isLoggedIn, router]);
 
-  const handleAuth = (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone || !password) {
-      toast({ variant: "destructive", title: "خطأ", description: "عذراً، جميع الحقول مطلوبة" });
+      toast({ variant: "destructive", title: "خطأ", description: "عذراً، جميع الحقول مطلوبة خيو" });
       return;
     }
 
+    setIsLoading(true);
     if (isLogin) {
-      const result = login(phone, password);
+      const result = await login(phone, password);
       if (result.success) {
         toast({ title: "مرحباً بك", description: result.message });
         router.push("/dashboard");
@@ -48,9 +51,10 @@ export default function AuthPage() {
     } else {
       if (!name) {
         toast({ variant: "destructive", title: "خطأ", description: "يرجى إدخال اسمك لإنشاء الحساب" });
+        setIsLoading(false);
         return;
       }
-      const result = register(phone, name, password);
+      const result = await register(phone, name, password, referralCode);
       if (result.success) {
         toast({ title: "تم التسجيل", description: result.message });
         setIsLogin(true);
@@ -58,6 +62,7 @@ export default function AuthPage() {
         toast({ variant: "destructive", title: "فشل التسجيل", description: result.message });
       }
     }
+    setIsLoading(false);
   };
 
   if (isForgotPassword) {
@@ -68,17 +73,13 @@ export default function AuthPage() {
             <CardTitle className="text-xl text-right flex items-center gap-2">
               <HelpCircle className="h-5 w-5 text-primary" /> استعادة الحساب
             </CardTitle>
-            <CardDescription className="text-right">أدخل رقم هاتفك المسجل لنرسل طلباً للإدارة.</CardDescription>
+            <CardDescription className="text-right">تواصل مع الإدارة عبر الواتساب لاستعادة حسابك.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={(e) => { e.preventDefault(); requestPasswordReset(phone); setIsForgotPassword(false); toast({ title: "تم الإرسال" }); }} className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-right block">رقم الهاتف</Label>
-                <Input placeholder="09xxxxxxxx" className="pr-10 h-11 text-right" value={phone} onChange={(e) => setPhone(e.target.value)} />
-              </div>
-              <Button type="submit" className="w-full h-11">إرسال طلب استعادة</Button>
-              <Button variant="ghost" className="w-full" onClick={() => setIsForgotPassword(false)}>العودة</Button>
-            </form>
+             <a href="https://wa.me/963939549573" target="_blank" className="block w-full">
+               <Button className="w-full h-11 bg-green-600 hover:bg-green-700">تواصل عبر واتساب</Button>
+             </a>
+             <Button variant="ghost" className="w-full mt-2" onClick={() => setIsForgotPassword(false)}>العودة</Button>
           </CardContent>
         </Card>
       </div>
@@ -120,13 +121,27 @@ export default function AuthPage() {
           <CardContent>
             <form onSubmit={handleAuth} className="space-y-4">
               {!isLogin && (
-                <div className="space-y-2">
-                  <Label className="text-right block font-bold text-xs pr-1">الاسم الكامل</Label>
-                  <div className="relative">
-                    <User className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="أدخل اسمك" className="pr-10 h-12 text-right rounded-xl border-muted bg-muted/20" value={name} onChange={(e) => setName(e.target.value)} />
+                <>
+                  <div className="space-y-2">
+                    <Label className="text-right block font-bold text-xs pr-1">الاسم الكامل</Label>
+                    <div className="relative">
+                      <User className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input placeholder="أدخل اسمك" className="pr-10 h-12 text-right rounded-xl border-muted bg-muted/20" value={name} onChange={(e) => setName(e.target.value)} />
+                    </div>
                   </div>
-                </div>
+                  <div className="space-y-2">
+                    <Label className="text-right block font-bold text-xs pr-1">كود الدعوة (اختياري)</Label>
+                    <div className="relative">
+                      <Gift className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        placeholder="أدخل كود صديقك لتربحا 25 ليرة" 
+                        className="pr-10 h-12 text-right rounded-xl border-muted bg-muted/20 uppercase font-mono" 
+                        value={referralCode} 
+                        onChange={(e) => setReferralCode(e.target.value)} 
+                      />
+                    </div>
+                  </div>
+                </>
               )}
               <div className="space-y-2">
                 <Label className="text-right block font-bold text-xs pr-1">رقم الهاتف</Label>
@@ -145,8 +160,8 @@ export default function AuthPage() {
               {isLogin && (
                 <button type="button" onClick={() => setIsForgotPassword(true)} className="text-[10px] text-primary font-bold hover:underline block w-full text-right pr-1">نسيت كلمة المرور؟</button>
               )}
-              <Button type="submit" className="w-full h-14 text-base font-bold mt-2 shadow-xl shadow-primary/20 rounded-2xl">
-                {isLogin ? "دخول للمنصة" : "إنشاء حساب"} <ArrowRight className="mr-2 h-4 w-4 rotate-180" />
+              <Button type="submit" disabled={isLoading} className="w-full h-14 text-base font-bold mt-2 shadow-xl shadow-primary/20 rounded-2xl">
+                {isLoading ? "جاري المعالجة..." : isLogin ? "دخول للمنصة" : "إنشاء حساب"} <ArrowRight className="mr-2 h-4 w-4 rotate-180" />
               </Button>
             </form>
           </CardContent>

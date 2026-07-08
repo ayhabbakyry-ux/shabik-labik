@@ -1,8 +1,7 @@
-
 "use client";
 
 import { useState } from "react";
-import { Send, Landmark, Image as ImageIcon, AlertCircle, Copy, CheckCircle2, Smartphone, Wallet, ArrowUpCircle } from "lucide-react";
+import { Send, Landmark, Image as ImageIcon, AlertCircle, Copy, CheckCircle2, Smartphone, Wallet, ArrowUpCircle, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/store";
 import {
@@ -22,10 +21,31 @@ export function WalletCard() {
   const { userBalance, requestDeposit, currency } = useUser();
   const [amount, setAmount] = useState("");
   const [imageProof, setImageProof] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // التأكد من أن الملف صورة
+    if (!file.type.startsWith('image/')) {
+      toast({ variant: "destructive", title: "خطأ في الملف", description: "يرجى اختيار ملف صورة صالح." });
+      return;
+    }
+
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImageProof(reader.result as string);
+      setUploading(false);
+      toast({ title: "تم رفع الإشعار", description: "الصورة جاهزة للإرسال." });
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleDeposit = () => {
     setError("");
@@ -108,11 +128,30 @@ export function WalletCard() {
               </div>
               <div className="grid gap-2 text-right">
                 <Label className="font-bold text-xs text-gray-400">صورة إشعار التحويل (إجباري)</Label>
-                <Input type="file" accept="image/*" className="bg-[#1c232d] border-gray-800 h-12 text-right text-white cursor-pointer rounded-xl" onChange={(e) => setImageProof("uploaded")} />
+                <div className="relative">
+                  <Input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    id="proof-upload" 
+                    onChange={handleFileChange} 
+                  />
+                  <label 
+                    htmlFor="proof-upload" 
+                    className="flex items-center justify-center gap-2 w-full h-14 bg-[#1c232d] border-2 border-dashed border-gray-700 rounded-xl cursor-pointer hover:border-primary transition-colors text-sm font-bold text-gray-300"
+                  >
+                    {uploading ? "جاري التحميل..." : imageProof ? "تم اختيار الصورة ✅" : <><Upload className="h-4 w-4" /> اختر صورة الإشعار</>}
+                  </label>
+                </div>
+                {imageProof && (
+                  <div className="mt-2 rounded-lg overflow-hidden border border-gray-800 h-20">
+                    <img src={imageProof} alt="Preview" className="w-full h-full object-cover" />
+                  </div>
+                )}
               </div>
             </div>
             <DialogFooter>
-              <Button onClick={handleDeposit} className="w-full h-14 text-lg font-black rounded-2xl shadow-xl shadow-primary/20">تأكيد وإرسال الطلب</Button>
+              <Button onClick={handleDeposit} disabled={uploading} className="w-full h-14 text-lg font-black rounded-2xl shadow-xl shadow-primary/20">تأكيد وإرسال الطلب</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

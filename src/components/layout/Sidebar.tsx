@@ -1,9 +1,19 @@
-
 "use client";
 
 import React from 'react';
 import { useUser } from "@/lib/store";
-import { LogOut, User, Heart, Home, CreditCard, Receipt, Wallet, ShoppingCart, MapPin, MessageCircle, Gift, ShieldAlert, Star } from "lucide-react";
+import { 
+  LogOut, 
+  Home, 
+  Wallet, 
+  Receipt, 
+  ShoppingCart, 
+  MapPin, 
+  LifeBuoy,
+  Gift,
+  Star,
+  Bot
+} from "lucide-react";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
@@ -21,13 +31,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { toast } = useToast();
 
   const menuItems = [
-    { title: "الرئيسية", icon: <Home className="h-5 w-5" />, href: "/dashboard", activeBg: "bg-[#1e3329]", activeText: "text-[#22c55e]" },
-    { title: "دعوة الأصدقاء والربح", icon: <Gift className="h-5 w-5" />, href: "/referral" },
-    { title: "إضافة رصيد لحسابي", icon: <CreditCard className="h-5 w-5" />, href: "/wallet" },
+    { title: "الرئيسية", icon: <Home className="h-5 w-5" />, href: "/dashboard" },
+    { title: "المحفظة", icon: <Wallet className="h-5 w-5" />, href: "/wallet" },
     { title: "دفعاتي المالية", icon: <Receipt className="h-5 w-5" />, href: "/payments" },
-    { title: "محفظتي", icon: <Wallet className="h-5 w-5" />, href: "/wallet" },
     { title: "مشترياتي", icon: <ShoppingCart className="h-5 w-5" />, href: "/history" },
+    { title: "ادعُ واربح", icon: <Gift className="h-5 w-5 text-primary" />, href: "/referral" },
     { title: "المراكز المعتمدة", icon: <MapPin className="h-5 w-5" />, href: "/centers" },
+    { title: "المساعد الذكي", icon: <Bot className="h-5 w-5" />, href: "/ai-assistant" },
+    { title: "الدعم الفني", icon: <LifeBuoy className="h-5 w-5" />, href: "/support" },
   ];
 
   const handleLevelClick = () => {
@@ -55,7 +66,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <div className="relative mb-4">
              <Avatar className="w-24 h-24 border-4 border-[#1e232d] shadow-2xl">
                 <AvatarImage src={`https://picsum.photos/seed/${userPhone}/200`} />
-                <AvatarFallback className="bg-primary text-2xl font-bold">{userName[0] || 'U'}</AvatarFallback>
+                <AvatarFallback className="bg-primary text-2xl font-bold">{userName?.[0] || 'U'}</AvatarFallback>
              </Avatar>
              <div className="absolute -bottom-1 -right-1 bg-yellow-500 rounded-full p-1.5 shadow-lg border-2 border-[#11151d]">
                 <Star className="h-3 w-3 text-[#11151d] fill-current" />
@@ -69,7 +80,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   onClick={handleLevelClick}
                   className="bg-yellow-500/10 text-yellow-500 px-3 py-0.5 rounded-full text-[10px] font-black uppercase flex items-center gap-1 border border-yellow-500/20 cursor-pointer hover:bg-yellow-500/20 transition-all"
                 >
-                  مميز ⭐
+                  {isAdmin ? "المدير أيهم" : "مميز ⭐"}
                 </span>
                <span className="text-gray-500 text-[10px] font-bold">ID: {userPhone || "0000"}</span>
             </div>
@@ -83,32 +94,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
         </div>
 
-        <div className="flex justify-around py-4 border-b border-gray-800/30">
-           <button className="text-gray-500 hover:text-red-500 transition-colors p-2"><Heart className="h-5 w-5" /></button>
-           <button className="text-gray-500 hover:text-white transition-colors p-2"><User className="h-5 w-5" /></button>
-           <button onClick={logout} className="text-gray-500 hover:text-destructive transition-colors p-2"><LogOut className="h-5 w-5" /></button>
-        </div>
-
         <div className="flex flex-col p-4 gap-1.5">
-          {isAdmin && (
-            <Link href="/admin" onClick={onClose}>
-              <div className={cn(
-                "flex items-center gap-4 px-4 py-3.5 rounded-2xl w-full transition-all mb-2",
-                pathname === "/admin" ? "bg-red-500/20 text-red-500 border border-red-500/30" : "bg-red-500/5 text-red-500 hover:bg-red-500/10"
-              )}>
-                <ShieldAlert className="h-5 w-5" />
-                <span className="font-black text-sm font-headline">لوحة الإدارة</span>
-              </div>
-            </Link>
-          )}
-
           {menuItems.map((item) => (
             <Link key={item.title} href={item.href} onClick={onClose}>
               <div
                 className={cn(
                   "flex items-center gap-4 px-4 py-3.5 rounded-2xl w-full transition-all active:scale-[0.97] cursor-pointer",
                   pathname === item.href 
-                    ? (item.activeBg || 'bg-[#1c232d] text-primary border border-primary/20 shadow-lg shadow-primary/5')
+                    ? 'bg-[#1c232d] text-primary border border-primary/20 shadow-lg shadow-primary/5'
                     : 'hover:bg-[#1c232d]/50 text-gray-400 hover:text-white'
                 )}
               >
@@ -119,18 +112,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               </div>
             </Link>
           ))}
-          
-          <a
-            href="https://wa.me/963939549573"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-4 px-4 py-3.5 rounded-2xl w-full transition-all active:scale-[0.97] hover:bg-[#1c232d]/50 text-gray-400 mt-2"
-          >
-            <div className="p-2 rounded-xl bg-gray-800/20">
-               <MessageCircle className="h-5 w-5" />
-            </div>
-            <span className="font-bold text-sm font-headline">الدعم الفني (واتساب)</span>
-          </a>
         </div>
 
         <div className="mt-8 px-8 pb-10">

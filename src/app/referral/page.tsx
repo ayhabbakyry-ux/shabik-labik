@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -8,11 +7,11 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { useUser } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Share2, Copy, Users, Gift, CheckCircle2, ArrowRight, Menu } from "lucide-react";
+import { Share2, Copy, Users, Gift, CheckCircle2, ArrowRight, Menu, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ReferralPage() {
-  const { userPhone, currency, isLoggedIn } = useUser();
+  const { userPhone, currency, isLoggedIn, isAdmin } = useUser();
   const [copied, setCopied] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { toast } = useToast();
@@ -26,96 +25,133 @@ export default function ReferralPage() {
 
   if (!isLoggedIn) return null;
 
-  const referralLink = `https://shabik-labik.com/register?ref=${userPhone}`;
+  // كود المدير ADMEN والمشترك آخر 5 أرقام
+  const myReferralCode = isAdmin ? "ADMEN" : (userPhone ? userPhone.slice(-5) : "00000");
+  const referralLink = `https://shabik-labik.vercel.app`;
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(referralLink);
-    setCopied(true);
-    toast({
-      title: "تم النسخ بنجاح",
-      description: "رابط الإحالة الخاص بك جاهز للمشاركة الآن.",
-    });
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      navigator.clipboard.writeText(myReferralCode);
+      setCopied(true);
+      toast({
+        title: "تم النسخ بنجاح",
+        description: `كود الإحالة (${myReferralCode}) جاهز للمشاركة الآن.`,
+      });
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "فشل النسخ",
+        description: "يرجى نسخ الكود يدوياً.",
+      });
+    }
+  };
+
+  const handleShare = async () => {
+    const shareText = `أهلاً بك! أدعوك للتسجيل في تطبيق شبك لبيك الرقمي والاستفادة من عروض الشحن التلقائي.\n🌐 رابط الموقع: ${referralLink}\n🔑 كود الدعوة الخاص بي: ${myReferralCode}\n(أدخل الكود عند التسجيل لتحصل على 25 ل.س مجاناً!)`;
+    
+    const shareData = {
+      title: 'شبك لبيك الرقمي',
+      text: shareText,
+      url: referralLink,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        throw new Error("Share API not available");
+      }
+    } catch (err) {
+      // نظام التراجع التلقائي في حال فشل ميزة المشاركة الذكية
+      try {
+        await navigator.clipboard.writeText(shareText);
+        toast({
+          title: "تم نسخ نص المشاركة",
+          description: "رسالة الدعوة جاهزة للإرسال عبر أي تطبيق تواصل الآن.",
+        });
+      } catch (err) {
+        toast({
+          variant: "destructive",
+          title: "عذراً يا غالي",
+          description: "حدث خطأ غير متوقع، يرجى نسخ الكود ومشاركته يدوياً.",
+        });
+      }
+    }
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24" dir="rtl">
+    <div className="min-h-screen bg-[#f8f9fc] pb-24" dir="rtl">
       <DesktopHeader />
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       
-      {/* Mobile Header with Back Button */}
-      <div className="md:hidden flex items-center justify-between p-4 bg-white border-b sticky top-0 z-40">
+      <div className="md:hidden flex items-center justify-between p-4 bg-white border-b sticky top-0 z-40 shadow-sm">
         <button 
           onClick={() => router.push('/dashboard')}
-          className="p-2 hover:bg-gray-100 rounded-full transition active:scale-95"
+          className="p-2 hover:bg-primary/10 rounded-xl transition active:scale-95 text-primary"
         >
-          <ArrowRight className="h-6 w-6 text-primary" />
+          <ArrowRight className="h-6 w-6" />
         </button>
-        <h1 className="text-lg font-bold font-headline">ادعُ واربح</h1>
+        <span className="font-bold text-sm">برنامج المكافآت الأكاديمي</span>
         <button 
           onClick={() => setIsSidebarOpen(true)}
-          className="p-2 hover:bg-gray-100 rounded-full"
+          className="p-2 hover:bg-muted rounded-xl text-primary"
         >
-          <Menu className="h-6 w-6 text-primary" />
+          <Menu className="h-6 w-6" />
         </button>
       </div>
       
-      <main className="max-w-md mx-auto p-4 space-y-6 pt-6">
-        <div className="text-center space-y-2">
-          <div className="bg-primary/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Gift className="h-10 w-10 text-primary" />
+      <main className="max-w-2xl mx-auto p-4 space-y-6 pt-10">
+        <div className="text-center space-y-4 animate-in fade-in slide-in-from-top-4 duration-700">
+          <div className="relative inline-block">
+            <div className="bg-primary/10 w-24 h-24 rounded-[32px] flex items-center justify-center mx-auto shadow-inner transform -rotate-6">
+              <Gift className="h-12 w-12 text-primary" />
+            </div>
+            <Sparkles className="absolute -top-2 -right-2 h-6 w-6 text-yellow-500 animate-pulse" />
           </div>
-          <h1 className="text-2xl font-bold font-headline">ادعُ أصدقاءك واربح!</h1>
-          <p className="text-muted-foreground text-sm">
-            احصل على <span className="text-primary font-bold">100 {currency}</span> مجاناً عن كل مستخدم جديد يسجل عن طريقك.
-          </p>
+          <div>
+            <h1 className="text-3xl font-black font-headline text-slate-900 tracking-tight">ادعُ أصدقاءك واربح!</h1>
+            <p className="text-muted-foreground text-sm font-medium mt-2 max-w-sm mx-auto leading-relaxed">
+              شارك كودك الخاص واحصل على <span className="text-primary font-bold text-lg">25 {currency}</span> مجاناً لكل صديق ينضم إلينا.
+            </p>
+          </div>
         </div>
 
-        <Card className="border-none shadow-xl bg-gradient-to-br from-primary to-blue-900 text-white overflow-hidden">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">رابط الإحالة الخاص بك</CardTitle>
-            <CardDescription className="text-blue-100/70">شارك هذا الرابط مع أصدقائك لبدء الربح.</CardDescription>
+        <Card className="border-none shadow-2xl rounded-[32px] bg-white overflow-hidden relative border-t-4 border-primary">
+          <CardHeader className="text-center pb-2">
+            <CardTitle className="text-slate-800 font-bold">كود الإحالة الخاص بك</CardTitle>
+            <CardDescription>هذا هو مفتاحك للحصول على رصيد مجاني</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-white/10 backdrop-blur-md p-3 rounded-xl flex items-center gap-3 border border-white/20">
-              <p className="flex-1 text-xs font-mono truncate text-right rtl">{referralLink}</p>
-              <Button size="icon" variant="ghost" className="hover:bg-white/20 text-white" onClick={handleCopy}>
-                {copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              </Button>
+          <CardContent className="space-y-6 p-8">
+            <div className="flex flex-col items-center gap-4">
+              <div 
+                onClick={handleCopy}
+                className="bg-slate-50 border-2 border-dashed border-slate-200 w-full p-6 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 transition-colors group relative"
+              >
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">اضغط للنسخ</span>
+                <span className="text-5xl font-black text-primary font-mono tracking-widest group-hover:scale-105 transition-transform">{myReferralCode}</span>
+                {copied && <CheckCircle2 className="h-6 w-6 text-green-500 absolute top-4 left-4 animate-bounce" />}
+              </div>
+              
+              <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4">
+                <Button onClick={handleCopy} className="w-full h-14 bg-white border-2 border-primary text-primary hover:bg-primary/5 rounded-2xl font-black text-lg shadow-sm active:scale-[0.98] transition-all">
+                   {copied ? "تم النسخ!" : "نسخ الكود"} <Copy className="mr-2 h-5 w-5" />
+                </Button>
+                <Button onClick={handleShare} className="w-full h-14 bg-primary hover:bg-primary/90 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 active:scale-[0.98] transition-all">
+                   مشاركة الرابط <Share2 className="mr-2 h-5 w-5" />
+                </Button>
+              </div>
             </div>
-            <Button className="w-full bg-white text-primary hover:bg-gray-100 font-bold h-12 rounded-xl">
-              <Share2 className="ml-2 h-4 w-4" /> مشاركة الرابط الآن
-            </Button>
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Card className="text-center p-4 border-none shadow-sm bg-white">
-            <Users className="h-8 w-8 text-primary mx-auto mb-2" />
-            <p className="text-2xl font-black">0</p>
-            <p className="text-[10px] text-muted-foreground font-bold">إجمالي الدعوات</p>
-          </Card>
-          <Card className="text-center p-4 border-none shadow-sm bg-white">
-            <Gift className="h-8 w-8 text-green-500 mx-auto mb-2" />
-            <p className="text-2xl font-black text-green-500">0</p>
-            <p className="text-[10px] text-muted-foreground font-bold">إجمالي الأرباح</p>
-          </Card>
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="font-bold text-right pr-2">كيف تعمل المكافآت؟</h3>
-          <div className="space-y-3">
-            {[
-              { step: 1, text: "انسخ رابط الدعوة الخاص بك." },
-              { step: 2, text: "أرسله لأصدقائك عبر الواتساب أو تيليجرام." },
-              { step: 3, text: "ستحصل على 100 ل.س.ج فور تأكيد حسابهم." }
-            ].map((item) => (
-              <div key={item.step} className="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-50">
-                <span className="bg-primary text-white w-8 h-8 rounded-full flex items-center justify-center font-bold shrink-0">{item.step}</span>
-                <p className="text-sm font-medium">{item.text}</p>
-              </div>
-            ))}
-          </div>
+        <div className="bg-primary/5 border border-primary/10 p-6 rounded-[32px] text-center space-y-2">
+           <h4 className="font-black text-primary text-sm flex items-center justify-center gap-2">
+             <Sparkles className="h-4 w-4" /> كيف تعمل المكافأة؟
+           </h4>
+           <p className="text-xs text-slate-600 leading-relaxed font-medium">
+             بمجرد استخدام صديقك لكودك عند تسجيله لأول مرة، سيتم إضافة <span className="font-bold text-primary">25 ليرة</span> لمحفظتك فوراً، وسيحصل صديقك أيضاً على <span className="font-bold text-primary">25 ليرة</span> كهدية ترحيبية.
+           </p>
         </div>
       </main>
 
