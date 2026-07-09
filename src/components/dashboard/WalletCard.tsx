@@ -15,7 +15,6 @@ import {
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 export function WalletCard() {
   const { userBalance, requestDeposit, currency } = useUser();
@@ -101,15 +100,15 @@ export function WalletCard() {
               <ArrowUpCircle className="h-5 w-5" /> إيداع رصيد جديد
             </button>
           </DialogTrigger>
-          <DialogContent className="w-[95%] max-w-[425px] max-h-[85vh] overflow-hidden bg-[#11151d] border-gray-800 text-white flex flex-col p-0 rounded-[32px]" dir="rtl">
-            <div className="p-6 pb-2 text-right">
+          <DialogContent className="w-[95%] max-w-[425px] h-[90vh] max-h-[90vh] overflow-hidden bg-[#11151d] border-gray-800 text-white flex flex-col p-0 rounded-[32px] sm:h-auto" dir="rtl">
+            <div className="p-6 pb-2 text-right shrink-0">
               <DialogHeader>
                 <DialogTitle className="text-right font-headline text-xl">شحن رصيد المحفظة</DialogTitle>
                 <DialogDescription className="text-right text-gray-400 text-xs">يرجى تحويل المبلغ المطلوب ثم إرفاق صورة الإشعار للمراجعة والتدقيق.</DialogDescription>
               </DialogHeader>
             </div>
 
-            <ScrollArea className="flex-1 px-6">
+            <div className="flex-1 overflow-y-auto px-6 py-2 space-y-6 scrollbar-hide">
               <div className="grid gap-4 py-2">
                 <div className="bg-[#1c232d] p-4 rounded-2xl border border-gray-800 space-y-4">
                   {accounts.map((acc) => (
@@ -140,7 +139,7 @@ export function WalletCard() {
                     </label>
                   </div>
                   {imageProof && (
-                    <div className="mt-2 rounded-2xl overflow-hidden border border-gray-800 h-24 relative group">
+                    <div className="mt-2 rounded-2xl overflow-hidden border border-gray-800 h-40 relative group">
                       <img src={imageProof} alt="Preview" className="w-full h-full object-contain bg-black" />
                       <button onClick={() => setImageProof(null)} className="absolute top-2 left-2 bg-red-500 p-1 rounded-full shadow-lg">
                         <X className="h-3 w-3 text-white" />
@@ -149,7 +148,7 @@ export function WalletCard() {
                   )}
                 </div>
               </div>
-            </ScrollArea>
+            </div>
 
             <div className="p-4 shrink-0 bg-[#161a23] border-t border-gray-800">
               <Button onClick={handleDeposit} disabled={uploading} className="w-full h-14 text-lg font-bold rounded-2xl shadow-xl shadow-primary/20 bg-primary hover:bg-primary/90">تأكيد وإرسال طلب الإيداع</Button>
