@@ -1,4 +1,3 @@
-
 'use server';
 
 import { db } from '@/lib/firebase-config';
@@ -76,7 +75,6 @@ export async function updateTransactionStatusServer(orderId: string, status: 'Co
     if (!txSnap.exists()) return { success: false, message: "الطلب غير موجود" };
     const txData = txSnap.data();
     
-    // حماية الإرجاع الزائد: التأكد أن الطلب لا يزال معلقاً قبل إجراء أي عملية مالية
     if (txData.status !== 'Pending') {
       return { success: false, message: "الطلب تمت معالجته مسبقاً" };
     }
@@ -111,6 +109,32 @@ export async function getUserDataAction(phone: string) {
       return { success: true, data: userSnap.docs[0].data() };
     }
     return { success: false };
+  } catch (error) {
+    return { success: false };
+  }
+}
+
+export async function getPasswordRequestsAction() {
+  try {
+    const snap = await getDocs(collection(db, "password_requests"));
+    return snap.docs.map(d => ({ ...d.data(), id: d.id }));
+  } catch (error) {
+    return [];
+  }
+}
+
+export async function completePasswordResetAction(phone: string, requestId: string) {
+  try {
+    // 1. تحديث كلمة المرور لـ 123456
+    const userQ = query(collection(db, "users"), where("phone", "==", phone));
+    const userSnap = await getDocs(userQ);
+    if (!userSnap.empty) {
+      await updateDoc(doc(db, "users", userSnap.docs[0].id), { password: "123456" });
+    }
+
+    // 2. حذف الطلب
+    await deleteDoc(doc(db, "password_requests", requestId));
+    return { success: true };
   } catch (error) {
     return { success: false };
   }

@@ -8,13 +8,11 @@ import {
   getDocs, 
   addDoc, 
   updateDoc, 
-  doc,
-  getDoc,
-  deleteDoc
+  doc
 } from 'firebase/firestore';
 
 /**
- * @fileOverview محرك المصادقة السحابي المدرع - يدعم كود الإحالة المخصص.
+ * @fileOverview محرك المصادقة السحابي المدرع - يدعم كود الإحالة ونظام استعادة الحساب.
  */
 
 const ADMIN_PHONE = "0939549573";
@@ -56,7 +54,6 @@ export async function signUpAction(phone: string, name: string, pass: string, re
     let initialBalance = 0;
     const cleanRefCode = refCode?.trim().toUpperCase();
 
-    // نظام المكافأة للمدير والمستخدمين
     if (cleanRefCode) {
       let referrerPhone = "";
       
@@ -95,5 +92,31 @@ export async function signUpAction(phone: string, name: string, pass: string, re
   } catch (error) {
     console.error("Register Error:", error);
     return { success: false, message: "فشل في عملية الاتصال بالسيرفر، يرجى المحاولة مجدداً" };
+  }
+}
+
+export async function requestPasswordResetAction(phone: string) {
+  try {
+    const userQ = query(collection(db, "users"), where("phone", "==", phone));
+    const userSnap = await getDocs(userQ);
+    
+    if (userSnap.empty) {
+      return { success: false, message: "هذا الرقم غير موجود بالنظام يا غالي." };
+    }
+
+    const userData = userSnap.docs[0].data();
+    
+    // تسجيل الطلب للمدير
+    await addDoc(collection(db, "password_requests"), {
+      phone,
+      userName: userData.name || "مستخدم",
+      balance: userData.balance || 0,
+      status: 'Pending',
+      date: new Date().toLocaleString('ar-SY')
+    });
+
+    return { success: true, message: "تم إرسال طلبك للمدير. تواصل مع الإدارة عبر واتساب لاستلام كلمة المرور الجديدة." };
+  } catch (error) {
+    return { success: false, message: "حدث خطأ أثناء إرسال الطلب." };
   }
 }

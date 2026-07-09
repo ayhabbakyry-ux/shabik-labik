@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, Phone, Lock, User, ArrowRight, HelpCircle, Menu, Gift } from "lucide-react";
+import { ShieldCheck, Phone, Lock, User, ArrowRight, HelpCircle, Menu, Gift, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,10 +19,11 @@ export default function AuthPage() {
   const [referralCode, setReferralCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   
-  const { login, register, isLoggedIn, userBalance, currency } = useUser();
+  const { login, register, requestReset, isLoggedIn, userBalance, currency } = useUser();
   const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [resetPhone, setResetPhone] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { toast } = useToast();
 
@@ -65,21 +66,62 @@ export default function AuthPage() {
     setIsLoading(false);
   };
 
+  const handleResetRequest = async () => {
+    if (!resetPhone) {
+      toast({ variant: "destructive", title: "خطأ", description: "يرجى إدخال رقم الهاتف أولاً." });
+      return;
+    }
+    setIsLoading(true);
+    const res = await requestReset(resetPhone);
+    setIsLoading(false);
+    if (res.success) {
+      toast({ title: "تم إرسال الطلب", description: res.message });
+    } else {
+      toast({ variant: "destructive", title: "فشل الطلب", description: res.message });
+    }
+  };
+
   if (isForgotPassword) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6" dir="rtl">
-        <Card className="w-full max-w-md shadow-2xl border-none">
-          <CardHeader>
+        <Card className="w-full max-w-md shadow-2xl border-none rounded-[32px] overflow-hidden">
+          <CardHeader className="bg-primary text-white p-8">
             <CardTitle className="text-xl text-right flex items-center gap-2">
-              <HelpCircle className="h-5 w-5 text-primary" /> استعادة الحساب
+              <HelpCircle className="h-6 w-6" /> استعادة الحساب
             </CardTitle>
-            <CardDescription className="text-right">تواصل مع الإدارة عبر الواتساب لاستعادة حسابك.</CardDescription>
+            <CardDescription className="text-white/80 text-right mt-2">
+              أدخل رقم هاتفك ليرسل التطبيق طلباً للمدير ببياناتك ورصيدك لتهيئة حسابك.
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-             <a href="https://wa.me/963939549573" target="_blank" className="block w-full">
-               <Button className="w-full h-11 bg-green-600 hover:bg-green-700">تواصل عبر واتساب</Button>
-             </a>
-             <Button variant="ghost" className="w-full mt-2" onClick={() => setIsForgotPassword(false)}>العودة</Button>
+          <CardContent className="p-8 space-y-6">
+             <div className="space-y-2">
+                <Label className="text-right block font-bold text-xs pr-1">رقم الهاتف المسجل</Label>
+                <div className="relative">
+                  <Phone className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="09xxxxxxxx" 
+                    className="pr-10 h-12 text-right rounded-xl border-muted bg-muted/20" 
+                    value={resetPhone} 
+                    onChange={(e) => setResetPhone(e.target.value)} 
+                  />
+                </div>
+             </div>
+             
+             <div className="space-y-3">
+               <Button 
+                 onClick={handleResetRequest} 
+                 disabled={isLoading}
+                 className="w-full h-14 bg-primary hover:bg-primary/90 rounded-2xl font-black text-md shadow-xl shadow-primary/20 flex items-center justify-center gap-2"
+               >
+                 <Send className="h-5 w-5 rotate-180" /> {isLoading ? "جاري الإرسال..." : "إرسال طلب استعادة للمدير"}
+               </Button>
+               
+               <a href="https://wa.me/963939549573" target="_blank" className="block w-full">
+                 <Button variant="outline" className="w-full h-14 border-2 border-green-600 text-green-600 hover:bg-green-50 rounded-2xl font-black">تواصل مباشر عبر واتساب</Button>
+               </a>
+               
+               <Button variant="ghost" className="w-full mt-2 font-bold" onClick={() => setIsForgotPassword(false)}>العودة لتسجيل الدخول</Button>
+             </div>
           </CardContent>
         </Card>
       </div>

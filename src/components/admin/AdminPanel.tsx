@@ -1,10 +1,9 @@
-
 "use client";
 
 import { useUser } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Check, X, ShieldAlert, Phone, Trash2, KeyRound, Clock, UserPlus, Wallet, ImageIcon, Eye, BellRing, BellOff, Volume2 } from "lucide-react";
+import { Check, X, ShieldAlert, Phone, Trash2, KeyRound, Clock, UserPlus, Wallet, ImageIcon, Eye, BellRing, BellOff, Volume2, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,7 +21,7 @@ import {
 export function AdminPanel() {
   const { 
     transactions, adminAction, currency, allUsers = [], deleteUser, 
-    passwordRequests = [], clearPasswordRequest, notificationsEnabled, requestNotificationPermission
+    passwordRequests = [], adminResetPassword, notificationsEnabled, requestNotificationPermission
   } = useUser();
   const { toast } = useToast();
 
@@ -51,6 +50,14 @@ export function AdminPanel() {
       title: action === 'approve' ? "تم قبول الإيداع" : "تم رفض الطلب",
       variant: action === 'approve' ? "default" : "destructive"
     });
+  };
+
+  const handleResetPassword = async (phone: string, requestId: string) => {
+    const confirmReset = window.confirm(`هل تريد تهيئة كلمة مرور الحساب (${phone}) إلى 123456؟`);
+    if (confirmReset) {
+      await adminResetPassword(phone, requestId);
+      toast({ title: "تمت تهيئة كلمة المرور بنجاح ✅" });
+    }
   };
 
   return (
@@ -105,7 +112,7 @@ export function AdminPanel() {
         <TabsList className="flex w-full bg-white p-1 rounded-2xl border mb-6 h-auto gap-1">
           <TabsTrigger value="deposits" className="flex-1 py-3 font-bold text-sm data-[state=active]:bg-primary data-[state=active]:text-white rounded-xl transition-all">الطلبات ({pendingTxs.length})</TabsTrigger>
           <TabsTrigger value="users" className="flex-1 py-3 font-bold text-sm data-[state=active]:bg-primary data-[state=active]:text-white rounded-xl transition-all">الحسابات</TabsTrigger>
-          <TabsTrigger value="passwords" className="flex-1 py-3 font-bold text-sm data-[state=active]:bg-primary data-[state=active]:text-white rounded-xl transition-all">الاستعادة</TabsTrigger>
+          <TabsTrigger value="passwords" className="flex-1 py-3 font-bold text-sm data-[state=active]:bg-primary data-[state=active]:text-white rounded-xl transition-all">الاستعادة ({passwordRequests.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="deposits" className="space-y-4 animate-in fade-in">
@@ -182,19 +189,36 @@ export function AdminPanel() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="passwords" className="space-y-4">
+        <TabsContent value="passwords" className="space-y-4 animate-in fade-in">
           {passwordRequests?.length === 0 ? (
              <div className="py-20 text-center bg-white border-2 border-dashed rounded-[32px]">
-               <p className="text-muted-foreground font-bold">لا توجد طلبات استعادة.</p>
+               <p className="text-muted-foreground font-bold">لا توجد طلبات استعادة حالياً.</p>
              </div>
           ) : (
             passwordRequests?.map((req) => (
-              <Card key={req.phone} className="border-none shadow-sm rounded-2xl bg-white">
-                <CardContent className="p-4 flex justify-between items-center">
-                   <Button variant="ghost" size="icon" onClick={() => clearPasswordRequest(req.phone)}><X className="h-4 w-4 text-red-400" /></Button>
-                   <div className="text-right">
-                      <p className="font-black text-primary">{req.phone}</p>
-                      <p className="text-[10px] text-muted-foreground">{req.date}</p>
+              <Card key={req.id} className="border-none shadow-sm rounded-3xl bg-white overflow-hidden">
+                <CardContent className="p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+                   <div className="text-right space-y-1 w-full md:w-auto">
+                      <div className="flex items-center gap-2">
+                        <p className="font-black text-xl text-primary">{req.userName}</p>
+                        <Badge variant="outline" className="text-[10px] font-bold">طلب استعادة</Badge>
+                      </div>
+                      <p className="font-mono text-sm text-muted-foreground">{req.phone}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Wallet className="h-4 w-4 text-green-600" />
+                        <span className="text-sm font-bold text-gray-500">الرصيد المحفوظ:</span>
+                        <span className="text-lg font-black text-green-600">{(req.balance || 0).toLocaleString()} {currency}</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1"><Clock className="h-3 w-3" /> {req.date}</p>
+                   </div>
+                   
+                   <div className="flex gap-2 w-full md:w-auto">
+                      <Button 
+                        onClick={() => handleResetPassword(req.phone, req.id)}
+                        className="flex-1 md:flex-none bg-primary hover:bg-primary/90 text-white font-bold h-12 px-8 rounded-2xl shadow-lg shadow-primary/10 flex items-center gap-2"
+                      >
+                        <RefreshCw className="h-4 w-4" /> تهيئة لكلمة 123456
+                      </Button>
                    </div>
                 </CardContent>
               </Card>

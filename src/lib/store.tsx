@@ -1,10 +1,17 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { signInAction, signUpAction } from '@/app/actions/auth';
+import { signInAction, signUpAction, requestPasswordResetAction } from '@/app/actions/auth';
 import { syncBalanceAction, recordTransactionAction, getUserTransactionsAction } from '@/app/actions/wallet';
-import { getAllUsersAction, deleteUserAction, processAdminAction, updateTransactionStatusServer, getUserDataAction } from '@/app/actions/admin';
+import { 
+  getAllUsersAction, 
+  deleteUserAction, 
+  processAdminAction, 
+  updateTransactionStatusServer, 
+  getUserDataAction,
+  getPasswordRequestsAction,
+  completePasswordResetAction
+} from '@/app/actions/admin';
 
 export type Transaction = {
   id: string;
@@ -37,7 +44,8 @@ type UserContextType = {
   requestDeposit: (amount: number, proofImage: string) => Promise<void>;
   adminAction: (txId: string, action: 'approve' | 'reject') => Promise<void>;
   deleteUser: (phone: string) => Promise<void>;
-  clearPasswordRequest: (phone: string) => Promise<void>;
+  requestReset: (phone: string) => Promise<{ success: boolean; message: string }>;
+  adminResetPassword: (phone: string, requestId: string) => Promise<void>;
   currency: string;
   checkPendingOrders: () => Promise<void>;
   notificationsEnabled: boolean;
@@ -58,6 +66,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   
   const prevTransactionsRef = useRef<Transaction[]>([]);
+  const prevPassRequestsRef = useRef<any[]>([]);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const currency = "ل.س.ج";
@@ -82,18 +91,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [playNotificationSound]);
 
   const requestNotificationPermission = useCallback(() => {
-    if (!("Notification" in window)) {
-      alert("عذراً يا غالي، متصفحك لا يدعم خاصية التنبيهات.");
-      return;
-    }
-
+    if (!("Notification" in window)) return;
     Notification.requestPermission().then(permission => {
-      console.log("Permission status:", permission);
       setNotificationsEnabled(permission === "granted");
       if (permission === "granted") {
         triggerNotification("تم تفعيل التنبيهات ✅", "مبروك يا غالي، رح توصلك كل تحديثات رصيدك وطلباتك هون فوراً.");
-      } else if (permission === "denied") {
-        alert("التنبيهات محظورة حالياً. يرجى تفعيلها من إعدادات المتصفح (اضغط على القفل بجانب الرابط).");
       }
     });
   }, [triggerNotification]);
@@ -110,14 +112,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     if (isLoggedIn && "Notification" in window && Notification.permission === "granted") {
       if (phone === ADMIN_PHONE) {
-        const newDeposits = cloudTxs.filter(tx => 
-          tx.type === 'إيداع محفظة' && 
-          tx.status === 'Pending' && 
-          !prev.find(p => p.id === tx.id)
-        );
+        // إشعارات للمدير عن طلبات الإيداع
+        const newDeposits = cloudTxs.filter(tx => tx.type === 'إيداع محفظة' && tx.status === 'Pending' && !prev.find(p => p.id === tx.id));
         if (newDeposits.length > 0) {
-          triggerNotification("طلب إيداع جديد! 💰", `وصلك طلب إيداع من ${newDeposits[0].userName || "زبون جديد"} بقيمة ${newDeposits[0].amount}`);
+          triggerNotification("طلب إيداع جديد! 💰", `وصلك طلب إيداع من ${newDeposits[0].userName || "زبون"} بقيمة ${newDeposits[0].amount}`);
         }
+
+        // إشعارات للمدير عن طلبات استعادة كلمة المرور
+        const currentPassReqs = await getPasswordRequestsAction();
+        if (currentPassReqs.length > prevPassRequestsRef.current.length) {
+          triggerNotification("طلب استعادة حساب 🔑", "هنيك زبون عم يستنى استعادة حسابه، تحقق من لوحة الإدارة.");
+        }
+        setPasswordRequests(currentPassReqs);
+        prevPassRequestsRef.current = currentPassReqs;
       } else {
         cloudTxs.forEach(tx => {
           const oldTx = prev.find(p => p.id === tx.id);
@@ -135,8 +142,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const res = await getUserDataAction(phone);
     if (res.success && res.data) {
       setUserBalance(res.data.balance || 0);
-      const authData = JSON.parse(localStorage.getItem('shabik_auth') || '{}');
-      localStorage.setItem('shabik_auth', JSON.stringify({ ...authData, balance: res.data.balance }));
     }
 
     if (phone === ADMIN_PHONE) {
@@ -147,7 +152,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const checkPendingOrders = useCallback(async () => {
     if (!isLoggedIn || isCheckingOrders) return;
-
     const pendingOrders = transactions.filter(tx => tx.status === 'Pending' && tx.external_order_id);
     if (pendingOrders.length === 0) return;
 
@@ -156,24 +160,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       try {
         const res = await fetch(`/api/check-order?order_id=${order.external_order_id}`);
         const data = await res.json();
-
         if (data.success && data.status) {
           const remoteStatus = String(data.status).toLowerCase().trim();
           let finalStatus: 'Completed' | 'Rejected' | null = null;
-
-          if (remoteStatus === 'accept' || remoteStatus === 'موافق' || remoteStatus === 'مقبول' || remoteStatus === 'نجاح') {
-            finalStatus = 'Completed';
-          } else if (remoteStatus === 'reject' || remoteStatus === 'رفض') {
-            finalStatus = 'Rejected';
-          }
-
+          if (remoteStatus === 'accept' || remoteStatus === 'موافق' || remoteStatus === 'مقبول' || remoteStatus === 'نجاح') finalStatus = 'Completed';
+          else if (remoteStatus === 'reject' || remoteStatus === 'رفض') finalStatus = 'Rejected';
           if (finalStatus) {
-            const ownerPhone = order.userPhone || userPhone;
-            const updateRes = await updateTransactionStatusServer(order.id, finalStatus, order.amount, ownerPhone);
+            const updateRes = await updateTransactionStatusServer(order.id, finalStatus, order.amount, order.userPhone || userPhone);
             if (updateRes.success) await fetchCloudData(userPhone);
           }
         }
-      } catch (err) { console.error("Polling error:", err); }
+      } catch (err) {}
     }
     setIsCheckingOrders(false);
   }, [isLoggedIn, isCheckingOrders, transactions, userPhone, fetchCloudData]);
@@ -185,7 +182,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setIsLoggedIn(true);
       setUserPhone(authData.phone);
       setUserName(authData.name);
-      setUserBalance(authData.balance || 0);
       fetchCloudData(authData.phone);
     }
   }, [fetchCloudData]);
@@ -196,8 +192,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         fetchCloudData(userPhone);
         checkPendingOrders();
       }, 15000);
-    } else {
-      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
     }
     return () => { if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current); };
   }, [isLoggedIn, userPhone, fetchCloudData, checkPendingOrders]);
@@ -212,13 +206,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       await fetchCloudData(phone);
       return { success: true, message: "أهلاً بك يا مدير أيهم" };
     }
-
     const result = await signInAction(phone, password);
     if (result.success && result.user) {
       setIsLoggedIn(true);
       setUserPhone(result.user.phone);
       setUserName(result.user.name);
-      setUserBalance(result.user.balance);
       localStorage.setItem('shabik_auth', JSON.stringify(result.user));
       await fetchCloudData(result.user.phone);
       return { success: true, message: result.message };
@@ -230,15 +222,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return await signUpAction(phone, name, pass, refCode);
   };
 
+  const requestReset = async (phone: string) => {
+    return await requestPasswordResetAction(phone);
+  };
+
+  const adminResetPassword = async (phone: string, requestId: string) => {
+    const res = await completePasswordResetAction(phone, requestId);
+    if (res.success) await fetchCloudData(userPhone);
+  };
+
   const deductBalance = async (amount: number, productDetails: string, initialStatus: 'Pending' | 'Completed' = 'Completed', externalId?: string) => {
     const before = userBalance;
     const newBalance = Math.max(0, userBalance - amount);
     setUserBalance(newBalance);
     await syncBalanceAction(userPhone, newBalance);
-    
-    const authData = JSON.parse(localStorage.getItem('shabik_auth') || '{}');
-    localStorage.setItem('shabik_auth', JSON.stringify({ ...authData, balance: newBalance }));
-
     const txData: Omit<Transaction, 'id'> = {
       external_order_id: externalId || "",
       type: 'شراء منتج',
@@ -251,10 +248,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       balanceBefore: before,
       balanceAfter: newBalance
     };
-    
     const result = await recordTransactionAction(txData);
-    const newTx: Transaction = { id: result.id || `ORD-${Date.now()}`, ...txData };
-    setTransactions(prev => [newTx, ...prev]);
+    setTransactions(prev => [{ id: result.id || `${Date.now()}`, ...txData }, ...prev]);
   };
 
   const requestDeposit = async (amount: number, proofImage: string) => {
@@ -269,8 +264,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       proofImage
     };
     const result = await recordTransactionAction(txData);
-    const newTx: Transaction = { id: result.id || `TX-${Date.now()}`, ...txData };
-    setTransactions(prev => [newTx, ...prev]);
+    setTransactions(prev => [{ id: result.id || `${Date.now()}`, ...txData }, ...prev]);
   };
 
   const adminAction = async (txId: string, action: 'approve' | 'reject') => {
@@ -283,10 +277,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (res.success) await fetchCloudData(userPhone);
   };
 
-  const clearPasswordRequest = async (phone: string) => {
-    setPasswordRequests(prev => prev.filter(r => r.phone !== phone));
-  };
-
   const logout = () => {
     setIsLoggedIn(false);
     setUserPhone("");
@@ -296,12 +286,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('shabik_auth');
   };
 
-  const isAdmin = userPhone === ADMIN_PHONE;
-
   return (
     <UserContext.Provider value={{ 
-      isLoggedIn, isAdmin, userPhone, userName, userBalance, transactions, allUsers, passwordRequests,
-      login, register, logout, deductBalance, requestDeposit, adminAction, deleteUser, clearPasswordRequest,
+      isLoggedIn, isAdmin: userPhone === ADMIN_PHONE, userPhone, userName, userBalance, transactions, allUsers, passwordRequests,
+      login, register, logout, deductBalance, requestDeposit, adminAction, deleteUser, requestReset, adminResetPassword,
       currency, checkPendingOrders, notificationsEnabled, requestNotificationPermission
     }}>
       {children}
