@@ -68,7 +68,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const playNotificationSound = useCallback(() => {
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
-      audio.play().catch(() => console.log("Sound blocked or interaction needed"));
+      audio.play().catch(() => console.log("Sound blocked by browser policy"));
     } catch (e) {
       console.error("Audio error", e);
     }
@@ -88,16 +88,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
 
     Notification.requestPermission().then(permission => {
+      console.log("Permission status:", permission);
       setNotificationsEnabled(permission === "granted");
       if (permission === "granted") {
         triggerNotification("تم تفعيل التنبيهات ✅", "مبروك يا غالي، رح توصلك كل تحديثات رصيدك وطلباتك هون فوراً.");
       } else if (permission === "denied") {
-        alert("التنبيهات محظورة. يرجى تفعيلها من إعدادات المتصفح (قفل الرابط بجانب العنوان).");
+        alert("التنبيهات محظورة حالياً. يرجى تفعيلها من إعدادات المتصفح (اضغط على القفل بجانب الرابط).");
       }
     });
   }, [triggerNotification]);
 
-  // مزامنة حالة التنبيهات عند تشغيل الموقع
   useEffect(() => {
     if ("Notification" in window) {
       setNotificationsEnabled(Notification.permission === "granted");
