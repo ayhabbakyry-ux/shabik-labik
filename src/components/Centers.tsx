@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from 'react';
@@ -50,14 +49,14 @@ export default function Centers() {
         </div>
 
         <div className="space-y-3 max-w-sm">
-          <h2 className="text-xl font-bold text-gray-300 font-headline">لا يوجد حالياً</h2>
+          <h2 className="text-xl font-bold text-gray-300 font-headline">لا يوجد مراكز حالياً</h2>
           
           <p className="text-gray-400 text-md leading-relaxed font-body">
-            إذا كنت ترغب بالانضمام إلينا تواصل معنا
+            إذا كنت ترغب بالانضمام كمركز معتمد، يرجى التواصل مع الإدارة.
           </p>
           
           <p className="text-[#22c55e] font-black text-xl pt-2 tracking-wide font-headline">
-            نكبر بكم إن شاء الله ❤️
+            نسعد بخدمتكم دائماً.
           </p>
         </div>
 

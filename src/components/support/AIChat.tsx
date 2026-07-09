@@ -20,8 +20,8 @@ export function AIChat() {
   const { userBalance, userPhone, userName, isAdmin } = useUser();
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: isAdmin 
-      ? `أهلاً بك يا مدير أيهم! أنا مساعدك الخاص. فيك تسألني عن أي زبون بالرقم ورح جردلك حسابه فوراً.` 
-      : `أهلاً بك يا غالي ${userName || 'يا طيب'}! أنا مساعد شبيك لبيك، كيف بقدر أخدمك اليوم؟` 
+      ? `مرحباً بك السيد أيهم. أنا المساعد الذكي الخاص بك، يمكنني تزويدك ببيانات المستخدمين وحالة أرصدتهم عند تزويدي بأرقام هواتفهم.` 
+      : `مرحباً بك ${userName || 'عزيزي المستخدم'}. أنا المساعد الذكي لمنصة شبك لبيك، كيف يمكنني مساعدتك اليوم؟` 
     }
   ]);
   const [input, setInput] = useState("");
@@ -55,7 +55,7 @@ export function AIChat() {
       
       setMessages(prev => [...prev, { role: 'assistant', content: result.assistantResponse }]);
     } catch (error: any) {
-      setMessages(prev => [...prev, { role: 'assistant', content: "أهلاً بك يا غالي. حالياً عم نحدث النظام لخدمتكم بشكل أفضل، يرجى المحاولة بعد دقيقة وبكون كل شي جاهز بإذن الله.", isError: true }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: "مرحباً بك. نأسف، النظام قيد التحديث حالياً لضمان تقديم أفضل خدمة، يرجى المحاولة لاحقاً.", isError: true }]);
     } finally {
       setLoading(false);
     }
@@ -70,8 +70,8 @@ export function AIChat() {
                 <Bot className="h-6 w-6 text-white" />
              </div>
              <div className="text-right">
-               <p className="text-lg font-black font-headline leading-tight">مساعد شبيك لبيك الذكي</p>
-               <p className="text-[10px] opacity-70 font-bold">{isAdmin ? "وضع المدير نشط" : "متصل الآن"}</p>
+               <p className="text-lg font-black font-headline leading-tight">المساعد الذكي</p>
+               <p className="text-[10px] opacity-70 font-bold">{isAdmin ? "نظام الإدارة نشط" : "متصل الآن"}</p>
              </div>
           </div>
           <Sparkles className="h-5 w-5 text-yellow-300 animate-pulse" />
@@ -92,7 +92,7 @@ export function AIChat() {
                   ) : (
                     <>
                       <AvatarImage src={`https://picsum.photos/seed/${userPhone}/100`} />
-                      <AvatarFallback className="bg-secondary text-white font-bold text-xs">أنت</AvatarFallback>
+                      <AvatarFallback className="bg-secondary text-white font-bold text-xs">U</AvatarFallback>
                     </>
                   )}
                 </Avatar>
@@ -128,7 +128,7 @@ export function AIChat() {
             className="flex gap-2 items-center bg-muted/30 p-1.5 rounded-2xl border border-muted shadow-inner"
           >
             <Input 
-              placeholder={isAdmin ? "اسأل عن زبون برقم الهاتف..." : "اكتب سؤالك هون يا غالي..."}
+              placeholder={isAdmin ? "يرجى إدخال رقم هاتف المستخدم..." : "يرجى كتابة استفسارك هنا..."}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               className="bg-transparent border-none text-right focus-visible:ring-0 shadow-none h-12"
@@ -143,7 +143,7 @@ export function AIChat() {
               <Send className="h-5 w-5 rotate-180" />
             </Button>
           </form>
-          <p className="text-[9px] text-center text-muted-foreground mt-2 font-bold opacity-50 tracking-widest uppercase">Shabik Labik AI Assistant v11.0</p>
+          <p className="text-[9px] text-center text-muted-foreground mt-2 font-bold opacity-50 tracking-widest uppercase">Shabik Labik AI Assistant v12.0</p>
         </div>
       </CardContent>
     </Card>

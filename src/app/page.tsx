@@ -36,7 +36,7 @@ export default function AuthPage() {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone || !password) {
-      toast({ variant: "destructive", title: "خطأ", description: "عذراً، جميع الحقول مطلوبة خيو" });
+      toast({ variant: "destructive", title: "خطأ", description: "يرجى تعبئة جميع الحقول المطلوبة." });
       return;
     }
 
@@ -44,14 +44,14 @@ export default function AuthPage() {
     if (isLogin) {
       const result = await login(phone, password);
       if (result.success) {
-        toast({ title: "مرحباً بك", description: result.message });
+        toast({ title: "تم تسجيل الدخول", description: result.message });
         router.push("/dashboard");
       } else {
         toast({ variant: "destructive", title: "فشل الدخول", description: result.message });
       }
     } else {
       if (!name) {
-        toast({ variant: "destructive", title: "خطأ", description: "يرجى إدخال اسمك لإنشاء الحساب" });
+        toast({ variant: "destructive", title: "خطأ", description: "يرجى إدخال الاسم لإنشاء الحساب." });
         setIsLoading(false);
         return;
       }
@@ -90,7 +90,7 @@ export default function AuthPage() {
               <HelpCircle className="h-6 w-6" /> استعادة الحساب
             </CardTitle>
             <CardDescription className="text-white/80 text-right mt-2">
-              أدخل رقم هاتفك ليرسل التطبيق طلباً للمدير ببياناتك ورصيدك لتهيئة حسابك.
+              يرجى إدخال رقم الهاتف المسجل لإرسال طلب استعادة البيانات للإدارة.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-8 space-y-6">
@@ -113,11 +113,11 @@ export default function AuthPage() {
                  disabled={isLoading}
                  className="w-full h-14 bg-primary hover:bg-primary/90 rounded-2xl font-black text-md shadow-xl shadow-primary/20 flex items-center justify-center gap-2"
                >
-                 <Send className="h-5 w-5 rotate-180" /> {isLoading ? "جاري الإرسال..." : "إرسال طلب استعادة للمدير"}
+                 <Send className="h-5 w-5 rotate-180" /> {isLoading ? "جاري الإرسال..." : "إرسال طلب الاستعادة"}
                </Button>
                
                <a href="https://wa.me/963939549573" target="_blank" className="block w-full">
-                 <Button variant="outline" className="w-full h-14 border-2 border-green-600 text-green-600 hover:bg-green-50 rounded-2xl font-black">تواصل مباشر عبر واتساب</Button>
+                 <Button variant="outline" className="w-full h-14 border-2 border-green-600 text-green-600 hover:bg-green-50 rounded-2xl font-black">التواصل المباشر عبر واتساب</Button>
                </a>
                
                <Button variant="ghost" className="w-full mt-2 font-bold" onClick={() => setIsForgotPassword(false)}>العودة لتسجيل الدخول</Button>
@@ -149,7 +149,7 @@ export default function AuthPage() {
           <ShieldCheck className="h-10 w-10 text-white" />
         </div>
         <h1 className="text-2xl font-bold font-headline text-primary">شبك لبيك الرقمي</h1>
-        <p className="text-muted-foreground text-sm font-medium">بوابتك الآمنة والموثوقة للشحن التلقائي</p>
+        <p className="text-muted-foreground text-sm font-medium">المنصة الموثوقة لخدمات الشحن التلقائي</p>
       </div>
 
       <Card className="w-full max-w-md shadow-2xl border-none bg-white/90 backdrop-blur-md rounded-[32px] overflow-hidden">
@@ -157,7 +157,7 @@ export default function AuthPage() {
           <CardHeader className="pb-4">
             <TabsList className="grid w-full grid-cols-2 mb-4 bg-muted/50 p-1 rounded-2xl">
               <TabsTrigger value="login" className="font-bold rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white">تسجيل الدخول</TabsTrigger>
-              <TabsTrigger value="register" className="font-bold rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white">حساب جديد</TabsTrigger>
+              <TabsTrigger value="register" className="font-bold rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white">إنشاء حساب</TabsTrigger>
             </TabsList>
           </CardHeader>
           <CardContent>
@@ -168,7 +168,7 @@ export default function AuthPage() {
                     <Label className="text-right block font-bold text-xs pr-1">الاسم الكامل</Label>
                     <div className="relative">
                       <User className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input placeholder="أدخل اسمك" className="pr-10 h-12 text-right rounded-xl border-muted bg-muted/20" value={name} onChange={(e) => setName(e.target.value)} />
+                      <Input placeholder="أدخل الاسم الكامل" className="pr-10 h-12 text-right rounded-xl border-muted bg-muted/20" value={name} onChange={(e) => setName(e.target.value)} />
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -176,7 +176,7 @@ export default function AuthPage() {
                     <div className="relative">
                       <Gift className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input 
-                        placeholder="أدخل كود صديقك لتربحا 25 ليرة" 
+                        placeholder="أدخل كود الدعوة للحصول على رصيد" 
                         className="pr-10 h-12 text-right rounded-xl border-muted bg-muted/20 uppercase font-mono" 
                         value={referralCode} 
                         onChange={(e) => setReferralCode(e.target.value)} 
@@ -193,7 +193,7 @@ export default function AuthPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-right block font-bold text-xs pr-1">كلمة السر</Label>
+                <Label className="text-right block font-bold text-xs pr-1">كلمة المرور</Label>
                 <div className="relative">
                   <Lock className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input type="password" placeholder="••••••••" className="pr-10 h-12 text-right rounded-xl border-muted bg-muted/20" value={password} onChange={(e) => setPassword(e.target.value)} />
@@ -203,7 +203,7 @@ export default function AuthPage() {
                 <button type="button" onClick={() => setIsForgotPassword(true)} className="text-[10px] text-primary font-bold hover:underline block w-full text-right pr-1">نسيت كلمة المرور؟</button>
               )}
               <Button type="submit" disabled={isLoading} className="w-full h-14 text-base font-bold mt-2 shadow-xl shadow-primary/20 rounded-2xl">
-                {isLoading ? "جاري المعالجة..." : isLogin ? "دخول للمنصة" : "إنشاء حساب"} <ArrowRight className="mr-2 h-4 w-4 rotate-180" />
+                {isLoading ? "جاري المعالجة..." : isLogin ? "دخول" : "تسجيل"} <ArrowRight className="mr-2 h-4 w-4 rotate-180" />
               </Button>
             </form>
           </CardContent>

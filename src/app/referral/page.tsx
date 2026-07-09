@@ -25,7 +25,6 @@ export default function ReferralPage() {
 
   if (!isLoggedIn) return null;
 
-  // كود المدير ADMEN والمشترك آخر 5 أرقام
   const myReferralCode = isAdmin ? "ADMEN" : (userPhone ? userPhone.slice(-5) : "00000");
   const referralLink = `https://shabik-labik.vercel.app`;
 
@@ -35,7 +34,7 @@ export default function ReferralPage() {
       setCopied(true);
       toast({
         title: "تم النسخ بنجاح",
-        description: `كود الإحالة (${myReferralCode}) جاهز للمشاركة الآن.`,
+        description: `كود الإحالة الخاص بك (${myReferralCode}) جاهز للمشاركة الآن.`,
       });
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -48,7 +47,7 @@ export default function ReferralPage() {
   };
 
   const handleShare = async () => {
-    const shareText = `أهلاً بك! أدعوك للتسجيل في تطبيق شبك لبيك الرقمي والاستفادة من عروض الشحن التلقائي.\n🌐 رابط الموقع: ${referralLink}\n🔑 كود الدعوة الخاص بي: ${myReferralCode}\n(أدخل الكود عند التسجيل لتحصل على 25 ل.س مجاناً!)`;
+    const shareText = `مرحباً بك! أدعوك للتسجيل في تطبيق شبك لبيك الرقمي والاستفادة من خدمات الشحن التلقائي.\n🌐 رابط الموقع: ${referralLink}\n🔑 كود الدعوة الخاص بي: ${myReferralCode}\n(أدخل الكود عند التسجيل لتحصل على رصيد إضافي مجاني!)`;
     
     const shareData = {
       title: 'شبك لبيك الرقمي',
@@ -63,17 +62,16 @@ export default function ReferralPage() {
         throw new Error("Share API not available");
       }
     } catch (err) {
-      // نظام التراجع التلقائي في حال فشل ميزة المشاركة الذكية
       try {
         await navigator.clipboard.writeText(shareText);
         toast({
           title: "تم نسخ نص المشاركة",
-          description: "رسالة الدعوة جاهزة للإرسال عبر أي تطبيق تواصل الآن.",
+          description: "رسالة الدعوة جاهزة للإرسال عبر تطبيقات التواصل الآن.",
         });
       } catch (err) {
         toast({
           variant: "destructive",
-          title: "عذراً يا غالي",
+          title: "عذراً",
           description: "حدث خطأ غير متوقع، يرجى نسخ الكود ومشاركته يدوياً.",
         });
       }
@@ -92,7 +90,7 @@ export default function ReferralPage() {
         >
           <ArrowRight className="h-6 w-6" />
         </button>
-        <span className="font-bold text-sm">برنامج المكافآت الأكاديمي</span>
+        <span className="font-bold text-sm">برنامج المكافآت</span>
         <button 
           onClick={() => setIsSidebarOpen(true)}
           className="p-2 hover:bg-muted rounded-xl text-primary"
@@ -110,9 +108,9 @@ export default function ReferralPage() {
             <Sparkles className="absolute -top-2 -right-2 h-6 w-6 text-yellow-500 animate-pulse" />
           </div>
           <div>
-            <h1 className="text-3xl font-black font-headline text-slate-900 tracking-tight">ادعُ أصدقاءك واربح!</h1>
+            <h1 className="text-3xl font-black font-headline text-slate-900 tracking-tight">برنامج المكافآت</h1>
             <p className="text-muted-foreground text-sm font-medium mt-2 max-w-sm mx-auto leading-relaxed">
-              شارك كودك الخاص واحصل على <span className="text-primary font-bold text-lg">25 {currency}</span> مجاناً لكل صديق ينضم إلينا.
+              شارك كود الدعوة الخاص بك واحصل على <span className="text-primary font-bold text-lg">25 {currency}</span> مجاناً لكل مستخدم ينضم للمنصة من خلالك.
             </p>
           </div>
         </div>
@@ -120,7 +118,7 @@ export default function ReferralPage() {
         <Card className="border-none shadow-2xl rounded-[32px] bg-white overflow-hidden relative border-t-4 border-primary">
           <CardHeader className="text-center pb-2">
             <CardTitle className="text-slate-800 font-bold">كود الإحالة الخاص بك</CardTitle>
-            <CardDescription>هذا هو مفتاحك للحصول على رصيد مجاني</CardDescription>
+            <CardDescription>استخدم هذا الكود للحصول على رصيد إضافي</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 p-8">
             <div className="flex flex-col items-center gap-4">
@@ -128,7 +126,7 @@ export default function ReferralPage() {
                 onClick={handleCopy}
                 className="bg-slate-50 border-2 border-dashed border-slate-200 w-full p-6 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 transition-colors group relative"
               >
-                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">اضغط للنسخ</span>
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">انقر للنسخ</span>
                 <span className="text-5xl font-black text-primary font-mono tracking-widest group-hover:scale-105 transition-transform">{myReferralCode}</span>
                 {copied && <CheckCircle2 className="h-6 w-6 text-green-500 absolute top-4 left-4 animate-bounce" />}
               </div>
@@ -147,10 +145,10 @@ export default function ReferralPage() {
 
         <div className="bg-primary/5 border border-primary/10 p-6 rounded-[32px] text-center space-y-2">
            <h4 className="font-black text-primary text-sm flex items-center justify-center gap-2">
-             <Sparkles className="h-4 w-4" /> كيف تعمل المكافأة؟
+             <Sparkles className="h-4 w-4" /> آلية عمل المكافأة
            </h4>
            <p className="text-xs text-slate-600 leading-relaxed font-medium">
-             بمجرد استخدام صديقك لكودك عند تسجيله لأول مرة، سيتم إضافة <span className="font-bold text-primary">25 ليرة</span> لمحفظتك فوراً، وسيحصل صديقك أيضاً على <span className="font-bold text-primary">25 ليرة</span> كهدية ترحيبية.
+             عند استخدام كود الدعوة الخاص بك من قبل مستخدم جديد، سيتم إضافة <span className="font-bold text-primary">25 ليرة</span> لمحفظتك فوراً، كما سيحصل المستخدم الجديد على مكافأة ترحيبية بقيمة <span className="font-bold text-primary">25 ليرة</span>.
            </p>
         </div>
       </main>

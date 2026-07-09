@@ -1,4 +1,3 @@
-
 "use client";
 
 import { WalletCard } from "@/components/dashboard/WalletCard";
@@ -13,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
-  const { isLoggedIn, userPhone, isAdmin, notificationsEnabled, requestNotificationPermission } = useUser();
+  const { isLoggedIn, userPhone, isAdmin, notificationsEnabled, requestNotificationPermission, userName } = useUser();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const router = useRouter();
 
@@ -41,8 +40,8 @@ export default function DashboardPage() {
               <Menu className="h-6 w-6 text-primary" />
             </button>
             <div className="text-right">
-              <h1 className="text-lg font-bold font-headline">أهلاً، <span className="text-primary">{isAdmin ? "المدير أيهم" : userPhone}</span></h1>
-              <p className="text-[10px] text-muted-foreground">وصول سريع للخدمات الرقمية</p>
+              <h1 className="text-lg font-bold font-headline">مرحباً، <span className="text-primary">{isAdmin ? "المدير العام" : (userName || userPhone)}</span></h1>
+              <p className="text-[10px] text-muted-foreground">الوصول السريع للخدمات الرقمية</p>
             </div>
           </div>
           <button className="p-2 bg-white rounded-full shadow-sm">
@@ -58,8 +57,8 @@ export default function DashboardPage() {
                 <BellRing className="h-4 w-4 text-white" />
               </div>
               <div className="text-right">
-                <p className="font-bold text-xs text-primary">فعل التنبيهات يا غالي</p>
-                <p className="text-[9px] text-muted-foreground">لتصلك حالة طلباتك ورصيدك فوراً بصوت رنة</p>
+                <p className="font-bold text-xs text-primary">تفعيل التنبيهات</p>
+                <p className="text-[9px] text-muted-foreground">لتصلك تحديثات حالة طلباتك ورصيدك فوراً مع تنبيه صوتي.</p>
               </div>
             </div>
             <Button 
@@ -81,7 +80,7 @@ export default function DashboardPage() {
               </div>
               <div className="text-right">
                 <p className="font-bold text-sm text-destructive">لوحة الإدارة نشطة</p>
-                <p className="text-[10px] text-muted-foreground">تحقق من طلبات الإيداع المعلقة</p>
+                <p className="text-[10px] text-muted-foreground">يرجى مراجعة طلبات الإيداع المعلقة.</p>
               </div>
             </div>
             <Button 
@@ -105,7 +104,7 @@ export default function DashboardPage() {
           
           <div className="relative">
             <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input className="pr-10 bg-white border-none shadow-sm h-12 text-right rounded-2xl" placeholder="ابحث عن ألعاب، بطاقات شحن..." />
+            <Input className="pr-10 bg-white border-none shadow-sm h-12 text-right rounded-2xl" placeholder="البحث عن الخدمات المتاحة..." />
           </div>
 
           <ServiceGrid isAdmin={isAdmin} />

@@ -39,7 +39,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { title: "المحفظة", icon: <Wallet className="h-5 w-5" />, href: "/wallet" },
     { title: "دفعاتي المالية", icon: <Receipt className="h-5 w-5" />, href: "/payments" },
     { title: "مشترياتي", icon: <ShoppingCart className="h-5 w-5" />, href: "/history" },
-    { title: "ادعُ واربح", icon: <Gift className="h-5 w-5 text-primary" />, href: "/referral" },
+    { title: "برنامج المكافآت", icon: <Gift className="h-5 w-5 text-primary" />, href: "/referral" },
     { title: "المراكز المعتمدة", icon: <MapPin className="h-5 w-5" />, href: "/centers" },
     { title: "المساعد الذكي", icon: <Bot className="h-5 w-5" />, href: "/ai-assistant" },
     { title: "تغيير كلمة المرور", icon: <KeyRound className="h-5 w-5" />, href: "/profile/change-password" },
@@ -48,11 +48,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const handleLevelClick = () => {
     toast({
-      description: "لزيادة مستواك كل ما عليك هو زيادة مشترياتك بالتوفيق إن شاء الله ❤️",
+      description: "لترقية مستوى حسابك، يرجى زيادة حجم المشتريات في المنصة.",
     });
   };
 
-  // دالة ضغط الصورة برمجياً قبل الرفع
   const compressImage = (base64Str: string): Promise<string> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -79,7 +78,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-        // ضغط بجودة 0.7 لضمان حجم تحت 500 ك.ب
         resolve(canvas.toDataURL('image/jpeg', 0.7));
       };
     });
@@ -90,7 +88,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      toast({ variant: "destructive", title: "خطأ", description: "يرجى اختيار صورة صالحة يا غالي." });
+      toast({ variant: "destructive", title: "خطأ", description: "يرجى اختيار ملف صورة صالح." });
       return;
     }
 
@@ -99,24 +97,23 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     reader.onloadend = async () => {
       try {
         const rawBase64 = reader.result as string;
-        // ضغط الصورة قبل الإرسال
         const compressedBase64 = await compressImage(rawBase64);
         
         const res = await updateProfileImage(compressedBase64);
         setUploading(false);
         
         if (res.success) {
-          toast({ title: "تم التحديث ✅", description: "صورة البروفيل الجديدة صارت جاهزة." });
+          toast({ title: "تم التحديث بنجاح", description: "تم تحديث صورة الملف الشخصي بنجاح." });
         } else {
           toast({ 
             variant: "destructive", 
             title: "فشل التعديل", 
-            description: res.message || "صار مشكلة بسيطة، جرب مرة تانية." 
+            description: res.message || "حدث خطأ أثناء الرفع، يرجى المحاولة مرة أخرى." 
           });
         }
       } catch (err) {
         setUploading(false);
-        toast({ variant: "destructive", title: "خطأ غير متوقع", description: "تعذر معالجة الصورة." });
+        toast({ variant: "destructive", title: "خطأ غير متوقع", description: "تعذر معالجة الصورة المطلوبة." });
       }
     };
     reader.readAsDataURL(file);
@@ -164,13 +161,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
           
           <div className="text-center space-y-1">
-            <h2 className="text-xl font-black font-headline tracking-tight">{userName || "المستخدم"}</h2>
+            <h2 className="text-xl font-black font-headline tracking-tight">{userName || "مستخدم"}</h2>
             <div className="flex items-center justify-center gap-2">
                <span 
                   onClick={handleLevelClick}
                   className="bg-yellow-500/10 text-yellow-500 px-3 py-0.5 rounded-full text-[10px] font-black uppercase flex items-center gap-1 border border-yellow-500/20 cursor-pointer hover:bg-yellow-500/20 transition-all"
                 >
-                  {isAdmin ? "المدير أيهم" : "مميز ⭐"}
+                  {isAdmin ? "المدير العام" : "عضو مميز ⭐"}
                 </span>
                <span className="text-gray-500 text-[10px] font-bold">ID: {userPhone || "0000"}</span>
             </div>

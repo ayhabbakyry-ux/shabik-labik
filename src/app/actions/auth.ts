@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore';
 
 /**
- * @fileOverview محرك المصادقة السحابي المدرع - يدعم كود الإحالة ونظام استعادة الحساب.
+ * @fileOverview محرك المصادقة - يدعم كود الإحالة ونظام استعادة الحساب بشكل رسمي.
  */
 
 const ADMIN_PHONE = "0939549573";
@@ -27,7 +27,7 @@ export async function signInAction(phone: string, pass: string) {
       const userData = userDoc.data();
       return { 
         success: true, 
-        message: "مرحباً بك يا غالي، نورت المنصة", 
+        message: "تم تسجيل الدخول بنجاح، مرحباً بك في المنصة.", 
         user: { 
           phone: userData.phone, 
           name: userData.name, 
@@ -35,10 +35,10 @@ export async function signInAction(phone: string, pass: string) {
         } 
       };
     }
-    return { success: false, message: "فشل الدخول، تأكد من الرقم أو كلمة السر" };
+    return { success: false, message: "فشل الدخول، يرجى التأكد من البيانات المدخلة." };
   } catch (error) {
     console.error("Auth Error:", error);
-    return { success: false, message: "فشل في عملية الاتصال، يرجى المحاولة مجدداً" };
+    return { success: false, message: "حدث خطأ أثناء الاتصال، يرجى المحاولة لاحقاً." };
   }
 }
 
@@ -48,7 +48,7 @@ export async function signUpAction(phone: string, name: string, pass: string, re
     const querySnapshot = await getDocs(q);
     
     if (!querySnapshot.empty) {
-      return { success: false, message: "هذا الرقم مسجل من قبل يا شهم" };
+      return { success: false, message: "هذا الرقم مسجل مسبقاً في النظام." };
     }
 
     let initialBalance = 0;
@@ -88,10 +88,10 @@ export async function signUpAction(phone: string, name: string, pass: string, re
     };
 
     await addDoc(collection(db, "users"), newUser);
-    return { success: true, message: "تم إنشاء الحساب بنجاح يا غالي، سجل دخولك الآن" };
+    return { success: true, message: "تم إنشاء الحساب بنجاح، يمكنك تسجيل الدخول الآن." };
   } catch (error) {
     console.error("Register Error:", error);
-    return { success: false, message: "فشل في عملية الاتصال بالسيرفر، يرجى المحاولة مجدداً" };
+    return { success: false, message: "حدث خطأ أثناء الاتصال بالسيرفر." };
   }
 }
 
@@ -101,12 +101,11 @@ export async function requestPasswordResetAction(phone: string) {
     const userSnap = await getDocs(userQ);
     
     if (userSnap.empty) {
-      return { success: false, message: "هذا الرقم غير موجود بالنظام يا غالي." };
+      return { success: false, message: "رقم الهاتف المدخل غير مسجل لدينا." };
     }
 
     const userData = userSnap.docs[0].data();
     
-    // تسجيل الطلب للمدير
     await addDoc(collection(db, "password_requests"), {
       phone,
       userName: userData.name || "مستخدم",
@@ -115,7 +114,7 @@ export async function requestPasswordResetAction(phone: string) {
       date: new Date().toLocaleString('ar-SY')
     });
 
-    return { success: true, message: "تم إرسال طلبك للمدير. تواصل مع الإدارة عبر واتساب لاستلام كلمة المرور الجديدة." };
+    return { success: true, message: "تم إرسال طلبك للإدارة. يرجى التواصل عبر واتساب لاستلام بيانات الدخول الجديدة." };
   } catch (error) {
     return { success: false, message: "حدث خطأ أثناء إرسال الطلب." };
   }
