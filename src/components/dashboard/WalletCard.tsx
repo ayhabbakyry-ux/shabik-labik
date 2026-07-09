@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -33,7 +32,7 @@ export function WalletCard() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      toast({ variant: "destructive", title: "خطأ في الملف", description: "يرجى اختيار ملف صورة صالح." });
+      toast({ variant: "destructive", title: "خطأ في نوع الملف", description: "يرجى اختيار ملف صورة صالح." });
       return;
     }
 
@@ -42,7 +41,7 @@ export function WalletCard() {
     reader.onloadend = () => {
       setImageProof(reader.result as string);
       setUploading(false);
-      toast({ title: "تم رفع الإشعار", description: "الصورة جاهزة للإرسال." });
+      toast({ title: "تم تحميل الملف", description: "صورة الإشعار جاهزة للإرسال." });
     };
     reader.readAsDataURL(file);
   };
@@ -51,28 +50,28 @@ export function WalletCard() {
     setError("");
     const numAmount = Number(amount);
     if (!amount || isNaN(numAmount)) {
-      setError("يرجى إدخال المبلغ");
+      setError("يرجى إدخال المبلغ المطلوب.");
       return;
     }
     if (numAmount < 100) {
-      setError("أقل مبلغ للشحن هو 100 ليرة");
+      setError("الحد الأدنى للإيداع هو 100 ليرة.");
       return;
     }
     if (!imageProof) {
-      setError("يجب رفع صورة الإشعار");
+      setError("يجب إرفاق صورة الإشعار لإتمام الطلب.");
       return;
     }
     requestDeposit(numAmount, imageProof);
     setOpen(false);
     setAmount("");
     setImageProof(null);
-    toast({ title: "تم إرسال الطلب", description: "سيتم تفعيل الرصيد بعد مراجعة الإدارة." });
+    toast({ title: "تم إرسال الطلب بنجاح", description: "سوف تتم مراجعة العملية من قبل الإدارة وتفعيل الرصيد." });
   };
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
-    toast({ description: "تم النسخ بنجاح" });
+    toast({ description: "تم النسخ بنجاح." });
     setTimeout(() => setCopiedId(null), 2000);
   };
 
@@ -103,10 +102,10 @@ export function WalletCard() {
             </button>
           </DialogTrigger>
           <DialogContent className="w-[95%] max-w-[425px] max-h-[85vh] overflow-hidden bg-[#11151d] border-gray-800 text-white flex flex-col p-0 rounded-[32px]" dir="rtl">
-            <div className="p-6 pb-2">
+            <div className="p-6 pb-2 text-right">
               <DialogHeader>
-                <DialogTitle className="text-right font-headline text-xl">شحن المحفظة</DialogTitle>
-                <DialogDescription className="text-right text-gray-400 text-xs">حول المبلغ وارفع صورة الإشعار للمراجعة.</DialogDescription>
+                <DialogTitle className="text-right font-headline text-xl">شحن رصيد المحفظة</DialogTitle>
+                <DialogDescription className="text-right text-gray-400 text-xs">يرجى تحويل المبلغ المطلوب ثم إرفاق صورة الإشعار للمراجعة.</DialogDescription>
               </DialogHeader>
             </div>
 
@@ -127,17 +126,17 @@ export function WalletCard() {
                 </div>
                 
                 <div className="grid gap-2 text-right">
-                  <Label className="font-bold text-xs text-gray-400">المبلغ المطلوب شحنه</Label>
+                  <Label className="font-bold text-xs text-gray-400">المبلغ المطلوب إيداعه</Label>
                   <Input type="number" placeholder="مثال: 50000" className="bg-[#1c232d] border-gray-800 h-12 text-right text-white rounded-xl focus:ring-primary" value={amount} onChange={(e) => setAmount(e.target.value)} />
                   {error && <p className="text-xs text-destructive mt-1 font-bold">{error}</p>}
                 </div>
 
                 <div className="grid gap-2 text-right pb-4">
-                  <Label className="font-bold text-xs text-gray-400">صورة الإشعار (إجباري)</Label>
+                  <Label className="font-bold text-xs text-gray-400">صورة الإشعار الرسمي (إجباري)</Label>
                   <div className="relative">
                     <Input type="file" accept="image/*" className="hidden" id="proof-upload" onChange={handleFileChange} />
                     <label htmlFor="proof-upload" className="flex items-center justify-center gap-2 w-full h-14 bg-[#1c232d] border-2 border-dashed border-gray-700 rounded-xl cursor-pointer hover:border-primary transition-colors text-sm font-bold text-gray-300">
-                      {uploading ? "جاري التحميل..." : imageProof ? "تم اختيار الصورة ✅" : <><Upload className="h-4 w-4" /> اختر صورة الإشعار</>}
+                      {uploading ? "جاري التحميل..." : imageProof ? "تم اختيار الصورة بنجاح ✅" : <><Upload className="h-4 w-4" /> اختر صورة الإشعار من الجهاز</>}
                     </label>
                   </div>
                   {imageProof && (
@@ -153,7 +152,7 @@ export function WalletCard() {
             </ScrollArea>
 
             <div className="p-4 shrink-0 bg-[#161a23] border-t border-gray-800">
-              <Button onClick={handleDeposit} disabled={uploading} className="w-full h-14 text-lg font-black rounded-2xl shadow-xl shadow-primary/20 bg-primary hover:bg-primary/90">تأكيد وإرسال الطلب</Button>
+              <Button onClick={handleDeposit} disabled={uploading} className="w-full h-14 text-lg font-black rounded-2xl shadow-xl shadow-primary/20 bg-primary hover:bg-primary/90">تأكيد وإرسال الطلب للمراجعة</Button>
             </div>
           </DialogContent>
         </Dialog>

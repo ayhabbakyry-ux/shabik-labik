@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 
 /**
- * @fileOverview أفعال الإدارة السحابية - تنفذ من السيرفر حصراً لتخطي الحظر الإقليمي.
+ * @fileOverview أفعال الإدارة السحابية - تنفيذ العمليات من جهة الخادم لضمان الأمان.
  */
 
 export async function getAllUsersAction() {
@@ -22,6 +22,16 @@ export async function getAllUsersAction() {
     return usersSnap.docs.map(d => ({ ...d.data(), id: d.id }));
   } catch (error) {
     console.error("Admin: Fetch Users Error", error);
+    return [];
+  }
+}
+
+export async function getAllTransactionsAction() {
+  try {
+    const txSnap = await getDocs(collection(db, "transactions"));
+    return txSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+  } catch (error) {
+    console.error("Admin: Fetch All Transactions Error", error);
     return [];
   }
 }
@@ -43,18 +53,19 @@ export async function processAdminAction(txId: string, action: 'approve' | 'reje
   try {
     const txRef = doc(db, "transactions", txId);
     const txSnap = await getDoc(txRef);
-    if (!txSnap.exists()) return { success: false, message: "العملية غير موجودة" };
+    if (!txSnap.exists()) return { success: false, message: "العملية المطلوبة غير موجودة في النظام." };
     
     const txData = txSnap.data();
-    if (txData.status !== 'Pending') return { success: false, message: "تمت معالجة الطلب مسبقاً" };
+    if (txData.status !== 'Pending') return { success: false, message: "لقد تمت معالجة هذا الطلب مسبقاً." };
 
     if (action === 'approve') {
       const userQ = query(collection(db, "users"), where("phone", "==", txData.userPhone));
       const userSnap = await getDocs(userQ);
       if (!userSnap.empty) {
         const userDoc = userSnap.docs[0];
-        const currentBalance = userDoc.data().balance || 0;
-        await updateDoc(doc(db, "users", userDoc.id), { balance: currentBalance + txData.amount });
+        const currentBalance = Number(userDoc.data().balance || 0);
+        const addedAmount = Number(txData.amount);
+        await updateDoc(doc(db, "users", userDoc.id), { balance: currentBalance + addedAmount });
       }
       await updateDoc(txRef, { status: 'Completed' });
     } else {
@@ -63,7 +74,7 @@ export async function processAdminAction(txId: string, action: 'approve' | 'reje
     return { success: true };
   } catch (error) {
     console.error("Admin: Action Error", error);
-    return { success: false };
+    return { success: false, message: "حدث خطأ أثناء معالجة الطلب." };
   }
 }
 
@@ -72,11 +83,11 @@ export async function updateTransactionStatusServer(orderId: string, status: 'Co
     const txRef = doc(db, "transactions", orderId);
     const txSnap = await getDoc(txRef);
     
-    if (!txSnap.exists()) return { success: false, message: "الطلب غير موجود" };
+    if (!txSnap.exists()) return { success: false, message: "الطلب غير موجود في السجلات." };
     const txData = txSnap.data();
     
     if (txData.status !== 'Pending') {
-      return { success: false, message: "الطلب تمت معالجته مسبقاً" };
+      return { success: false, message: "الطلب تمت معالجته مسبقاً." };
     }
 
     await updateDoc(txRef, { status });
@@ -125,14 +136,11 @@ export async function getPasswordRequestsAction() {
 
 export async function completePasswordResetAction(phone: string, requestId: string) {
   try {
-    // 1. تحديث كلمة المرور لـ 123456
     const userQ = query(collection(db, "users"), where("phone", "==", phone));
     const userSnap = await getDocs(userQ);
     if (!userSnap.empty) {
       await updateDoc(doc(db, "users", userSnap.docs[0].id), { password: "123456" });
     }
-
-    // 2. حذف الطلب
     await deleteDoc(doc(db, "password_requests", requestId));
     return { success: true };
   } catch (error) {

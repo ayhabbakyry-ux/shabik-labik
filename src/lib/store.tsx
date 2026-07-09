@@ -10,7 +10,8 @@ import {
   updateTransactionStatusServer, 
   getUserDataAction,
   getPasswordRequestsAction,
-  completePasswordResetAction
+  completePasswordResetAction,
+  getAllTransactionsAction
 } from '@/app/actions/admin';
 import { changePasswordAction, updateProfileImageAction } from '@/app/actions/profile';
 
@@ -82,7 +83,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const playNotificationSound = useCallback(() => {
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
-      audio.play().catch(() => console.log("Sound blocked by browser policy"));
+      audio.play().catch(() => console.log("تم حظر الصوت بواسطة سياسة المتصفح."));
     } catch (e) {
       console.error("Audio error", e);
     }
@@ -100,7 +101,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     Notification.requestPermission().then(permission => {
       setNotificationsEnabled(permission === "granted");
       if (permission === "granted") {
-        triggerNotification("تم تفعيل التنبيهات ✅", "مبروك يا غالي، رح توصلك كل تحديثات رصيدك وطلباتك هون فوراً.");
+        triggerNotification("تم تفعيل التنبيهات بنجاح ✅", "سوف تتلقى إشعارات فورية حول حالة طلباتك ورصيدك.");
       }
     });
   }, [triggerNotification]);
@@ -112,20 +113,29 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const fetchCloudData = useCallback(async (phone: string) => {
-    const cloudTxs = await getUserTransactionsAction(phone);
+    const isAdminUser = phone === ADMIN_PHONE;
+    
+    // جلب العمليات: للمدير نجلب كل شيء، وللمستخدم نجلب عملياته فقط
+    let cloudTxs: Transaction[] = [];
+    if (isAdminUser) {
+      cloudTxs = await getAllTransactionsAction() as Transaction[];
+    } else {
+      cloudTxs = await getUserTransactionsAction(phone);
+    }
+    
     const prev = prevTransactionsRef.current;
 
-    if (phone === ADMIN_PHONE) {
+    if (isAdminUser) {
       const currentPassReqs = await getPasswordRequestsAction();
       if (currentPassReqs.length > prevPassRequestsRef.current.length) {
-        triggerNotification("طلب استعادة حساب 🔑", "زبون عم يستنى تهيئة حسابه، تحقق من لوحة الإدارة.");
+        triggerNotification("طلب استعادة حساب جديد 🔑", "هناك مستخدم ينتظر تهيئة بيانات دخوله، يرجى مراجعة لوحة الإدارة.");
       }
       setPasswordRequests(currentPassReqs);
       prevPassRequestsRef.current = currentPassReqs;
 
       const newDeposits = cloudTxs.filter(tx => tx.type === 'إيداع محفظة' && tx.status === 'Pending' && !prev.find(p => p.id === tx.id));
       if (newDeposits.length > 0) {
-        triggerNotification("طلب إيداع جديد! 💰", `وصلك طلب إيداع من ${newDeposits[0].userName || "زبون"} بقيمة ${newDeposits[0].amount}`);
+        triggerNotification("طلب إيداع جديد 💰", `وصل طلب إيداع جديد من ${newDeposits[0].userName || "مستخدم"} بقيمة ${newDeposits[0].amount.toLocaleString()} ليرة.`);
       }
 
       const users = await getAllUsersAction();
@@ -134,14 +144,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       cloudTxs.forEach(tx => {
         const oldTx = prev.find(p => p.id === tx.id);
         if (oldTx && oldTx.status !== tx.status) {
-          const statusAr = tx.status === 'Completed' ? 'مكتمل ✅' : 'مرفوض ❌';
-          triggerNotification("تحديث حالة الطلب", `طلبك (${tx.type}) صار هلق ${statusAr}`);
+          const statusAr = tx.status === 'Completed' ? 'تم القبول ✅' : 'تم الرفض ❌';
+          triggerNotification("تحديث حالة الطلب", `طلبكم الخاص بـ (${tx.type}) قد تغيرت حالته إلى: ${statusAr}`);
         }
       });
     }
 
-    setTransactions(cloudTxs);
-    prevTransactionsRef.current = cloudTxs;
+    // ترتيب العمليات من الأحدث للأقدم
+    const sortedTxs = [...cloudTxs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    setTransactions(sortedTxs);
+    prevTransactionsRef.current = sortedTxs;
     
     const res = await getUserDataAction(phone);
     if (res.success && res.data) {
@@ -166,6 +178,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           let finalStatus: 'Completed' | 'Rejected' | null = null;
           if (remoteStatus === 'accept' || remoteStatus === 'موافق' || remoteStatus === 'مقبول' || remoteStatus === 'نجاح') finalStatus = 'Completed';
           else if (remoteStatus === 'reject' || remoteStatus === 'رفض') finalStatus = 'Rejected';
+          
           if (finalStatus) {
             const updateRes = await updateTransactionStatusServer(order.id, finalStatus, order.amount, order.userPhone || userPhone);
             if (updateRes.success) await fetchCloudData(userPhone);
@@ -205,7 +218,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setUserName(adminData.name);
       localStorage.setItem('shabik_auth', JSON.stringify(adminData));
       await fetchCloudData(phone);
-      return { success: true, message: "أهلاً بك يا مدير أيهم" };
+      return { success: true, message: "مرحباً بك السيد المدير." };
     }
     const result = await signInAction(phone, password);
     if (result.success && result.user) {
@@ -274,7 +287,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       date: new Date().toLocaleString('ar-SY'),
       userName,
       userPhone,
-      details: "طلب شحن رصيد",
+      details: "طلب إيداع رصيد للمحفظة",
       proofImage
     };
     const result = await recordTransactionAction(txData);
