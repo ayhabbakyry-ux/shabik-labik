@@ -34,7 +34,7 @@ export default function ReferralPage() {
       setCopied(true);
       toast({
         title: "تم النسخ بنجاح",
-        description: `كود الإحالة الخاص بك (${myReferralCode}) جاهز للمشاركة الآن.`,
+        description: `كود الإحالة الخاص بكم (${myReferralCode}) جاهز للمشاركة الآن.`,
       });
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -47,7 +47,7 @@ export default function ReferralPage() {
   };
 
   const handleShare = async () => {
-    const shareText = `مرحباً بك! أدعوك للتسجيل في تطبيق شبك لبيك الرقمي والاستفادة من خدمات الشحن التلقائي.\n🌐 رابط الموقع: ${referralLink}\n🔑 كود الدعوة الخاص بي: ${myReferralCode}\n(أدخل الكود عند التسجيل لتحصل على رصيد إضافي مجاني!)`;
+    const shareText = `أهلاً بك! أدعوك للتسجيل في تطبيق شبك لبيك الرقمي والاستفادة من عروض الشحن التلقائي.\n🌐 رابط الموقع: ${referralLink}\n🔑 كود الدعوة الخاص بي: ${myReferralCode}\n(أدخل الكود عند التسجيل لتحصل على 25 ل.س مجاناً!)`;
     
     const shareData = {
       title: 'شبك لبيك الرقمي',
@@ -117,7 +117,7 @@ export default function ReferralPage() {
 
         <Card className="border-none shadow-2xl rounded-[32px] bg-white overflow-hidden relative border-t-4 border-primary">
           <CardHeader className="text-center pb-2">
-            <CardTitle className="text-slate-800 font-bold">كود الإحالة الخاص بك</CardTitle>
+            <CardTitle className="text-slate-800 font-bold">كود الإحالة الخاص بكم</CardTitle>
             <CardDescription>استخدم هذا الكود للحصول على رصيد إضافي</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 p-8">
@@ -148,7 +148,7 @@ export default function ReferralPage() {
              <Sparkles className="h-4 w-4" /> آلية عمل المكافأة
            </h4>
            <p className="text-xs text-slate-600 leading-relaxed font-medium">
-             عند استخدام كود الدعوة الخاص بك من قبل مستخدم جديد، سيتم إضافة <span className="font-bold text-primary">25 ليرة</span> لمحفظتك فوراً، كما سيحصل المستخدم الجديد على مكافأة ترحيبية بقيمة <span className="font-bold text-primary">25 ليرة</span>.
+             عند استخدام كود الدعوة الخاص بكم من قبل مستخدم جديد، سيتم إضافة <span className="font-bold text-primary">25 ليرة</span> لمحفظتكم فوراً، كما سيحصل المستخدم الجديد على مكافأة ترحيبية بقيمة <span className="font-bold text-primary">25 ليرة</span>.
            </p>
         </div>
       </main>
