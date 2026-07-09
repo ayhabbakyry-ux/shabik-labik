@@ -68,9 +68,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const playNotificationSound = useCallback(() => {
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
-      audio.play().catch(() => console.log("Sound blocked by browser interaction rules"));
+      audio.play().catch(() => console.log("Sound blocked or interaction needed"));
     } catch (e) {
-      console.error("Audio play error", e);
+      console.error("Audio error", e);
     }
   }, []);
 
@@ -92,17 +92,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (permission === "granted") {
         triggerNotification("تم تفعيل التنبيهات ✅", "مبروك يا غالي، رح توصلك كل تحديثات رصيدك وطلباتك هون فوراً.");
       } else if (permission === "denied") {
-        alert("التنبيهات محظورة من إعدادات المتصفح. يرجى الضغط على القفل بجانب رابط الموقع وتفعيل 'Notifications' أو 'الإشعارات'.");
+        alert("التنبيهات محظورة. يرجى تفعيلها من إعدادات المتصفح (قفل الرابط بجانب العنوان).");
       }
     });
   }, [triggerNotification]);
 
+  // مزامنة حالة التنبيهات عند تشغيل الموقع
+  useEffect(() => {
+    if ("Notification" in window) {
+      setNotificationsEnabled(Notification.permission === "granted");
+    }
+  }, []);
+
   const fetchCloudData = useCallback(async (phone: string) => {
     const cloudTxs = await getUserTransactionsAction(phone);
-    
-    if (isLoggedIn && Notification.permission === "granted") {
-      const prev = prevTransactionsRef.current;
-      
+    const prev = prevTransactionsRef.current;
+
+    if (isLoggedIn && "Notification" in window && Notification.permission === "granted") {
       if (phone === ADMIN_PHONE) {
         const newDeposits = cloudTxs.filter(tx => 
           tx.type === 'إيداع محفظة' && 
@@ -164,10 +170,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           if (finalStatus) {
             const ownerPhone = order.userPhone || userPhone;
             const updateRes = await updateTransactionStatusServer(order.id, finalStatus, order.amount, ownerPhone);
-            
-            if (updateRes.success) {
-              await fetchCloudData(userPhone);
-            }
+            if (updateRes.success) await fetchCloudData(userPhone);
           }
         }
       } catch (err) { console.error("Polling error:", err); }
@@ -184,10 +187,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setUserName(authData.name);
       setUserBalance(authData.balance || 0);
       fetchCloudData(authData.phone);
-      
-      if ("Notification" in window) {
-        setNotificationsEnabled(Notification.permission === "granted");
-      }
     }
   }, [fetchCloudData]);
 
@@ -276,16 +275,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const adminAction = async (txId: string, action: 'approve' | 'reject') => {
     const res = await processAdminAction(txId, action);
-    if (res.success) {
-      await fetchCloudData(userPhone);
-    }
+    if (res.success) await fetchCloudData(userPhone);
   };
 
   const deleteUser = async (phone: string) => {
     const res = await deleteUserAction(phone);
-    if (res.success) {
-      await fetchCloudData(userPhone);
-    }
+    if (res.success) await fetchCloudData(userPhone);
   };
 
   const clearPasswordRequest = async (phone: string) => {
