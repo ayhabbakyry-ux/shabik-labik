@@ -12,6 +12,7 @@ import {
   getPasswordRequestsAction,
   completePasswordResetAction
 } from '@/app/actions/admin';
+import { changePasswordAction } from '@/app/actions/profile';
 
 export type Transaction = {
   id: string;
@@ -46,6 +47,7 @@ type UserContextType = {
   deleteUser: (phone: string) => Promise<void>;
   requestReset: (phone: string) => Promise<{ success: boolean; message: string }>;
   adminResetPassword: (phone: string, requestId: string) => Promise<void>;
+  changePassword: (currentPass: string, newPass: string) => Promise<{ success: boolean; message: string }>;
   currency: string;
   checkPendingOrders: () => Promise<void>;
   notificationsEnabled: boolean;
@@ -107,48 +109,48 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const fetchCloudData = useCallback(async (phone: string) => {
+    // جلب المعاملات
     const cloudTxs = await getUserTransactionsAction(phone);
     const prev = prevTransactionsRef.current;
 
-    if (isLoggedIn && "Notification" in window && Notification.permission === "granted") {
-      if (phone === ADMIN_PHONE) {
-        // إشعارات للمدير عن طلبات الإيداع
-        const newDeposits = cloudTxs.filter(tx => tx.type === 'إيداع محفظة' && tx.status === 'Pending' && !prev.find(p => p.id === tx.id));
-        if (newDeposits.length > 0) {
-          triggerNotification("طلب إيداع جديد! 💰", `وصلك طلب إيداع من ${newDeposits[0].userName || "زبون"} بقيمة ${newDeposits[0].amount}`);
-        }
-
-        // إشعارات للمدير عن طلبات استعادة كلمة المرور
-        const currentPassReqs = await getPasswordRequestsAction();
-        if (currentPassReqs.length > prevPassRequestsRef.current.length) {
-          triggerNotification("طلب استعادة حساب 🔑", "هنيك زبون عم يستنى استعادة حسابه، تحقق من لوحة الإدارة.");
-        }
-        setPasswordRequests(currentPassReqs);
-        prevPassRequestsRef.current = currentPassReqs;
-      } else {
-        cloudTxs.forEach(tx => {
-          const oldTx = prev.find(p => p.id === tx.id);
-          if (oldTx && oldTx.status !== tx.status) {
-            const statusAr = tx.status === 'Completed' ? 'مكتمل ✅' : 'مرفوض ❌';
-            triggerNotification("تحديث حالة الطلب", `طلبك (${tx.type}) صار هلق ${statusAr}`);
-          }
-        });
+    // جلب طلبات الاستعادة للمدير فوراً
+    if (phone === ADMIN_PHONE) {
+      const currentPassReqs = await getPasswordRequestsAction();
+      if (currentPassReqs.length > prevPassRequestsRef.current.length) {
+        triggerNotification("طلب استعادة حساب 🔑", "زبون عم يستنى تهيئة حسابه، تحقق من لوحة الإدارة.");
       }
+      setPasswordRequests(currentPassReqs);
+      prevPassRequestsRef.current = currentPassReqs;
+
+      // إشعار الإيداع للمدير
+      const newDeposits = cloudTxs.filter(tx => tx.type === 'إيداع محفظة' && tx.status === 'Pending' && !prev.find(p => p.id === tx.id));
+      if (newDeposits.length > 0) {
+        triggerNotification("طلب إيداع جديد! 💰", `وصلك طلب إيداع من ${newDeposits[0].userName || "زبون"} بقيمة ${newDeposits[0].amount}`);
+      }
+
+      // جلب جميع المستخدمين للمدير
+      const users = await getAllUsersAction();
+      setAllUsers(users);
+    } else {
+      // إشعارات تغير الحالة للزبائن
+      cloudTxs.forEach(tx => {
+        const oldTx = prev.find(p => p.id === tx.id);
+        if (oldTx && oldTx.status !== tx.status) {
+          const statusAr = tx.status === 'Completed' ? 'مكتمل ✅' : 'مرفوض ❌';
+          triggerNotification("تحديث حالة الطلب", `طلبك (${tx.type}) صار هلق ${statusAr}`);
+        }
+      });
     }
 
     setTransactions(cloudTxs);
     prevTransactionsRef.current = cloudTxs;
     
+    // جلب الرصيد المحدث
     const res = await getUserDataAction(phone);
     if (res.success && res.data) {
       setUserBalance(res.data.balance || 0);
     }
-
-    if (phone === ADMIN_PHONE) {
-      const users = await getAllUsersAction();
-      setAllUsers(users);
-    }
-  }, [isLoggedIn, ADMIN_PHONE, triggerNotification]);
+  }, [ADMIN_PHONE, triggerNotification]);
 
   const checkPendingOrders = useCallback(async () => {
     if (!isLoggedIn || isCheckingOrders) return;
@@ -231,6 +233,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (res.success) await fetchCloudData(userPhone);
   };
 
+  const changePassword = async (currentPass: string, newPass: string) => {
+    return await changePasswordAction(userPhone, currentPass, newPass);
+  };
+
   const deductBalance = async (amount: number, productDetails: string, initialStatus: 'Pending' | 'Completed' = 'Completed', externalId?: string) => {
     const before = userBalance;
     const newBalance = Math.max(0, userBalance - amount);
@@ -290,7 +296,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     <UserContext.Provider value={{ 
       isLoggedIn, isAdmin: userPhone === ADMIN_PHONE, userPhone, userName, userBalance, transactions, allUsers, passwordRequests,
       login, register, logout, deductBalance, requestDeposit, adminAction, deleteUser, requestReset, adminResetPassword,
-      currency, checkPendingOrders, notificationsEnabled, requestNotificationPermission
+      changePassword, currency, checkPendingOrders, notificationsEnabled, requestNotificationPermission
     }}>
       {children}
     </UserContext.Provider>

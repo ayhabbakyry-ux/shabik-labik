@@ -12,7 +12,9 @@ import {
   LifeBuoy,
   Gift,
   Star,
-  Bot
+  Bot,
+  ShieldCheck,
+  KeyRound
 } from "lucide-react";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -38,6 +40,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { title: "ادعُ واربح", icon: <Gift className="h-5 w-5 text-primary" />, href: "/referral" },
     { title: "المراكز المعتمدة", icon: <MapPin className="h-5 w-5" />, href: "/centers" },
     { title: "المساعد الذكي", icon: <Bot className="h-5 w-5" />, href: "/ai-assistant" },
+    { title: "تغيير كلمة المرور", icon: <KeyRound className="h-5 w-5" />, href: "/profile/change-password" },
     { title: "الدعم الفني", icon: <LifeBuoy className="h-5 w-5" />, href: "/support" },
   ];
 
