@@ -7,11 +7,13 @@ import {
   where, 
   getDocs, 
   updateDoc, 
-  doc 
+  doc,
+  addDoc,
+  setDoc
 } from 'firebase/firestore';
 
 /**
- * @fileOverview أفعال الملف الشخصي - تغيير كلمة المرور وتحديث صورة البروفيل.
+ * @fileOverview أفعال الملف الشخصي - تغيير كلمة المرور وتحديث صورة البروفيل مع دعم الإنشاء التلقائي.
  */
 
 export async function changePasswordAction(phone: string, currentPass: string, newPass: string) {
@@ -33,17 +35,32 @@ export async function changePasswordAction(phone: string, currentPass: string, n
   }
 }
 
-export async function updateProfileImageAction(phone: string, imageData: string) {
+export async function updateProfileImageAction(phone: string, imageData: string, name: string) {
   try {
     const q = query(collection(db, "users"), where("phone", "==", phone));
     const snap = await getDocs(q);
+    
     if (!snap.empty) {
+      // تحديث إذا كان موجود
       await updateDoc(doc(db, "users", snap.docs[0].id), { profileImage: imageData });
       return { success: true };
+    } else {
+      // إنشاء سجل جديد في حال كان المدير أو مستخدم غير مسجل بقاعدة البيانات (Fallback)
+      await addDoc(collection(db, "users"), {
+        phone,
+        name,
+        profileImage: imageData,
+        balance: 0,
+        createdAt: new Date().toISOString()
+      });
+      return { success: true };
     }
-    return { success: false };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Update Profile Image Error:", error);
-    return { success: false };
+    // إذا كان الخطأ بسبب الحجم الكبير
+    if (error.message?.includes('too large') || error.code === 'out-of-range') {
+      return { success: false, message: "الصورة حجمها كبير جداً، حاول اختيار صورة أصغر." };
+    }
+    return { success: false, message: "حدث خطأ أثناء حفظ الصورة." };
   }
 }

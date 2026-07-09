@@ -49,7 +49,7 @@ type UserContextType = {
   requestReset: (phone: string) => Promise<{ success: boolean; message: string }>;
   adminResetPassword: (phone: string, requestId: string) => Promise<void>;
   changePassword: (currentPass: string, newPass: string) => Promise<{ success: boolean; message: string }>;
-  updateProfileImage: (imageData: string) => Promise<{ success: boolean }>;
+  updateProfileImage: (imageData: string) => Promise<{ success: boolean; message?: string }>;
   currency: string;
   checkPendingOrders: () => Promise<void>;
   notificationsEnabled: boolean;
@@ -147,6 +147,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (res.success && res.data) {
       setUserBalance(res.data.balance || 0);
       setProfileImage(res.data.profileImage || null);
+      if (res.data.name) setUserName(res.data.name);
     }
   }, [ADMIN_PHONE, triggerNotification]);
 
@@ -236,12 +237,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateProfileImage = async (imageData: string) => {
-    const res = await updateProfileImageAction(userPhone, imageData);
+    const res = await updateProfileImageAction(userPhone, imageData, userName);
     if (res.success) {
       setProfileImage(imageData);
       return { success: true };
     }
-    return { success: false };
+    return { success: false, message: res.message };
   };
 
   const deductBalance = async (amount: number, productDetails: string, initialStatus: 'Pending' | 'Completed' = 'Completed', externalId?: string) => {
