@@ -1,7 +1,8 @@
+
 "use client";
 
 import { useState } from "react";
-import { Send, Landmark, Image as ImageIcon, AlertCircle, Copy, CheckCircle2, Smartphone, Wallet, ArrowUpCircle, Upload } from "lucide-react";
+import { Send, Landmark, Image as ImageIcon, AlertCircle, Copy, CheckCircle2, Smartphone, Wallet, ArrowUpCircle, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/store";
 import {
@@ -16,6 +17,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export function WalletCard() {
   const { userBalance, requestDeposit, currency } = useUser();
@@ -31,7 +33,6 @@ export function WalletCard() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // التأكد من أن الملف صورة
     if (!file.type.startsWith('image/')) {
       toast({ variant: "destructive", title: "خطأ في الملف", description: "يرجى اختيار ملف صورة صالح." });
       return;
@@ -83,7 +84,7 @@ export function WalletCard() {
   ];
 
   return (
-    <div className="bg-gradient-to-br from-[#1c232d] to-[#11151d] p-8 rounded-[32px] shadow-2xl flex flex-col items-center text-center relative overflow-hidden border border-white/5">
+    <div className="bg-gradient-to-br from-[#1c232d] to-[#11151d] p-6 md:p-8 rounded-[32px] shadow-2xl flex flex-col items-center text-center relative overflow-hidden border border-white/5">
       <div className="absolute top-0 left-0 w-32 h-32 bg-primary/10 rounded-full -ml-16 -mt-16 blur-[60px]"></div>
       
       <div className="bg-primary/20 p-4 rounded-2xl mb-4 backdrop-blur-md border border-white/5">
@@ -91,7 +92,7 @@ export function WalletCard() {
       </div>
       
       <div className="text-gray-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">الرصيد المتاح حالياً</div>
-      <div className="text-white text-5xl font-black mb-8 tracking-tighter">
+      <div className="text-white text-4xl md:text-5xl font-black mb-8 tracking-tighter">
         {(userBalance || 0).toLocaleString()} <span className="text-xs font-medium text-gray-500">{currency}</span>
       </div>
       
@@ -102,57 +103,59 @@ export function WalletCard() {
               <ArrowUpCircle className="h-5 w-5" /> إيداع رصيد جديد
             </button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px] overflow-hidden bg-[#11151d] border-gray-800 text-white" dir="rtl">
-            <DialogHeader>
-              <DialogTitle className="text-right font-headline text-xl">شحن المحفظة</DialogTitle>
-              <DialogDescription className="text-right text-gray-400">حول المبلغ وارفع صورة الإشعار للمراجعة.</DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="bg-[#1c232d] p-4 rounded-2xl border border-gray-800 space-y-4">
-                {accounts.map((acc) => (
-                  <div key={acc.id} className="space-y-2">
-                    <span className="flex items-center gap-2 text-[10px] font-bold text-gray-400">{acc.icon} {acc.label}</span>
-                    <div className="flex items-center gap-2 bg-black/40 p-3 rounded-xl border border-white/5">
-                      <span className={`flex-1 text-right font-bold truncate ${acc.isMono ? 'font-mono text-[10px]' : 'text-md'}`}>{acc.value}</span>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-primary hover:bg-primary/10" onClick={() => copyToClipboard(acc.value, acc.id)}>
-                        {copiedId === acc.id ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="grid gap-2 text-right">
-                <Label className="font-bold text-xs text-gray-400">المبلغ المطلوب شحنه ( {currency} )</Label>
-                <Input type="number" placeholder="مثال: 50000" className="bg-[#1c232d] border-gray-800 h-12 text-right text-white rounded-xl focus:ring-primary" value={amount} onChange={(e) => setAmount(e.target.value)} />
-                {error && <p className="text-xs text-destructive mt-1 font-bold">{error}</p>}
-              </div>
-              <div className="grid gap-2 text-right">
-                <Label className="font-bold text-xs text-gray-400">صورة إشعار التحويل (إجباري)</Label>
-                <div className="relative">
-                  <Input 
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden" 
-                    id="proof-upload" 
-                    onChange={handleFileChange} 
-                  />
-                  <label 
-                    htmlFor="proof-upload" 
-                    className="flex items-center justify-center gap-2 w-full h-14 bg-[#1c232d] border-2 border-dashed border-gray-700 rounded-xl cursor-pointer hover:border-primary transition-colors text-sm font-bold text-gray-300"
-                  >
-                    {uploading ? "جاري التحميل..." : imageProof ? "تم اختيار الصورة ✅" : <><Upload className="h-4 w-4" /> اختر صورة الإشعار</>}
-                  </label>
-                </div>
-                {imageProof && (
-                  <div className="mt-2 rounded-lg overflow-hidden border border-gray-800 h-20">
-                    <img src={imageProof} alt="Preview" className="w-full h-full object-cover" />
-                  </div>
-                )}
-              </div>
+          <DialogContent className="w-[95%] max-w-[425px] max-h-[90vh] overflow-hidden bg-[#11151d] border-gray-800 text-white flex flex-col p-0 rounded-[32px]" dir="rtl">
+            <div className="p-6 pb-2">
+              <DialogHeader>
+                <DialogTitle className="text-right font-headline text-xl">شحن المحفظة</DialogTitle>
+                <DialogDescription className="text-right text-gray-400">حول المبلغ وارفع صورة الإشعار للمراجعة.</DialogDescription>
+              </DialogHeader>
             </div>
-            <DialogFooter>
-              <Button onClick={handleDeposit} disabled={uploading} className="w-full h-14 text-lg font-black rounded-2xl shadow-xl shadow-primary/20">تأكيد وإرسال الطلب</Button>
-            </DialogFooter>
+
+            <ScrollArea className="flex-1 px-6">
+              <div className="grid gap-4 py-2">
+                <div className="bg-[#1c232d] p-4 rounded-2xl border border-gray-800 space-y-4">
+                  {accounts.map((acc) => (
+                    <div key={acc.id} className="space-y-2">
+                      <span className="flex items-center gap-2 text-[10px] font-bold text-gray-400">{acc.icon} {acc.label}</span>
+                      <div className="flex items-center gap-2 bg-black/40 p-3 rounded-xl border border-white/5">
+                        <span className={`flex-1 text-right font-bold truncate ${acc.isMono ? 'font-mono text-[10px]' : 'text-md'}`}>{acc.value}</span>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-primary hover:bg-primary/10" onClick={() => copyToClipboard(acc.value, acc.id)}>
+                          {copiedId === acc.id ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="grid gap-2 text-right">
+                  <Label className="font-bold text-xs text-gray-400">المبلغ المطلوب شحنه</Label>
+                  <Input type="number" placeholder="مثال: 50000" className="bg-[#1c232d] border-gray-800 h-12 text-right text-white rounded-xl focus:ring-primary" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                  {error && <p className="text-xs text-destructive mt-1 font-bold">{error}</p>}
+                </div>
+
+                <div className="grid gap-2 text-right pb-4">
+                  <Label className="font-bold text-xs text-gray-400">صورة الإشعار (إجباري)</Label>
+                  <div className="relative">
+                    <Input type="file" accept="image/*" className="hidden" id="proof-upload" onChange={handleFileChange} />
+                    <label htmlFor="proof-upload" className="flex items-center justify-center gap-2 w-full h-14 bg-[#1c232d] border-2 border-dashed border-gray-700 rounded-xl cursor-pointer hover:border-primary transition-colors text-sm font-bold text-gray-300">
+                      {uploading ? "جاري التحميل..." : imageProof ? "تم اختيار الصورة ✅" : <><Upload className="h-4 w-4" /> اختر صورة الإشعار</>}
+                    </label>
+                  </div>
+                  {imageProof && (
+                    <div className="mt-2 rounded-2xl overflow-hidden border border-gray-800 h-32 relative group">
+                      <img src={imageProof} alt="Preview" className="w-full h-full object-cover" />
+                      <button onClick={() => setImageProof(null)} className="absolute top-2 left-2 bg-red-500 p-1 rounded-full shadow-lg">
+                        <X className="h-3 w-3 text-white" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </ScrollArea>
+
+            <div className="p-6 pt-2">
+              <Button onClick={handleDeposit} disabled={uploading} className="w-full h-14 text-lg font-black rounded-2xl shadow-xl shadow-primary/20 bg-primary hover:bg-primary/90">تأكيد وإرسال الطلب</Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
