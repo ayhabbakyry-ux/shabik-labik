@@ -22,49 +22,18 @@ import {
 export function AdminPanel() {
   const { 
     transactions, adminAction, currency, allUsers = [], deleteUser, 
-    passwordRequests = [], clearPasswordRequest 
+    passwordRequests = [], clearPasswordRequest, notificationsEnabled, requestNotificationPermission
   } = useUser();
   const { toast } = useToast();
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const prevPendingCount = useRef(0);
 
   const pendingTxs = transactions?.filter(t => t.status === 'Pending' && t.type === 'إيداع محفظة') || [];
 
-  // نظام الإشعارات الذكي مع الصوت
-  useEffect(() => {
-    if (notificationsEnabled && pendingTxs.length > prevPendingCount.current) {
-      // 1. تشغيل صوت التنبيه
-      const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
-      audio.play().catch(e => console.log("Audio play blocked"));
-
-      // 2. إظهار إشعار نظام (إذا مسموح)
-      if ("Notification" in window && Notification.permission === "granted") {
-        new Notification("طلب إيداع جديد! 💰", {
-          body: `وصلك طلب إيداع جديد من أحد الزبائن. تحقق من لوحة الإدارة.`,
-          icon: "/favicon.ico"
-        });
-      }
-
-      toast({
-        title: "طلب إيداع جديد! 💰",
-        description: "وصلك طلب إيداع جديد من زبون، تحقق من قائمة الطلبات.",
-        variant: "default",
-      });
-    }
-    prevPendingCount.current = pendingTxs.length;
-  }, [pendingTxs.length, notificationsEnabled, toast]);
-
   const toggleNotifications = () => {
-    if (!notificationsEnabled) {
-      // طلب إذن الإشعارات من المتصفح
-      if ("Notification" in window) {
-        Notification.requestPermission();
-      }
-      setNotificationsEnabled(true);
-      toast({ title: "تم تفعيل التنبيهات الصوتية ✅" });
-    } else {
-      setNotificationsEnabled(false);
+    requestNotificationPermission();
+    if (notificationsEnabled) {
       toast({ title: "تم إيقاف التنبيهات" });
+    } else {
+      toast({ title: "تم تفعيل التنبيهات الصوتية ✅" });
     }
   };
 
@@ -91,7 +60,7 @@ export function AdminPanel() {
         <Button 
           onClick={toggleNotifications}
           variant={notificationsEnabled ? "default" : "outline"}
-          className={`rounded-2xl gap-2 font-bold shadow-sm transition-all ${notificationsEnabled ? 'bg-green-600 hover:bg-green-700 animate-pulse' : ''}`}
+          className={`rounded-2xl gap-2 font-bold shadow-sm transition-all ${notificationsEnabled ? 'bg-green-600 hover:bg-green-700' : ''}`}
         >
           {notificationsEnabled ? <BellRing className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
           {notificationsEnabled ? "تنبيهات الصوت نشطة" : "تفعيل تنبيهات الصوت"}
@@ -115,10 +84,10 @@ export function AdminPanel() {
               <p className="text-xs opacity-70 font-bold mb-1">طلبات معلقة</p>
               <p className="text-3xl font-black">{pendingTxs.length}</p>
             </div>
-            <Clock className={`h-10 w-10 opacity-20 ${pendingTxs.length > 0 ? 'animate-spin-slow' : ''}`} />
+            <Clock className={`h-10 w-10 opacity-20 ${pendingTxs.length > 0 ? 'animate-spin' : ''}`} />
           </CardContent>
           {pendingTxs.length > 0 && (
-            <div className="absolute top-2 left-2 bg-white text-orange-500 rounded-full h-6 w-6 flex items-center justify-center font-black text-xs">!</div>
+            <div className="absolute top-2 left-2 bg-white text-orange-500 rounded-full h-6 w-6 flex items-center justify-center font-black text-xs animate-bounce">!</div>
           )}
         </Card>
         <Card className="bg-green-600 text-white border-none rounded-3xl overflow-hidden shadow-lg">

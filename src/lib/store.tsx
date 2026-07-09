@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { signInAction, signUpAction } from '@/app/actions/auth';
 import { syncBalanceAction, recordTransactionAction, getUserTransactionsAction } from '@/app/actions/wallet';
 import { getAllUsersAction, deleteUserAction, processAdminAction, updateTransactionStatusServer, getUserDataAction } from '@/app/actions/admin';
@@ -40,6 +40,8 @@ type UserContextType = {
   clearPasswordRequest: (phone: string) => Promise<void>;
   currency: string;
   checkPendingOrders: () => Promise<void>;
+  notificationsEnabled: boolean;
+  requestNotificationPermission: () => void;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -53,14 +55,68 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [passwordRequests, setPasswordRequests] = useState<any[]>([]);
   const [isCheckingOrders, setIsCheckingOrders] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   
+  const prevTransactionsRef = useRef<Transaction[]>([]);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   const currency = "ل.س.ج";
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
+  const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
+
+  const playNotificationSound = () => {
+    const audio = new Audio(NOTIFICATION_SOUND);
+    audio.play().catch(() => console.log("Sound blocked by browser"));
+  };
+
+  const triggerNotification = (title: string, body: string) => {
+    if (notificationsEnabled && "Notification" in window && Notification.permission === "granted") {
+      new Notification(title, { body, icon: "/favicon.ico" });
+      playNotificationSound();
+    }
+  };
+
+  const requestNotificationPermission = () => {
+    if ("Notification" in window) {
+      Notification.requestPermission().then(permission => {
+        setNotificationsEnabled(permission === "granted");
+      });
+    }
+  };
 
   const fetchCloudData = useCallback(async (phone: string) => {
     const cloudTxs = await getUserTransactionsAction(phone);
+    
+    // فحص التغييرات للإشعارات
+    if (isLoggedIn && notificationsEnabled) {
+      const prev = prevTransactionsRef.current;
+      
+      // للمدير: طلبات إيداع جديدة
+      if (phone === ADMIN_PHONE) {
+        const newDeposits = cloudTxs.filter(tx => 
+          tx.type === 'إيداع محفظة' && 
+          tx.status === 'Pending' && 
+          !prev.find(p => p.id === tx.id)
+        );
+        if (newDeposits.length > 0) {
+          triggerNotification("طلب إيداع جديد! 💰", `وصلك طلب إيداع من ${newDeposits[0].userName || "زبون جديد"}`);
+        }
+      } 
+      // للمستخدم: تغير حالة الطلبات
+      else {
+        cloudTxs.forEach(tx => {
+          const oldTx = prev.find(p => p.id === tx.id);
+          if (oldTx && oldTx.status !== tx.status) {
+            const statusAr = tx.status === 'Completed' ? 'مكتمل ✅' : 'مرفوض ❌';
+            triggerNotification("تحديث حالة الطلب", `طلبك (${tx.type}) أصبح الآن ${statusAr}`);
+          }
+        });
+      }
+    }
+
     setTransactions(cloudTxs);
+    prevTransactionsRef.current = cloudTxs;
     
     const res = await getUserDataAction(phone);
     if (res.success && res.data) {
@@ -73,7 +129,43 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const users = await getAllUsersAction();
       setAllUsers(users);
     }
-  }, [ADMIN_PHONE]);
+  }, [isLoggedIn, notificationsEnabled, ADMIN_PHONE]);
+
+  const checkPendingOrders = useCallback(async () => {
+    if (!isLoggedIn || isCheckingOrders) return;
+
+    const pendingOrders = transactions.filter(tx => tx.status === 'Pending' && tx.external_order_id);
+    if (pendingOrders.length === 0) return;
+
+    setIsCheckingOrders(true);
+    for (const order of pendingOrders) {
+      try {
+        const res = await fetch(`/api/check-order?order_id=${order.external_order_id}`);
+        const data = await res.json();
+
+        if (data.success && data.status) {
+          const remoteStatus = String(data.status).toLowerCase().trim();
+          let finalStatus: 'Completed' | 'Rejected' | null = null;
+
+          if (remoteStatus === 'accept' || remoteStatus === 'موافق' || remoteStatus === 'مقبول' || remoteStatus === 'نجاح') {
+            finalStatus = 'Completed';
+          } else if (remoteStatus === 'reject' || remoteStatus === 'رفض') {
+            finalStatus = 'Rejected';
+          }
+
+          if (finalStatus) {
+            const ownerPhone = order.userPhone || userPhone;
+            const updateRes = await updateTransactionStatusServer(order.id, finalStatus, order.amount, ownerPhone);
+            
+            if (updateRes.success) {
+              await fetchCloudData(userPhone);
+            }
+          }
+        }
+      } catch (err) { console.error("Polling error:", err); }
+    }
+    setIsCheckingOrders(false);
+  }, [isLoggedIn, isCheckingOrders, transactions, userPhone, fetchCloudData]);
 
   useEffect(() => {
     const savedAuth = localStorage.getItem('shabik_auth');
@@ -84,8 +176,25 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setUserName(authData.name);
       setUserBalance(authData.balance || 0);
       fetchCloudData(authData.phone);
+      
+      if ("Notification" in window) {
+        setNotificationsEnabled(Notification.permission === "granted");
+      }
     }
   }, [fetchCloudData]);
+
+  // محرك التحديث التلقائي العالمي
+  useEffect(() => {
+    if (isLoggedIn) {
+      pollingIntervalRef.current = setInterval(() => {
+        fetchCloudData(userPhone);
+        checkPendingOrders();
+      }, 15000);
+    } else {
+      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+    }
+    return () => { if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current); };
+  }, [isLoggedIn, userPhone, fetchCloudData, checkPendingOrders]);
 
   const login = async (phone: string, password: string) => {
     if (phone === ADMIN_PHONE && password === ADMIN_PASS) {
@@ -165,47 +274,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const checkPendingOrders = async () => {
-    if (!isLoggedIn || isCheckingOrders) return;
-
-    const pendingOrders = transactions.filter(tx => tx.status === 'Pending' && tx.external_order_id);
-    if (pendingOrders.length === 0) return;
-
-    setIsCheckingOrders(true);
-    for (const order of pendingOrders) {
-      try {
-        const res = await fetch(`/api/check-order?order_id=${order.external_order_id}`);
-        const data = await res.json();
-
-        if (data.success && data.status) {
-          const remoteStatus = String(data.status).toLowerCase().trim();
-          let finalStatus: 'Completed' | 'Rejected' | null = null;
-
-          if (remoteStatus === 'accept' || remoteStatus === 'موافق' || remoteStatus === 'مقبول' || remoteStatus === 'نجاح') {
-            finalStatus = 'Completed';
-          } else if (remoteStatus === 'reject' || remoteStatus === 'رفض') {
-            finalStatus = 'Rejected';
-          }
-
-          if (finalStatus) {
-            const ownerPhone = order.userPhone || userPhone;
-            const updateRes = await updateTransactionStatusServer(order.id, finalStatus, order.amount, ownerPhone);
-            
-            if (updateRes.success) {
-              setTransactions(prev => prev.map(t => t.id === order.id ? { ...t, status: finalStatus! } : t));
-              if (finalStatus === 'Rejected' && ownerPhone === userPhone && updateRes.newBalance !== undefined) {
-                setUserBalance(updateRes.newBalance);
-                const authData = JSON.parse(localStorage.getItem('shabik_auth') || '{}');
-                localStorage.setItem('shabik_auth', JSON.stringify({ ...authData, balance: updateRes.newBalance }));
-              }
-            }
-          }
-        }
-      } catch (err) { console.error("Polling error:", err); }
-    }
-    setIsCheckingOrders(false);
-  };
-
   const deleteUser = async (phone: string) => {
     const res = await deleteUserAction(phone);
     if (res.success) {
@@ -232,7 +300,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     <UserContext.Provider value={{ 
       isLoggedIn, isAdmin, userPhone, userName, userBalance, transactions, allUsers, passwordRequests,
       login, register, logout, deductBalance, requestDeposit, adminAction, deleteUser, clearPasswordRequest,
-      currency, checkPendingOrders
+      currency, checkPendingOrders, notificationsEnabled, requestNotificationPermission
     }}>
       {children}
     </UserContext.Provider>

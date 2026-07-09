@@ -12,7 +12,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -103,11 +102,11 @@ export function WalletCard() {
               <ArrowUpCircle className="h-5 w-5" /> إيداع رصيد جديد
             </button>
           </DialogTrigger>
-          <DialogContent className="w-[95%] max-w-[425px] max-h-[90vh] overflow-hidden bg-[#11151d] border-gray-800 text-white flex flex-col p-0 rounded-[32px]" dir="rtl">
+          <DialogContent className="w-[95%] max-w-[425px] max-h-[85vh] overflow-hidden bg-[#11151d] border-gray-800 text-white flex flex-col p-0 rounded-[32px]" dir="rtl">
             <div className="p-6 pb-2">
               <DialogHeader>
                 <DialogTitle className="text-right font-headline text-xl">شحن المحفظة</DialogTitle>
-                <DialogDescription className="text-right text-gray-400">حول المبلغ وارفع صورة الإشعار للمراجعة.</DialogDescription>
+                <DialogDescription className="text-right text-gray-400 text-xs">حول المبلغ وارفع صورة الإشعار للمراجعة.</DialogDescription>
               </DialogHeader>
             </div>
 
@@ -142,8 +141,8 @@ export function WalletCard() {
                     </label>
                   </div>
                   {imageProof && (
-                    <div className="mt-2 rounded-2xl overflow-hidden border border-gray-800 h-32 relative group">
-                      <img src={imageProof} alt="Preview" className="w-full h-full object-cover" />
+                    <div className="mt-2 rounded-2xl overflow-hidden border border-gray-800 h-24 relative group">
+                      <img src={imageProof} alt="Preview" className="w-full h-full object-contain bg-black" />
                       <button onClick={() => setImageProof(null)} className="absolute top-2 left-2 bg-red-500 p-1 rounded-full shadow-lg">
                         <X className="h-3 w-3 text-white" />
                       </button>
@@ -153,7 +152,7 @@ export function WalletCard() {
               </div>
             </ScrollArea>
 
-            <div className="p-6 pt-2">
+            <div className="p-4 shrink-0 bg-[#161a23] border-t border-gray-800">
               <Button onClick={handleDeposit} disabled={uploading} className="w-full h-14 text-lg font-black rounded-2xl shadow-xl shadow-primary/20 bg-primary hover:bg-primary/90">تأكيد وإرسال الطلب</Button>
             </div>
           </DialogContent>
