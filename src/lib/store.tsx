@@ -12,7 +12,7 @@ import {
   getPasswordRequestsAction,
   completePasswordResetAction
 } from '@/app/actions/admin';
-import { changePasswordAction } from '@/app/actions/profile';
+import { changePasswordAction, updateProfileImageAction } from '@/app/actions/profile';
 
 export type Transaction = {
   id: string;
@@ -35,6 +35,7 @@ type UserContextType = {
   userPhone: string;
   userName: string;
   userBalance: number;
+  profileImage: string | null;
   transactions: Transaction[];
   allUsers: any[];
   passwordRequests: any[];
@@ -48,6 +49,7 @@ type UserContextType = {
   requestReset: (phone: string) => Promise<{ success: boolean; message: string }>;
   adminResetPassword: (phone: string, requestId: string) => Promise<void>;
   changePassword: (currentPass: string, newPass: string) => Promise<{ success: boolean; message: string }>;
+  updateProfileImage: (imageData: string) => Promise<{ success: boolean }>;
   currency: string;
   checkPendingOrders: () => Promise<void>;
   notificationsEnabled: boolean;
@@ -61,6 +63,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [userPhone, setUserPhone] = useState("");
   const [userName, setUserName] = useState("");
   const [userBalance, setUserBalance] = useState(0);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [passwordRequests, setPasswordRequests] = useState<any[]>([]);
@@ -109,11 +112,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const fetchCloudData = useCallback(async (phone: string) => {
-    // جلب المعاملات
     const cloudTxs = await getUserTransactionsAction(phone);
     const prev = prevTransactionsRef.current;
 
-    // جلب طلبات الاستعادة للمدير فوراً
     if (phone === ADMIN_PHONE) {
       const currentPassReqs = await getPasswordRequestsAction();
       if (currentPassReqs.length > prevPassRequestsRef.current.length) {
@@ -122,17 +123,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setPasswordRequests(currentPassReqs);
       prevPassRequestsRef.current = currentPassReqs;
 
-      // إشعار الإيداع للمدير
       const newDeposits = cloudTxs.filter(tx => tx.type === 'إيداع محفظة' && tx.status === 'Pending' && !prev.find(p => p.id === tx.id));
       if (newDeposits.length > 0) {
         triggerNotification("طلب إيداع جديد! 💰", `وصلك طلب إيداع من ${newDeposits[0].userName || "زبون"} بقيمة ${newDeposits[0].amount}`);
       }
 
-      // جلب جميع المستخدمين للمدير
       const users = await getAllUsersAction();
       setAllUsers(users);
     } else {
-      // إشعارات تغير الحالة للزبائن
       cloudTxs.forEach(tx => {
         const oldTx = prev.find(p => p.id === tx.id);
         if (oldTx && oldTx.status !== tx.status) {
@@ -145,10 +143,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setTransactions(cloudTxs);
     prevTransactionsRef.current = cloudTxs;
     
-    // جلب الرصيد المحدث
     const res = await getUserDataAction(phone);
     if (res.success && res.data) {
       setUserBalance(res.data.balance || 0);
+      setProfileImage(res.data.profileImage || null);
     }
   }, [ADMIN_PHONE, triggerNotification]);
 
@@ -237,6 +235,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return await changePasswordAction(userPhone, currentPass, newPass);
   };
 
+  const updateProfileImage = async (imageData: string) => {
+    const res = await updateProfileImageAction(userPhone, imageData);
+    if (res.success) {
+      setProfileImage(imageData);
+      return { success: true };
+    }
+    return { success: false };
+  };
+
   const deductBalance = async (amount: number, productDetails: string, initialStatus: 'Pending' | 'Completed' = 'Completed', externalId?: string) => {
     const before = userBalance;
     const newBalance = Math.max(0, userBalance - amount);
@@ -288,15 +295,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setUserPhone("");
     setUserName("");
     setUserBalance(0);
+    setProfileImage(null);
     setTransactions([]);
     localStorage.removeItem('shabik_auth');
   };
 
   return (
     <UserContext.Provider value={{ 
-      isLoggedIn, isAdmin: userPhone === ADMIN_PHONE, userPhone, userName, userBalance, transactions, allUsers, passwordRequests,
+      isLoggedIn, isAdmin: userPhone === ADMIN_PHONE, userPhone, userName, userBalance, profileImage, transactions, allUsers, passwordRequests,
       login, register, logout, deductBalance, requestDeposit, adminAction, deleteUser, requestReset, adminResetPassword,
-      changePassword, currency, checkPendingOrders, notificationsEnabled, requestNotificationPermission
+      changePassword, updateProfileImage, currency, checkPendingOrders, notificationsEnabled, requestNotificationPermission
     }}>
       {children}
     </UserContext.Provider>

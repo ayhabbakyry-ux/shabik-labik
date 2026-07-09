@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useUser } from "@/lib/store";
 import { 
   LogOut, 
@@ -13,8 +13,9 @@ import {
   Gift,
   Star,
   Bot,
-  ShieldCheck,
-  KeyRound
+  KeyRound,
+  Camera,
+  Loader2
 } from "lucide-react";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -28,9 +29,10 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
-  const { userPhone, userName, userBalance, logout, currency, isAdmin } = useUser();
+  const { userPhone, userName, userBalance, logout, currency, isAdmin, profileImage, updateProfileImage } = useUser();
   const pathname = usePathname();
   const { toast } = useToast();
+  const [uploading, setUploading] = useState(false);
 
   const menuItems = [
     { title: "الرئيسية", icon: <Home className="h-5 w-5" />, href: "/dashboard" },
@@ -50,6 +52,35 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     });
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast({ variant: "destructive", title: "خطأ", description: "يرجى اختيار صورة صالحة يا غالي." });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ variant: "destructive", title: "حجم كبير", description: "الصورة لازم تكون أقل من 2 ميجا." });
+      return;
+    }
+
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64 = reader.result as string;
+      const res = await updateProfileImage(base64);
+      setUploading(false);
+      if (res.success) {
+        toast({ title: "تم التحديث ✅", description: "صورة البروفيل الجديدة صارت جاهزة." });
+      } else {
+        toast({ variant: "destructive", title: "فشل التعديل", description: "صار مشكلة بسيطة، جرب مرة تانية." });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <>
       {isOpen && (
@@ -66,14 +97,29 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         dir="rtl"
       >
         <div className="flex flex-col items-center pt-12 pb-8 border-b border-gray-800/40 px-6">
-          <div className="relative mb-4">
-             <Avatar className="w-24 h-24 border-4 border-[#1e232d] shadow-2xl">
-                <AvatarImage src={`https://picsum.photos/seed/${userPhone}/200`} />
-                <AvatarFallback className="bg-primary text-2xl font-bold">{userName?.[0] || 'U'}</AvatarFallback>
-             </Avatar>
-             <div className="absolute -bottom-1 -right-1 bg-yellow-500 rounded-full p-1.5 shadow-lg border-2 border-[#11151d]">
-                <Star className="h-3 w-3 text-[#11151d] fill-current" />
-             </div>
+          <div className="relative mb-4 group cursor-pointer">
+            <input 
+              type="file" 
+              id="sidebar-profile-upload" 
+              className="hidden" 
+              accept="image/*" 
+              onChange={handleImageUpload}
+              disabled={uploading}
+            />
+            <label htmlFor="sidebar-profile-upload" className="cursor-pointer block relative">
+               <Avatar className={cn("w-24 h-24 border-4 border-[#1e232d] shadow-2xl transition-all group-hover:opacity-80 group-hover:scale-105", uploading && "animate-pulse")}>
+                  <AvatarImage src={profileImage || `https://picsum.photos/seed/${userPhone}/200`} className="object-cover" />
+                  <AvatarFallback className="bg-primary text-2xl font-bold">{userName?.[0] || 'U'}</AvatarFallback>
+               </Avatar>
+               
+               <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-full">
+                  {uploading ? <Loader2 className="h-6 w-6 text-white animate-spin" /> : <Camera className="h-6 w-6 text-white" />}
+               </div>
+            </label>
+            
+            <div className="absolute -bottom-1 -right-1 bg-yellow-500 rounded-full p-1.5 shadow-lg border-2 border-[#11151d]">
+               <Star className="h-3 w-3 text-[#11151d] fill-current" />
+            </div>
           </div>
           
           <div className="text-center space-y-1">
