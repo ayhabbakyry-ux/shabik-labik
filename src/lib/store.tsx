@@ -65,34 +65,44 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
 
-  const playNotificationSound = () => {
-    const audio = new Audio(NOTIFICATION_SOUND);
-    audio.play().catch(() => console.log("Sound blocked by browser"));
-  };
+  const playNotificationSound = useCallback(() => {
+    try {
+      const audio = new Audio(NOTIFICATION_SOUND);
+      audio.play().catch(() => console.log("Sound blocked by browser interaction rules"));
+    } catch (e) {
+      console.error("Audio play error", e);
+    }
+  }, []);
 
-  const triggerNotification = (title: string, body: string) => {
-    if (notificationsEnabled && "Notification" in window && Notification.permission === "granted") {
-      new Notification(title, { body, icon: "/favicon.ico" });
+  const triggerNotification = useCallback((title: string, body: string) => {
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification(title, { body, icon: "https://picsum.photos/seed/genie/200/200" });
       playNotificationSound();
     }
-  };
+  }, [playNotificationSound]);
 
-  const requestNotificationPermission = () => {
-    if ("Notification" in window) {
-      Notification.requestPermission().then(permission => {
-        setNotificationsEnabled(permission === "granted");
-      });
+  const requestNotificationPermission = useCallback(() => {
+    if (!("Notification" in window)) {
+      alert("عذراً يا غالي، متصفحك لا يدعم خاصية التنبيهات.");
+      return;
     }
-  };
+
+    Notification.requestPermission().then(permission => {
+      setNotificationsEnabled(permission === "granted");
+      if (permission === "granted") {
+        triggerNotification("تم تفعيل التنبيهات ✅", "مبروك يا غالي، رح توصلك كل تحديثات رصيدك وطلباتك هون فوراً.");
+      } else if (permission === "denied") {
+        alert("التنبيهات محظورة من إعدادات المتصفح. يرجى الضغط على القفل بجانب رابط الموقع وتفعيل 'Notifications' أو 'الإشعارات'.");
+      }
+    });
+  }, [triggerNotification]);
 
   const fetchCloudData = useCallback(async (phone: string) => {
     const cloudTxs = await getUserTransactionsAction(phone);
     
-    // فحص التغييرات للإشعارات
-    if (isLoggedIn && notificationsEnabled) {
+    if (isLoggedIn && Notification.permission === "granted") {
       const prev = prevTransactionsRef.current;
       
-      // للمدير: طلبات إيداع جديدة
       if (phone === ADMIN_PHONE) {
         const newDeposits = cloudTxs.filter(tx => 
           tx.type === 'إيداع محفظة' && 
@@ -100,16 +110,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           !prev.find(p => p.id === tx.id)
         );
         if (newDeposits.length > 0) {
-          triggerNotification("طلب إيداع جديد! 💰", `وصلك طلب إيداع من ${newDeposits[0].userName || "زبون جديد"}`);
+          triggerNotification("طلب إيداع جديد! 💰", `وصلك طلب إيداع من ${newDeposits[0].userName || "زبون جديد"} بقيمة ${newDeposits[0].amount}`);
         }
-      } 
-      // للمستخدم: تغير حالة الطلبات
-      else {
+      } else {
         cloudTxs.forEach(tx => {
           const oldTx = prev.find(p => p.id === tx.id);
           if (oldTx && oldTx.status !== tx.status) {
             const statusAr = tx.status === 'Completed' ? 'مكتمل ✅' : 'مرفوض ❌';
-            triggerNotification("تحديث حالة الطلب", `طلبك (${tx.type}) أصبح الآن ${statusAr}`);
+            triggerNotification("تحديث حالة الطلب", `طلبك (${tx.type}) صار هلق ${statusAr}`);
           }
         });
       }
@@ -129,7 +137,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const users = await getAllUsersAction();
       setAllUsers(users);
     }
-  }, [isLoggedIn, notificationsEnabled, ADMIN_PHONE]);
+  }, [isLoggedIn, ADMIN_PHONE, triggerNotification]);
 
   const checkPendingOrders = useCallback(async () => {
     if (!isLoggedIn || isCheckingOrders) return;
@@ -183,7 +191,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [fetchCloudData]);
 
-  // محرك التحديث التلقائي العالمي
   useEffect(() => {
     if (isLoggedIn) {
       pollingIntervalRef.current = setInterval(() => {

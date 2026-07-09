@@ -59,14 +59,14 @@ export default function DashboardPage() {
               </div>
               <div className="text-right">
                 <p className="font-bold text-xs text-primary">فعل التنبيهات يا غالي</p>
-                <p className="text-[9px] text-muted-foreground">لتصلك حالة طلباتك ورصيدك فوراً</p>
+                <p className="text-[9px] text-muted-foreground">لتصلك حالة طلباتك ورصيدك فوراً بصوت رنة</p>
               </div>
             </div>
             <Button 
               variant="default" 
               size="sm" 
               onClick={requestNotificationPermission}
-              className="font-bold text-[10px] rounded-xl h-8"
+              className="font-bold text-[10px] rounded-xl h-8 px-4"
             >
               تفعيل الآن
             </Button>
