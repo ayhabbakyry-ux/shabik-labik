@@ -85,7 +85,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const audio = new Audio(NOTIFICATION_SOUND);
       audio.play().catch(() => console.log("تم حظر الصوت بواسطة سياسة المتصفح."));
     } catch (e) {
-      console.error("Audio error", e);
+      console.error("خطأ في تشغيل الصوت", e);
     }
   }, []);
 
@@ -115,7 +115,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const fetchCloudData = useCallback(async (phone: string) => {
     const isAdminUser = phone === ADMIN_PHONE;
     
-    // جلب العمليات: للمدير نجلب كل شيء، وللمستخدم نجلب عملياته فقط
     let cloudTxs: Transaction[] = [];
     if (isAdminUser) {
       cloudTxs = await getAllTransactionsAction() as Transaction[];
@@ -128,14 +127,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (isAdminUser) {
       const currentPassReqs = await getPasswordRequestsAction();
       if (currentPassReqs.length > prevPassRequestsRef.current.length) {
-        triggerNotification("طلب استعادة حساب جديد 🔑", "هناك مستخدم ينتظر تهيئة بيانات دخوله، يرجى مراجعة لوحة الإدارة.");
+        triggerNotification("طلب استعادة حساب جديد 🔑", "هناك مستخدم ينتظر تهيئة بيانات الدخول، يرجى مراجعة لوحة الإدارة.");
       }
       setPasswordRequests(currentPassReqs);
       prevPassRequestsRef.current = currentPassReqs;
 
       const newDeposits = cloudTxs.filter(tx => tx.type === 'إيداع محفظة' && tx.status === 'Pending' && !prev.find(p => p.id === tx.id));
       if (newDeposits.length > 0) {
-        triggerNotification("طلب إيداع جديد 💰", `وصل طلب إيداع جديد من ${newDeposits[0].userName || "مستخدم"} بقيمة ${newDeposits[0].amount.toLocaleString()} ليرة.`);
+        triggerNotification("طلب إيداع جديد 💰", `تم استلام طلب إيداع جديد من ${newDeposits[0].userName || "مستخدم"} بقيمة ${newDeposits[0].amount.toLocaleString()} ليرة.`);
       }
 
       const users = await getAllUsersAction();
@@ -150,7 +149,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       });
     }
 
-    // ترتيب العمليات من الأحدث للأقدم
     const sortedTxs = [...cloudTxs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     setTransactions(sortedTxs);
     prevTransactionsRef.current = sortedTxs;
@@ -212,13 +210,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (phone: string, password: string) => {
     if (phone === ADMIN_PHONE && password === ADMIN_PASS) {
-      const adminData = { phone, name: "المدير أيهم", balance: 0 };
+      const adminData = { phone, name: "المدير العام", balance: 0 };
       setIsLoggedIn(true);
       setUserPhone(phone);
       setUserName(adminData.name);
       localStorage.setItem('shabik_auth', JSON.stringify(adminData));
       await fetchCloudData(phone);
-      return { success: true, message: "مرحباً بك السيد المدير." };
+      return { success: true, message: "تم تسجيل الدخول بصلاحيات الإدارة." };
     }
     const result = await signInAction(phone, password);
     if (result.success && result.user) {

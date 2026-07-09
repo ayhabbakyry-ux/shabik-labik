@@ -7,7 +7,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { useUser } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Share2, Copy, Users, Gift, CheckCircle2, ArrowRight, Menu, Sparkles } from "lucide-react";
+import { Share2, Copy, Gift, CheckCircle2, ArrowRight, Menu, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ReferralPage() {

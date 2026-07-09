@@ -36,7 +36,7 @@ export default function AuthPage() {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone || !password) {
-      toast({ variant: "destructive", title: "خطأ", description: "يرجى تعبئة جميع الحقول المطلوبة." });
+      toast({ variant: "destructive", title: "تنبيه", description: "يرجى تعبئة كافة البيانات المطلوبة." });
       return;
     }
 
@@ -51,13 +51,13 @@ export default function AuthPage() {
       }
     } else {
       if (!name) {
-        toast({ variant: "destructive", title: "خطأ", description: "يرجى إدخال الاسم لإنشاء الحساب." });
+        toast({ variant: "destructive", title: "تنبيه", description: "يرجى إدخال الاسم الكامل لإنشاء الحساب." });
         setIsLoading(false);
         return;
       }
       const result = await register(phone, name, password, referralCode);
       if (result.success) {
-        toast({ title: "تم التسجيل", description: result.message });
+        toast({ title: "تم إنشاء الحساب", description: result.message });
         setIsLogin(true);
       } else {
         toast({ variant: "destructive", title: "فشل التسجيل", description: result.message });
@@ -68,7 +68,7 @@ export default function AuthPage() {
 
   const handleResetRequest = async () => {
     if (!resetPhone) {
-      toast({ variant: "destructive", title: "خطأ", description: "يرجى إدخال رقم الهاتف أولاً." });
+      toast({ variant: "destructive", title: "تنبيه", description: "يرجى إدخال رقم الهاتف أولاً." });
       return;
     }
     setIsLoading(true);
