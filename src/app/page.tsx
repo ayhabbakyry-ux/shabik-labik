@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, Phone, Lock, User, ArrowRight, HelpCircle, Menu, Send } from "lucide-react";
+import { ShieldCheck, Phone, Lock, User, ArrowRight, HelpCircle, Menu, Send, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,7 @@ export default function AuthPage() {
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   
   const { login, register, requestReset, isLoggedIn, userBalance, currency } = useUser();
@@ -55,7 +56,7 @@ export default function AuthPage() {
         setIsLoading(false);
         return;
       }
-      const result = await register(phone, name, password);
+      const result = await register(phone, name, password, referralCode);
       if (result.success) {
         toast({ title: "تم إنشاء الحساب", description: result.message });
         setIsLogin(true);
@@ -187,6 +188,15 @@ export default function AuthPage() {
                   <Input type="password" placeholder="••••••••" className="pr-10 h-12 text-right rounded-xl border-muted bg-muted/20" value={password} onChange={(e) => setPassword(e.target.value)} />
                 </div>
               </div>
+              {!isLogin && (
+                <div className="space-y-2">
+                  <Label className="text-right block font-bold text-xs pr-1">كود الدعوة (اختياري)</Label>
+                  <div className="relative">
+                    <Ticket className="absolute right-3 top-3 h-4 w-4 text-primary opacity-50" />
+                    <Input placeholder="أدخل كود الدعوة إن وجد" className="pr-10 h-12 text-right rounded-xl border-muted bg-white" value={referralCode} onChange={(e) => setReferralCode(e.target.value)} />
+                  </div>
+                </div>
+              )}
               {isLogin && (
                 <button type="button" onClick={() => setIsForgotPassword(true)} className="text-[10px] text-primary font-bold hover:underline block w-full text-right pr-1">نسيت كلمة المرور؟</button>
               )}
