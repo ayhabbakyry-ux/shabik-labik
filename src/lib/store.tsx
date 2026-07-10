@@ -118,36 +118,39 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     
     let cloudTxs: Transaction[] = [];
     if (isAdminUser) {
+      // جلب كافة العمليات المالية من السيرفر للمدير
       cloudTxs = await getAllTransactionsAction() as Transaction[];
+      
+      // جلب كافة طلبات استعادة كلمة المرور
+      const currentPassReqs = await getPasswordRequestsAction();
+      if (currentPassReqs.length > prevPassRequestsRef.current.length) {
+        triggerNotification("طلب استعادة حساب جديد 🔑", "هناك مستخدم ينتظر تهيئة بيانات الدخول.");
+      }
+      setPasswordRequests(currentPassReqs);
+      prevPassRequestsRef.current = currentPassReqs;
+
+      // جلب كافة المستخدمين المسجلين في النظام
+      const users = await getAllUsersAction();
+      setAllUsers(users || []);
     } else {
       cloudTxs = await getUserTransactionsAction(phone);
     }
     
     const prev = prevTransactionsRef.current;
-
+    
+    // تنبيهات العمليات الجديدة للمدير
     if (isAdminUser) {
-      const currentPassReqs = await getPasswordRequestsAction();
-      if (currentPassReqs.length > prevPassRequestsRef.current.length) {
-        triggerNotification("طلب استعادة حساب جديد 🔑", "هناك مستخدم ينتظر تهيئة بيانات الدخول، يرجى مراجعة لوحة الإدارة.");
-      }
-      setPasswordRequests(currentPassReqs);
-      prevPassRequestsRef.current = currentPassReqs;
-
       const newDeposits = cloudTxs.filter(tx => tx.type === 'إيداع محفظة' && tx.status === 'Pending' && !prev.find(p => p.id === tx.id));
       if (newDeposits.length > 0) {
-        triggerNotification("طلب إيداع جديد 💰", `تم استلام طلب إيداع جديد من ${newDeposits[0].userName || "مستخدم"} بقيمة ${newDeposits[0].amount.toLocaleString()} ليرة.`);
-      }
-
-      const users = await getAllUsersAction();
-      if (users && users.length > 0) {
-        setAllUsers(users);
+        triggerNotification("طلب إيداع جديد 💰", `تم استلام طلب إيداع جديد بقيمة ${newDeposits[0].amount.toLocaleString()} ليرة.`);
       }
     } else {
+      // تنبيهات تغيير الحالة للمستخدم العادي
       cloudTxs.forEach(tx => {
         const oldTx = prev.find(p => p.id === tx.id);
         if (oldTx && oldTx.status !== tx.status) {
           const statusAr = tx.status === 'Completed' ? 'تم القبول ✅' : 'تم الرفض ❌';
-          triggerNotification("تحديث حالة الطلب", `طلبكم الخاص بـ (${tx.type}) قد تغيرت حالته إلى: ${statusAr}`);
+          triggerNotification("تحديث حالة الطلب", `طلبكم (${tx.type}) أصبح حالته: ${statusAr}`);
         }
       });
     }
@@ -219,7 +222,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setUserPhone(phone);
       setUserName(adminData.name);
       localStorage.setItem('shabik_auth', JSON.stringify(adminData));
-      await fetchCloudData(phone);
+      await fetchCloudData(phone); // جلب البيانات السحابية فور الدخول
       return { success: true, message: "تم تسجيل الدخول بصلاحيات الإدارة." };
     }
     const result = await signInAction(phone, password);
@@ -247,8 +250,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (res.success) await fetchCloudData(userPhone);
   };
 
-  const changePassword = async (currentPass: string, newPass: string) => {
-    return await changePasswordAction(userPhone, currentPass, newPass);
+  const changePassword = async (currentPass: string, name: string) => {
+    return await changePasswordAction(userPhone, currentPass, name);
   };
 
   const updateProfileImage = async (imageData: string) => {
