@@ -51,13 +51,16 @@ export function ProductSheet({
     try {
       const response = await fetch(`/api/products`, { cache: 'no-store' });
       const data = await response.json();
+      
       if (Array.isArray(data)) {
         setAllProducts(data);
+      } else if (data && data.error) {
+        setErrorMsg(data.error);
       } else {
-        setErrorMsg("تعذر جلب البيانات.");
+        setErrorMsg("تعذر جلب البيانات من السيرفر.");
       }
     } catch (error: any) {
-      setErrorMsg("خطأ في الاتصال.");
+      setErrorMsg("خطأ في الاتصال بالسيرفر.");
     } finally {
       setFetching(false);
     }
@@ -75,6 +78,12 @@ export function ProductSheet({
       const prodName = (p.name || "").toLowerCase();
       const catName = (p.category_name || "").toLowerCase();
       
+      // دعم البحث بالأسماء العربية والإنجليزية للمشغلين
+      const isSyriatelMatch = searchKey === "syriatel" && (prodName.includes("سيريتل") || catName.includes("سيريتل") || prodName.includes("syriatel"));
+      const isMTNMatch = (searchKey === "mtn") && (prodName.includes("mtn") || prodName.includes("ام تي ان") || catName.includes("mtn"));
+      
+      if (isSyriatelMatch || isMTNMatch) return true;
+
       if (searchKey === "tiktok") {
         return prodName.includes("tiktok") || prodName.includes("تيك") || catName.includes("تيك");
       }
@@ -94,13 +103,11 @@ export function ProductSheet({
       let finalPrice = price;
       
       if (isMobileCredit) {
-        // حسبة ذكية: لكل 10 وحدات 0.20 ليرة زيادة تلقائية
         const unitsMatch = prodName.match(/\d+/);
         const units = unitsMatch ? parseInt(unitsMatch[0]) : 0;
         const markup = (units / 10) * 0.20;
         finalPrice = price + markup;
       } else {
-        // الألعاب والتطبيقات: زيادة 2 ليرة ثابتة
         finalPrice = price + 2;
       }
 
@@ -141,7 +148,6 @@ export function ProductSheet({
 
       if (result.success) {
           const isPending = result.status_type === 'pending';
-          // يتم خصم المبلغ المسجل في customerPrice تماماً
           deductBalance(price, `${product.name} - ID: ${globalTargetId}`, isPending ? 'Pending' : 'Completed', result.order_id);
           toast({ title: isPending ? "الطلب قيد المعالجة" : "تمت العملية", description: result.message });
       } else {
@@ -199,8 +205,8 @@ export function ProductSheet({
           ) : errorMsg ? (
             <div className="h-full p-6 flex flex-col items-center justify-center text-center gap-4">
                <AlertCircle className="h-10 w-10 text-destructive" />
-               <p className="font-bold text-destructive">{errorMsg}</p>
-               <Button onClick={fetchProducts} variant="outline" size="sm">إعادة المحاولة</Button>
+               <p className="font-bold text-destructive text-sm leading-relaxed">{errorMsg}</p>
+               <Button onClick={fetchProducts} variant="outline" size="sm" className="rounded-xl font-bold">إعادة المحاولة</Button>
             </div>
           ) : (
             <ScrollArea className="h-full p-4">
@@ -232,7 +238,7 @@ export function ProductSheet({
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4">
                   <PackageX className="h-10 w-10 opacity-30" />
-                  <p className="text-sm font-bold">لا توجد باقات حالياً.</p>
+                  <p className="text-sm font-bold">لا توجد باقات متاحة لهذا القسم حالياً.</p>
                 </div>
               )}
             </ScrollArea>
