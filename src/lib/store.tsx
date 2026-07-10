@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -138,7 +139,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
 
       const users = await getAllUsersAction();
-      setAllUsers(users);
+      if (users && users.length > 0) {
+        setAllUsers(users);
+      }
     } else {
       cloudTxs.forEach(tx => {
         const oldTx = prev.find(p => p.id === tx.id);
@@ -200,6 +203,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isLoggedIn) {
+      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = setInterval(() => {
         fetchCloudData(userPhone);
         checkPendingOrders();
@@ -309,6 +313,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setUserBalance(0);
     setProfileImage(null);
     setTransactions([]);
+    setAllUsers([]);
+    setPasswordRequests([]);
     localStorage.removeItem('shabik_auth');
   };
 
