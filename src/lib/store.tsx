@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -200,7 +201,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       pollingIntervalRef.current = setInterval(() => {
         fetchCloudData(userPhone);
         checkPendingOrders();
-      }, 20000); // زيادة فترة الاستعلام للشبكات البطيئة
+      }, 20000); 
     }
     return () => { if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current); };
   }, [isLoggedIn, userPhone, fetchCloudData, checkPendingOrders]);
@@ -248,10 +249,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       await syncBalanceAction(userPhone, newBal);
       await recordTransactionAction({
         external_order_id: externalId || "",
-        type: 'شراء منتج',
+        type: 'طلب شحن',
         amount,
         status: initialStatus,
-        date: new Date().toLocaleString('ar-SY'),
+        date: new Date().toISOString(),
         userName,
         userPhone,
         details: productDetails,
@@ -268,7 +269,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         type: 'إيداع محفظة',
         amount,
         status: 'Pending',
-        date: new Date().toLocaleString('ar-SY'),
+        date: new Date().toISOString(),
         userName,
         userPhone,
         details: "طلب إيداع رصيد",

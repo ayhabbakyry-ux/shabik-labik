@@ -44,7 +44,6 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      console.log("🔄 جاري التحديث التلقائي للطلبات...");
       checkPendingOrders();
     }, 15000);
 
@@ -75,6 +74,20 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
       case 'Completed': return { color: 'bg-green-600', text: 'مكتمل', icon: <CheckCircle2 className="h-4 w-4" /> };
       case 'Rejected': return { color: 'bg-red-600', text: 'مرفوض', icon: <XCircle className="h-4 w-4" /> };
       default: return { color: 'bg-orange-500', text: 'قيد الانتظار', icon: <Clock className="h-4 w-4" /> };
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    try {
+      return new Date(dateStr).toLocaleString('ar-SY', {
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (e) {
+      return dateStr;
     }
   };
 
@@ -153,11 +166,10 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
                       <div className="p-4 flex justify-between items-start">
                         <div className="text-right space-y-1">
                           <p className="font-bold text-sm text-primary">{tx.type}</p>
-                          <p className="text-[10px] text-gray-400 font-mono">{tx.date}</p>
+                          <p className="text-[10px] text-gray-400 font-mono">{formatDate(tx.date)}</p>
                           <p className="text-[11px] text-gray-300 font-medium leading-relaxed">{tx.details}</p>
                           
-                          {/* الحسبة المالية الأكاديمية */}
-                          {tx.type === 'شراء منتج' && tx.balanceBefore !== undefined && (
+                          {tx.balanceBefore !== undefined && (
                             <div className="mt-3 bg-black/30 p-2 rounded-xl border border-white/5 flex items-center gap-2 text-[10px] font-bold">
                               <Calculator className="h-3 w-3 text-gray-500" />
                               <span className="text-gray-400">حسبة الرصيد:</span>
