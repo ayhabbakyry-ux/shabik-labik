@@ -11,11 +11,15 @@ import { useRouter } from "next/navigation";
 import { Bell, Search, Menu, ShieldAlert, Sparkles, BellRing } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { PlaceHolderImages } from "@/lib/placeholder-images";
 
 export default function DashboardPage() {
   const { isLoggedIn, userPhone, isAdmin, notificationsEnabled, isNotificationSupported, requestNotificationPermission, userName } = useUser();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const router = useRouter();
+
+  // Hero Banner Data
+  const heroBanner = PlaceHolderImages.find(img => img.id === 'hero-banner');
 
   // Strict Auth Guard
   useEffect(() => {
@@ -92,6 +96,18 @@ export default function DashboardPage() {
             >
               فتح اللوحة
             </Button>
+          </div>
+        )}
+
+        {/* Hero Promotional Banner - Placed ABOVE WalletCard */}
+        {heroBanner && (
+          <div className="w-full rounded-[32px] overflow-hidden shadow-2xl border border-white/5 animate-in fade-in zoom-in duration-1000">
+            <img 
+              src={heroBanner.imageUrl} 
+              alt="منصة شبيك لبيك" 
+              className="w-full h-auto object-cover max-h-[300px] md:max-h-[450px]" 
+              data-ai-hint={heroBanner.imageHint}
+            />
           </div>
         )}
 

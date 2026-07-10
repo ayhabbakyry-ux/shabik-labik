@@ -30,6 +30,12 @@
       "description": "Shabik Labik Genie Lamp Logo",
       "imageUrl": "https://picsum.photos/seed/genie/200/200",
       "imageHint": "magic lamp"
+    },
+    {
+      "id": "hero-banner",
+      "description": "Shabik Labik Hero Banner Genie",
+      "imageUrl": "https://picsum.photos/seed/magic-genie/1200/600",
+      "imageHint": "magic genie"
     }
   ]
 }
