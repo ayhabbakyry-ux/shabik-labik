@@ -1,5 +1,5 @@
-export const dynamic = 'force-dynamic';
 "use client";
+export const dynamic = 'force-dynamic';
 
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { Navbar, DesktopHeader } from "@/components/layout/Navbar";
