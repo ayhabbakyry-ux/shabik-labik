@@ -73,7 +73,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   
   const prevTransactionsRef = useRef<Transaction[]>([]);
-  const prevPassRequestsRef = useRef<any[]>([]);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const currency = "ل.س.ج";
@@ -84,10 +83,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const playNotificationSound = useCallback(() => {
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
-      audio.play().catch(() => console.log("Sound blocked by browser policy."));
-    } catch (e) {
-      console.error("Audio playback error", e);
-    }
+      audio.play().catch(() => {});
+    } catch (e) {}
   }, []);
 
   const triggerNotification = useCallback((title: string, body: string) => {
@@ -101,113 +98,73 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (!("Notification" in window)) return;
     Notification.requestPermission().then(permission => {
       setNotificationsEnabled(permission === "granted");
-      if (permission === "granted") {
-        triggerNotification("تم تفعيل التنبيهات بنجاح ✅", "سوف تتلقى إشعارات فورية حول حالة طلباتك ورصيدك.");
-      }
     });
-  }, [triggerNotification]);
-
-  useEffect(() => {
-    if ("Notification" in window) {
-      setNotificationsEnabled(Notification.permission === "granted");
-    }
   }, []);
 
   const fetchCloudData = useCallback(async (phone: string) => {
     if (!phone) return;
-    const currentPhone = phone.trim();
-    const isAdminUser = currentPhone === ADMIN_PHONE;
+    const isAdminUser = phone.trim() === ADMIN_PHONE;
     
     try {
-      // 1. جلب بيانات المستخدم الحالي (الرصيد والصورة)
-      const userDataRes = await getUserDataAction(currentPhone);
+      // 1. بيانات المستخدم
+      const userDataRes = await getUserDataAction(phone.trim());
       if (userDataRes.success && userDataRes.data) {
         setUserBalance(userDataRes.data.balance || 0);
         setProfileImage(userDataRes.data.profileImage || null);
         if (userDataRes.data.name) setUserName(userDataRes.data.name);
-      } else if (isAdminUser) {
-        // إنشاء حساب للمدير إذا لم يكن موجوداً
-        await signUpAction(currentPhone, "المدير العام", ADMIN_PASS);
       }
 
-      // 2. جلب البيانات السحابية بناءً على نوع الحساب
+      // 2. بيانات السحاب (بدون تصفير)
       if (isAdminUser) {
-        // جلب كل شيء للمدير
         const [allTxs, allReqs, allUsrs] = await Promise.all([
           getAllTransactionsAction(),
           getPasswordRequestsAction(),
           getAllUsersAction()
         ]);
 
-        // تحديث العمليات
-        if (allTxs) {
-          const sortedTxs = [...allTxs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        if (allUsrs && allUsrs.length > 0) setAllUsers(allUsrs);
+        if (allReqs) setPasswordRequests(allReqs);
+        if (allTxs && allTxs.length > 0) {
+          const sorted = [...allTxs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          setTransactions(sorted as Transaction[]);
           
-          // إشعار بالإيداعات الجديدة للمدير
-          const newDeposits = sortedTxs.filter(tx => tx.type === 'إيداع محفظة' && tx.status === 'Pending' && !prevTransactionsRef.current.find(p => p.id === tx.id));
-          if (newDeposits.length > 0) {
-            triggerNotification("طلب إيداع جديد 💰", `تم استلام طلب إيداع جديد بقيمة ${newDeposits[0].amount.toLocaleString()} ليرة.`);
-          }
-          
-          setTransactions(sortedTxs as Transaction[]);
-          prevTransactionsRef.current = sortedTxs as Transaction[];
+          // إشعار بالطلبات الجديدة
+          const newOnes = sorted.filter(tx => tx.status === 'Pending' && !prevTransactionsRef.current.find(p => p.id === tx.id));
+          if (newOnes.length > 0) triggerNotification("تحديث جديد 🔔", "لديك طلبات معلقة بانتظار المعالجة.");
+          prevTransactionsRef.current = sorted as Transaction[];
         }
-
-        // تحديث طلبات الاستعادة
-        if (allReqs) {
-          if (allReqs.length > prevPassRequestsRef.current.length) {
-            triggerNotification("طلب استعادة حساب جديد 🔑", "هناك مستخدم ينتظر تهيئة بيانات الدخول.");
-          }
-          setPasswordRequests(allReqs);
-          prevPassRequestsRef.current = allReqs;
-        }
-
-        // تحديث قائمة المستخدمين
-        if (allUsrs) {
-          setAllUsers(allUsrs);
-        }
-
       } else {
-        // جلب عمليات المستخدم العادي فقط
-        const userTxs = await getUserTransactionsAction(currentPhone);
+        const userTxs = await getUserTransactionsAction(phone.trim());
         if (userTxs) {
-          // إشعار بتحديث الحالة للمستخدم
-          userTxs.forEach(tx => {
-            const oldTx = prevTransactionsRef.current.find(p => p.id === tx.id);
-            if (oldTx && oldTx.status !== tx.status) {
-              const statusAr = tx.status === 'Completed' ? 'تم القبول ✅' : 'تم الرفض ❌';
-              triggerNotification("تحديث حالة الطلب", `طلبكم (${tx.type}) أصبح حالته: ${statusAr}`);
-            }
-          });
           const sorted = [...userTxs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
           setTransactions(sorted);
           prevTransactionsRef.current = sorted;
         }
       }
     } catch (err) {
-      console.error("Fetch Cloud Data Error:", err);
+      console.error("Fetch Cloud Error:", err);
     }
-  }, [ADMIN_PHONE, ADMIN_PASS, triggerNotification]);
+  }, [ADMIN_PHONE, triggerNotification]);
 
   const checkPendingOrders = useCallback(async () => {
     if (!isLoggedIn || isCheckingOrders) return;
-    const pendingOrders = transactions.filter(tx => tx.status === 'Pending' && tx.external_order_id);
-    if (pendingOrders.length === 0) return;
+    const pending = transactions.filter(tx => tx.status === 'Pending' && tx.external_order_id);
+    if (pending.length === 0) return;
 
     setIsCheckingOrders(true);
-    for (const order of pendingOrders) {
+    for (const order of pending) {
       try {
         const res = await fetch(`/api/check-order?order_id=${order.external_order_id}`);
         const data = await res.json();
         if (data.success && data.status) {
-          const remoteStatus = String(data.status).toLowerCase().trim();
-          let finalStatus: 'Completed' | 'Rejected' | null = null;
-          if (remoteStatus === 'accept' || remoteStatus === 'موافق' || remoteStatus === 'مقبول' || remoteStatus === 'نجاح') finalStatus = 'Completed';
-          else if (remoteStatus === 'reject' || remoteStatus === 'رفض') finalStatus = 'Rejected';
+          const remote = String(data.status).toLowerCase().trim();
+          let final: 'Completed' | 'Rejected' | null = null;
+          if (['accept', 'موافق', 'مقبول', 'نجاح'].includes(remote)) final = 'Completed';
+          else if (['reject', 'رفض'].includes(remote)) final = 'Rejected';
           
-          if (finalStatus) {
-            const updateRes = await updateTransactionStatusServer(order.id, finalStatus, order.amount, order.userPhone || userPhone);
-            if (updateRes.success) await fetchCloudData(userPhone);
+          if (final) {
+            await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
+            await fetchCloudData(userPhone);
           }
         }
       } catch (err) {}
@@ -216,13 +173,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [isLoggedIn, isCheckingOrders, transactions, userPhone, fetchCloudData]);
 
   useEffect(() => {
-    const savedAuth = localStorage.getItem('shabik_auth');
-    if (savedAuth) {
-      const authData = JSON.parse(savedAuth);
+    const saved = localStorage.getItem('shabik_auth');
+    if (saved) {
+      const data = JSON.parse(saved);
       setIsLoggedIn(true);
-      setUserPhone(authData.phone);
-      setUserName(authData.name);
-      fetchCloudData(authData.phone);
+      setUserPhone(data.phone);
+      setUserName(data.name);
+      fetchCloudData(data.phone);
     }
   }, [fetchCloudData]);
 
@@ -244,8 +201,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setUserPhone(phone);
       setUserName(adminData.name);
       localStorage.setItem('shabik_auth', JSON.stringify(adminData));
+      await signUpAction(phone, "المدير العام", ADMIN_PASS); // التأكد من وجود سجل للمدير
       await fetchCloudData(phone);
-      return { success: true, message: "تم تسجيل الدخول بصلاحيات الإدارة." };
+      return { success: true, message: "أهلاً بك يا مدير." };
     }
     const result = await signInAction(phone, password);
     if (result.success && result.user) {
@@ -257,78 +215,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       return { success: true, message: result.message };
     }
     return { success: false, message: result.message };
-  };
-
-  const register = async (phone: string, name: string, pass: string, refCode?: string) => {
-    return await signUpAction(phone, name, pass, refCode);
-  };
-
-  const requestReset = async (phone: string) => {
-    return await requestPasswordResetAction(phone);
-  };
-
-  const adminResetPassword = async (phone: string, requestId: string) => {
-    const res = await completePasswordResetAction(phone, requestId);
-    if (res.success) await fetchCloudData(userPhone);
-  };
-
-  const changePassword = async (currentPass: string, name: string) => {
-    return await changePasswordAction(userPhone, currentPass, name);
-  };
-
-  const updateProfileImage = async (imageData: string) => {
-    const res = await updateProfileImageAction(userPhone, imageData, userName);
-    if (res.success) {
-      setProfileImage(imageData);
-      return { success: true };
-    }
-    return { success: false, message: res.message };
-  };
-
-  const deductBalance = async (amount: number, productDetails: string, initialStatus: 'Pending' | 'Completed' = 'Completed', externalId?: string) => {
-    const before = userBalance;
-    const newBalance = Math.max(0, userBalance - amount);
-    setUserBalance(newBalance);
-    await syncBalanceAction(userPhone, newBalance);
-    const txData: Omit<Transaction, 'id'> = {
-      external_order_id: externalId || "",
-      type: 'شراء منتج',
-      amount,
-      status: initialStatus,
-      date: new Date().toLocaleString('ar-SY'),
-      userName,
-      userPhone,
-      details: productDetails,
-      balanceBefore: before,
-      balanceAfter: newBalance
-    };
-    const result = await recordTransactionAction(txData);
-    setTransactions(prev => [{ id: result.id || `${Date.now()}`, ...txData }, ...prev]);
-  };
-
-  const requestDeposit = async (amount: number, proofImage: string) => {
-    const txData: Omit<Transaction, 'id'> = {
-      type: 'إيداع محفظة',
-      amount,
-      status: 'Pending',
-      date: new Date().toLocaleString('ar-SY'),
-      userName,
-      userPhone,
-      details: "طلب إيداع رصيد للمحفظة",
-      proofImage
-    };
-    const result = await recordTransactionAction(txData);
-    setTransactions(prev => [{ id: result.id || `${Date.now()}`, ...txData }, ...prev]);
-  };
-
-  const adminAction = async (txId: string, action: 'approve' | 'reject') => {
-    const res = await processAdminAction(txId, action);
-    if (res.success) await fetchCloudData(userPhone);
-  };
-
-  const deleteUser = async (phone: string) => {
-    const res = await deleteUserAction(phone);
-    if (res.success) await fetchCloudData(userPhone);
   };
 
   const logout = () => {
@@ -343,10 +229,69 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('shabik_auth');
   };
 
+  const deductBalance = async (amount: number, productDetails: string, initialStatus: 'Pending' | 'Completed' = 'Completed', externalId?: string) => {
+    const before = userBalance;
+    const newBal = Math.max(0, userBalance - amount);
+    setUserBalance(newBal);
+    await syncBalanceAction(userPhone, newBal);
+    const result = await recordTransactionAction({
+      external_order_id: externalId || "",
+      type: 'شراء منتج',
+      amount,
+      status: initialStatus,
+      date: new Date().toLocaleString('ar-SY'),
+      userName,
+      userPhone,
+      details: productDetails,
+      balanceBefore: before,
+      balanceAfter: newBal
+    });
+    await fetchCloudData(userPhone);
+  };
+
+  const requestDeposit = async (amount: number, proofImage: string) => {
+    await recordTransactionAction({
+      type: 'إيداع محفظة',
+      amount,
+      status: 'Pending',
+      date: new Date().toLocaleString('ar-SY'),
+      userName,
+      userPhone,
+      details: "طلب إيداع رصيد",
+      proofImage
+    });
+    await fetchCloudData(userPhone);
+  };
+
+  const adminAction = async (txId: string, action: 'approve' | 'reject') => {
+    const res = await processAdminAction(txId, action);
+    if (res.success) await fetchCloudData(userPhone);
+  };
+
+  const deleteUser = async (phone: string) => {
+    const res = await deleteUserAction(phone);
+    if (res.success) await fetchCloudData(userPhone);
+  };
+
+  const requestReset = async (phone: string) => requestPasswordResetAction(phone);
+  
+  const adminResetPassword = async (phone: string, requestId: string) => {
+    const res = await completePasswordResetAction(phone, requestId);
+    if (res.success) await fetchCloudData(userPhone);
+  };
+
+  const changePassword = async (currentPass: string, newPass: string) => changePasswordAction(userPhone, currentPass, newPass);
+  
+  const updateProfileImage = async (imageData: string) => {
+    const res = await updateProfileImageAction(userPhone, imageData, userName);
+    if (res.success) setProfileImage(imageData);
+    return res;
+  };
+
   return (
     <UserContext.Provider value={{ 
       isLoggedIn, isAdmin: userPhone === ADMIN_PHONE, userPhone, userName, userBalance, profileImage, transactions, allUsers, passwordRequests,
-      login, register, logout, deductBalance, requestDeposit, adminAction, deleteUser, requestReset, adminResetPassword,
+      login, register: signUpAction, logout, deductBalance, requestDeposit, adminAction, deleteUser, requestReset, adminResetPassword,
       changePassword, updateProfileImage, currency, checkPendingOrders, notificationsEnabled, requestNotificationPermission
     }}>
       {children}
@@ -356,6 +301,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
 export function useUser() {
   const context = useContext(UserContext);
-  if (context === undefined) throw new Error('useUser must be used within a UserProvider');
+  if (context === undefined) throw new Error('useUser error');
   return context;
 }
