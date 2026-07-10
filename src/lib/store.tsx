@@ -115,70 +115,79 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const fetchCloudData = useCallback(async (phone: string) => {
     if (!phone) return;
-    const isAdminUser = phone === ADMIN_PHONE;
+    const currentPhone = phone.trim();
+    const isAdminUser = currentPhone === ADMIN_PHONE;
     
     try {
-      const userDataRes = await getUserDataAction(phone);
+      // 1. جلب بيانات المستخدم الحالي (الرصيد والصورة)
+      const userDataRes = await getUserDataAction(currentPhone);
       if (userDataRes.success && userDataRes.data) {
         setUserBalance(userDataRes.data.balance || 0);
         setProfileImage(userDataRes.data.profileImage || null);
         if (userDataRes.data.name) setUserName(userDataRes.data.name);
       } else if (isAdminUser) {
-        // إذا كان مديراً ولا يملك حساباً في السحاب، نقوم بإنشائه فوراً ليتمكن من استقبال الرصيد
-        await signUpAction(phone, "المدير العام", ADMIN_PASS);
+        // إنشاء حساب للمدير إذا لم يكن موجوداً
+        await signUpAction(currentPhone, "المدير العام", ADMIN_PASS);
       }
 
-      let cloudTxs: Transaction[] = [];
+      // 2. جلب البيانات السحابية بناءً على نوع الحساب
       if (isAdminUser) {
-        const txs = await getAllTransactionsAction();
-        if (txs && txs.length > 0) {
-          cloudTxs = txs as Transaction[];
-        } else if (transactions.length > 0) {
-          cloudTxs = transactions; // احتفظ بالبيانات القديمة إذا فشل السحب
-        }
-        
-        const currentPassReqs = await getPasswordRequestsAction();
-        if (currentPassReqs && currentPassReqs.length > 0) {
-          if (currentPassReqs.length > prevPassRequestsRef.current.length) {
-            triggerNotification("طلب استعادة حساب جديد 🔑", "هناك مستخدم ينتظر تهيئة بيانات الدخول.");
-          }
-          setPasswordRequests(currentPassReqs);
-          prevPassRequestsRef.current = currentPassReqs;
-        }
+        // جلب كل شيء للمدير
+        const [allTxs, allReqs, allUsrs] = await Promise.all([
+          getAllTransactionsAction(),
+          getPasswordRequestsAction(),
+          getAllUsersAction()
+        ]);
 
-        const users = await getAllUsersAction();
-        if (users && users.length > 0) {
-          setAllUsers(users);
-        }
-      } else {
-        const userTxs = await getUserTransactionsAction(phone);
-        if (userTxs) cloudTxs = userTxs;
-      }
-      
-      if (cloudTxs.length > 0) {
-        const prev = prevTransactionsRef.current;
-        if (isAdminUser) {
-          const newDeposits = cloudTxs.filter(tx => tx.type === 'إيداع محفظة' && tx.status === 'Pending' && !prev.find(p => p.id === tx.id));
+        // تحديث العمليات
+        if (allTxs) {
+          const sortedTxs = [...allTxs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          
+          // إشعار بالإيداعات الجديدة للمدير
+          const newDeposits = sortedTxs.filter(tx => tx.type === 'إيداع محفظة' && tx.status === 'Pending' && !prevTransactionsRef.current.find(p => p.id === tx.id));
           if (newDeposits.length > 0) {
             triggerNotification("طلب إيداع جديد 💰", `تم استلام طلب إيداع جديد بقيمة ${newDeposits[0].amount.toLocaleString()} ليرة.`);
           }
-        } else {
-          cloudTxs.forEach(tx => {
-            const oldTx = prev.find(p => p.id === tx.id);
+          
+          setTransactions(sortedTxs as Transaction[]);
+          prevTransactionsRef.current = sortedTxs as Transaction[];
+        }
+
+        // تحديث طلبات الاستعادة
+        if (allReqs) {
+          if (allReqs.length > prevPassRequestsRef.current.length) {
+            triggerNotification("طلب استعادة حساب جديد 🔑", "هناك مستخدم ينتظر تهيئة بيانات الدخول.");
+          }
+          setPasswordRequests(allReqs);
+          prevPassRequestsRef.current = allReqs;
+        }
+
+        // تحديث قائمة المستخدمين
+        if (allUsrs) {
+          setAllUsers(allUsrs);
+        }
+
+      } else {
+        // جلب عمليات المستخدم العادي فقط
+        const userTxs = await getUserTransactionsAction(currentPhone);
+        if (userTxs) {
+          // إشعار بتحديث الحالة للمستخدم
+          userTxs.forEach(tx => {
+            const oldTx = prevTransactionsRef.current.find(p => p.id === tx.id);
             if (oldTx && oldTx.status !== tx.status) {
               const statusAr = tx.status === 'Completed' ? 'تم القبول ✅' : 'تم الرفض ❌';
               triggerNotification("تحديث حالة الطلب", `طلبكم (${tx.type}) أصبح حالته: ${statusAr}`);
             }
           });
+          const sorted = [...userTxs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          setTransactions(sorted);
+          prevTransactionsRef.current = sorted;
         }
-        const sortedTxs = [...cloudTxs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setTransactions(sortedTxs);
-        prevTransactionsRef.current = sortedTxs;
       }
     } catch (err) {
       console.error("Fetch Cloud Data Error:", err);
     }
-  }, [ADMIN_PHONE, ADMIN_PASS, triggerNotification, transactions]);
+  }, [ADMIN_PHONE, ADMIN_PASS, triggerNotification]);
 
   const checkPendingOrders = useCallback(async () => {
     if (!isLoggedIn || isCheckingOrders) return;
@@ -235,11 +244,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setUserPhone(phone);
       setUserName(adminData.name);
       localStorage.setItem('shabik_auth', JSON.stringify(adminData));
-      // التأكد من وجود حساب للمدير في السحاب لربط العمليات المالية
-      const checkAdmin = await getUserDataAction(phone);
-      if (!checkAdmin.success) {
-        await signUpAction(phone, "المدير العام", ADMIN_PASS);
-      }
       await fetchCloudData(phone);
       return { success: true, message: "تم تسجيل الدخول بصلاحيات الإدارة." };
     }
