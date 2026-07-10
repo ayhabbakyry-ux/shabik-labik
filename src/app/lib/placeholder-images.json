@@ -36,6 +36,12 @@
       "description": "Shabik Labik Hero Banner Genie",
       "imageUrl": "https://picsum.photos/seed/magic-genie/1200/600",
       "imageHint": "magic genie"
+    },
+    {
+      "id": "balance-genie",
+      "description": "Shabik Labik Balance Genie",
+      "imageUrl": "https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg",
+      "imageHint": "magic genie"
     }
   ]
 }
