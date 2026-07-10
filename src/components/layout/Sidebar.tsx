@@ -15,7 +15,8 @@ import {
   Bot,
   KeyRound,
   Camera,
-  Loader2
+  Loader2,
+  Gift
 } from "lucide-react";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -39,6 +40,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { title: "المحفظة", icon: <Wallet className="h-5 w-5" />, href: "/wallet" },
     { title: "دفعاتي المالية", icon: <Receipt className="h-5 w-5" />, href: "/payments" },
     { title: "مشترياتي", icon: <ShoppingCart className="h-5 w-5" />, href: "/history" },
+    { title: "برنامج المكافآت", icon: <Gift className="h-5 w-5" />, href: "/referral" },
     { title: "المراكز المعتمدة", icon: <MapPin className="h-5 w-5" />, href: "/centers" },
     { title: "المساعد الذكي", icon: <Bot className="h-5 w-5" />, href: "/ai-assistant" },
     { title: "تغيير كلمة المرور", icon: <KeyRound className="h-5 w-5" />, href: "/profile/change-password" },

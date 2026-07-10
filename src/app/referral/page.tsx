@@ -12,7 +12,7 @@ import { Share2, Copy, Gift, CheckCircle2, ArrowRight, Menu, Sparkles } from "lu
 import { useToast } from "@/hooks/use-toast";
 
 /**
- * @fileOverview صفحة برنامج المكافآت - تم تعديلها لعرض كود المدير الموحد ADMEN فقط.
+ * @fileOverview صفحة برنامج المكافآت - تم تحديثها لاستخدام كود ADMIN ونص الرسالة المخصص.
  */
 
 export default function ReferralPage() {
@@ -30,9 +30,11 @@ export default function ReferralPage() {
 
   if (!isLoggedIn) return null;
 
-  // كود الإحالة الموحد هو ADMEN لجميع المستخدمين لترويج المنصة كما طلب أيهم
-  const myReferralCode = "ADMEN";
+  // كود الإحالة الموحد هو ADMIN
+  const myReferralCode = "ADMIN";
   const referralLink = `https://shabik-labik.vercel.app`;
+
+  const shareText = `أهلاً بك! أدعوك للتسجيل في تطبيق شبيك لبيك الرقمي والاستفادة من عروض الشحن التلقائي.\n🌐 رابط الموقع: ${referralLink}\n🔑 كود الدعوة الخاص بي: ${myReferralCode} \n(أدخل الكود عند التسجيل لتحصل على 25 ل.س مجاناً!)`;
 
   const handleCopy = () => {
     try {
@@ -40,7 +42,7 @@ export default function ReferralPage() {
       setCopied(true);
       toast({
         title: "تم النسخ بنجاح",
-        description: `كود الدعوة الموحد (${myReferralCode}) جاهز للمشاركة.`,
+        description: `كود الدعوة (${myReferralCode}) جاهز للمشاركة.`,
       });
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -53,10 +55,8 @@ export default function ReferralPage() {
   };
 
   const handleShare = async () => {
-    const shareText = `أهلاً بك! أدعوك للتسجيل في تطبيق شبك لبيك الرقمي والاستفادة من عروض الشحن التلقائي.\n🌐 رابط الموقع: ${referralLink}\n🔑 كود الدعوة الموحد: ${myReferralCode}\n(أدخل الكود عند التسجيل لتحصل على 25 ل.س مجاناً!)`;
-    
     const shareData = {
-      title: 'شبك لبيك الرقمي',
+      title: 'شبيك لبيك الرقمي',
       text: shareText,
       url: referralLink,
     };
@@ -154,7 +154,7 @@ export default function ReferralPage() {
              <Sparkles className="h-4 w-4" /> آلية عمل المكافأة
            </h4>
            <p className="text-xs text-slate-600 leading-relaxed font-medium">
-             عند استخدام كود الدعوة الموحد <span className="font-bold text-primary">ADMEN</span>، سيحصل المستخدم الجديد على <span className="font-bold text-primary">25 ليرة</span> فوراً كهدية ترحيبية، وسيتم دعم حساب المدير بـ <span className="font-bold text-primary">25 ليرة</span> أيضاً.
+             عند استخدام كود الدعوة الموحد <span className="font-bold text-primary">{myReferralCode}</span>، سيحصل المستخدم الجديد على <span className="font-bold text-primary">25 ليرة</span> فوراً كهدية ترحيبية، وسيتم دعم حساب المدير بـ <span className="font-bold text-primary">25 ليرة</span> أيضاً.
            </p>
         </div>
       </main>

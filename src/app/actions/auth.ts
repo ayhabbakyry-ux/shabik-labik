@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 
 /**
- * @fileOverview محرك المصادقة - تم حصر نظام الإحالة بكود المدير (ADMEN) لضمان توزيع المكافآت كما طلب أيهم.
+ * @fileOverview محرك المصادقة - تم حصر نظام الإحالة بكود المدير (ADMIN) لضمان توزيع المكافآت.
  */
 
 const ADMIN_PHONE = "0939549573";
@@ -55,8 +55,8 @@ export async function signUpAction(phone: string, name: string, pass: string, re
     let initialBalance = 0;
     const cleanRefCode = refCode?.trim().toUpperCase();
 
-    // نظام الإحالة الحصري للمدير (ADMEN) - أمر صارم من أيهم لضمان مكافأة المدير والجديد بـ 25 ليرة
-    if (cleanRefCode === "ADMEN") {
+    // نظام الإحالة الحصري للمدير (ADMIN) - يمنح 25 ليرة للمدير و 25 ليرة للجديد
+    if (cleanRefCode === "ADMIN") {
       const referrerPhone = ADMIN_PHONE;
       
       // لا يمكن للمدير إحالة نفسه
