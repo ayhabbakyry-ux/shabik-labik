@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -82,7 +81,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
 
-  // فحص دعم الجهاز للميزات الحديثة عند التشغيل
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const supported = 'Notification' in window && 'serviceWorker' in navigator;
@@ -95,8 +93,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const playNotificationSound = useCallback(() => {
     try {
-      const audio = new Audio(NOTIFICATION_SOUND);
-      audio.play().catch(() => {});
+      if (typeof Audio !== 'undefined') {
+        const audio = new Audio(NOTIFICATION_SOUND);
+        audio.play().catch(() => {});
+      }
     } catch (e) {}
   }, []);
 
@@ -136,9 +136,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           getAllUsersAction()
         ]);
 
-        if (allUsrs && allUsrs.length > 0) setAllUsers(allUsrs);
+        if (allUsrs) setAllUsers(allUsrs);
         if (allReqs) setPasswordRequests(allReqs);
-        if (allTxs && allTxs.length > 0) {
+        if (allTxs) {
           const sorted = [...allTxs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
           setTransactions(sorted as Transaction[]);
           
@@ -154,13 +154,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           prevTransactionsRef.current = sorted;
         }
       }
-    } catch (err) {
-      console.error("Fetch Cloud Error:", err);
-    }
+    } catch (err) {}
   }, [ADMIN_PHONE, triggerNotification]);
 
   const checkPendingOrders = useCallback(async () => {
-    if (!isLoggedIn || isCheckingOrders) return;
+    if (!isLoggedIn || isCheckingOrders || typeof window === 'undefined') return;
     const pending = transactions.filter(tx => tx.status === 'Pending' && tx.external_order_id);
     if (pending.length === 0) return;
 
@@ -202,7 +200,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       pollingIntervalRef.current = setInterval(() => {
         fetchCloudData(userPhone);
         checkPendingOrders();
-      }, 15000);
+      }, 20000); // زيادة فترة الاستعلام للشبكات البطيئة
     }
     return () => { if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current); };
   }, [isLoggedIn, userPhone, fetchCloudData, checkPendingOrders]);
@@ -246,34 +244,38 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const before = userBalance;
     const newBal = Math.max(0, userBalance - amount);
     setUserBalance(newBal);
-    await syncBalanceAction(userPhone, newBal);
-    const result = await recordTransactionAction({
-      external_order_id: externalId || "",
-      type: 'شراء منتج',
-      amount,
-      status: initialStatus,
-      date: new Date().toLocaleString('ar-SY'),
-      userName,
-      userPhone,
-      details: productDetails,
-      balanceBefore: before,
-      balanceAfter: newBal
-    });
-    await fetchCloudData(userPhone);
+    try {
+      await syncBalanceAction(userPhone, newBal);
+      await recordTransactionAction({
+        external_order_id: externalId || "",
+        type: 'شراء منتج',
+        amount,
+        status: initialStatus,
+        date: new Date().toLocaleString('ar-SY'),
+        userName,
+        userPhone,
+        details: productDetails,
+        balanceBefore: before,
+        balanceAfter: newBal
+      });
+      await fetchCloudData(userPhone);
+    } catch (e) {}
   };
 
   const requestDeposit = async (amount: number, proofImage: string) => {
-    await recordTransactionAction({
-      type: 'إيداع محفظة',
-      amount,
-      status: 'Pending',
-      date: new Date().toLocaleString('ar-SY'),
-      userName,
-      userPhone,
-      details: "طلب إيداع رصيد",
-      proofImage
-    });
-    await fetchCloudData(userPhone);
+    try {
+      await recordTransactionAction({
+        type: 'إيداع محفظة',
+        amount,
+        status: 'Pending',
+        date: new Date().toLocaleString('ar-SY'),
+        userName,
+        userPhone,
+        details: "طلب إيداع رصيد",
+        proofImage
+      });
+      await fetchCloudData(userPhone);
+    } catch (e) {}
   };
 
   const adminAction = async (txId: string, action: 'approve' | 'reject') => {
@@ -287,14 +289,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const requestReset = async (phone: string) => requestPasswordResetAction(phone);
-  
   const adminResetPassword = async (phone: string, requestId: string) => {
     const res = await completePasswordResetAction(phone, requestId);
     if (res.success) await fetchCloudData(userPhone);
   };
-
   const changePassword = async (currentPass: string, newPass: string) => changePasswordAction(userPhone, currentPass, newPass);
-  
   const updateProfileImage = async (imageData: string) => {
     const res = await updateProfileImageAction(userPhone, imageData, userName);
     if (res.success) setProfileImage(imageData);

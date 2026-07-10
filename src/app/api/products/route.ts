@@ -4,20 +4,19 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * @fileOverview مسار جلب المنتجات المطور - مع نظام معالجة أخطاء متقدم لمنع الانهيار وضمان ظهور البيانات.
+ * @fileOverview مسار جلب المنتجات المطور - مع نظام معالجة أخطاء متقدم ومهلة انتظار طويلة للشبكات الضعيفة.
  */
 export async function GET() {
     const API_TOKEN = process.env.ALRAGHEB_TOKEN;
     const ENDPOINT = 'https://api.alragheb-store.com/client/api/products';
 
     if (!API_TOKEN) {
-        console.error("API Error: Missing ALRAGHEB_TOKEN");
         return NextResponse.json({ success: false, error: "التوكن مفقود في إعدادات السيرفر" }, { status: 200 });
     }
 
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // مهلة 10 ثوانٍ
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // زيادة المهلة إلى 30 ثانية للشبكات الضعيفة
 
         const response = await fetch(ENDPOINT, {
             method: 'GET',
@@ -33,7 +32,7 @@ export async function GET() {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-            return NextResponse.json({ success: false, error: `فشل الاتصال: ${response.status}` }, { status: 200 });
+            return NextResponse.json({ success: false, error: `خطأ اتصال: ${response.status}` }, { status: 200 });
         }
 
         const rawData = await response.json();
@@ -70,10 +69,10 @@ export async function GET() {
         return NextResponse.json(formattedProducts);
 
     } catch (error: any) {
-        console.error("Products API Crash:", error.message);
+        console.error("Products API Error:", error.message);
         return NextResponse.json({ 
             success: false, 
-            error: error.name === 'AbortError' ? "انتهت مهلة الاتصال بالسيرفر" : "خطأ في معالجة البيانات" 
+            error: error.name === 'AbortError' ? "انتهت مهلة الاتصال بالرغم من الانتظار" : "تعذر الوصول للسيرفر حالياً" 
         }, { status: 200 });
     }
 }
