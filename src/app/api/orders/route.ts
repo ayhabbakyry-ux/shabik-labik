@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار تنفيذ طلبات الشحن المحدث - يعتمد كلياً على متغيرات البيئة للأمان.
+ * @fileOverview مسار تنفيذ طلبات الشحن المطور - يضمن عدم انهيار الجلب حتى في حال تعثر السيرفر الخارجي.
  */
 export async function POST(request: Request) {
     const API_TOKEN = process.env.ALRAGHEB_TOKEN;
@@ -21,6 +21,9 @@ export async function POST(request: Request) {
 
         const ENDPOINT = `https://api.alragheb-store.com/client/api/newOrder/${product_id}/params?qty=${qty}&playerId=${playerId}&order_uuid=${order_uuid}`;
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 ثانية للطلبات
+
         const response = await fetch(ENDPOINT, {
             method: 'GET',
             headers: {
@@ -28,8 +31,15 @@ export async function POST(request: Request) {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },
-            cache: 'no-store'
+            cache: 'no-store',
+            signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            throw new Error(`External API returned ${response.status}`);
+        }
 
         const rawData = await response.json();
         console.log('Alragheb API Response:', JSON.stringify(rawData));
@@ -73,7 +83,7 @@ export async function POST(request: Request) {
         console.error("Critical Order API Error:", error);
         return NextResponse.json({ 
             success: false, 
-            message: 'حدث خطأ في الاتصال بسيرفر الشحن.' 
+            message: error.name === 'AbortError' ? 'فشل الاتصال: السيرفر لم يستجب في الوقت المحدد.' : 'حدث خطأ في الاتصال بسيرفر الشحن.' 
         }, { status: 200 });
     }
 }

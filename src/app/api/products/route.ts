@@ -4,17 +4,21 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * @fileOverview مسار جلب المنتجات - يعتمد كلياً على متغيرات البيئة للأمان.
+ * @fileOverview مسار جلب المنتجات المطور - مع نظام معالجة أخطاء متقدم لمنع الانهيار وضمان ظهور البيانات.
  */
 export async function GET() {
     const API_TOKEN = process.env.ALRAGHEB_TOKEN;
     const ENDPOINT = 'https://api.alragheb-store.com/client/api/products';
 
     if (!API_TOKEN) {
-        return NextResponse.json({ success: false, error: "التوكن مفقود في إعدادات البيئة" }, { status: 200 });
+        console.error("API Error: Missing ALRAGHEB_TOKEN");
+        return NextResponse.json({ success: false, error: "التوكن مفقود في إعدادات السيرفر" }, { status: 200 });
     }
 
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // مهلة 10 ثوانٍ
+
         const response = await fetch(ENDPOINT, {
             method: 'GET',
             headers: {
@@ -22,11 +26,14 @@ export async function GET() {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },
-            cache: 'no-store'
+            cache: 'no-store',
+            signal: controller.signal
         });
 
+        clearTimeout(timeoutId);
+
         if (!response.ok) {
-            return NextResponse.json({ success: false, error: "فشل الاتصال بسيرفر الراغب" }, { status: 200 });
+            return NextResponse.json({ success: false, error: `فشل الاتصال: ${response.status}` }, { status: 200 });
         }
 
         const rawData = await response.json();
@@ -34,11 +41,13 @@ export async function GET() {
         let productsArray = [];
         if (Array.isArray(rawData)) {
             productsArray = rawData;
-        } else if (rawData.data && Array.isArray(rawData.data)) {
-            productsArray = rawData.data;
-        } else {
-            const possibleKey = Object.keys(rawData).find(key => Array.isArray(rawData[key]));
-            productsArray = possibleKey ? rawData[possibleKey] : [];
+        } else if (rawData && typeof rawData === 'object') {
+            if (rawData.data && Array.isArray(rawData.data)) {
+                productsArray = rawData.data;
+            } else {
+                const possibleKey = Object.keys(rawData).find(key => Array.isArray(rawData[key]));
+                productsArray = possibleKey ? rawData[possibleKey] : [];
+            }
         }
 
         const formattedProducts = productsArray.map((prod: any) => {
@@ -61,6 +70,10 @@ export async function GET() {
         return NextResponse.json(formattedProducts);
 
     } catch (error: any) {
-        return NextResponse.json({ success: false, error: error.message }, { status: 200 });
+        console.error("Products API Crash:", error.message);
+        return NextResponse.json({ 
+            success: false, 
+            error: error.name === 'AbortError' ? "انتهت مهلة الاتصال بالسيرفر" : "خطأ في معالجة البيانات" 
+        }, { status: 200 });
     }
 }
