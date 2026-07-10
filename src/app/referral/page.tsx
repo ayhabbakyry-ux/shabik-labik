@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -9,6 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Share2, Copy, Gift, CheckCircle2, ArrowRight, Menu, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+/**
+ * @fileOverview صفحة برنامج المكافآت - تم تعديلها لعرض كود المدير الموحد ADMEN فقط.
+ */
 
 export default function ReferralPage() {
   const { userPhone, currency, isLoggedIn, isAdmin } = useUser();
@@ -25,7 +30,8 @@ export default function ReferralPage() {
 
   if (!isLoggedIn) return null;
 
-  const myReferralCode = isAdmin ? "ADMEN" : (userPhone ? userPhone.slice(-5) : "00000");
+  // كود الإحالة الموحد هو ADMEN لجميع المستخدمين لترويج المنصة كما طلب أيهم
+  const myReferralCode = "ADMEN";
   const referralLink = `https://shabik-labik.vercel.app`;
 
   const handleCopy = () => {
@@ -34,7 +40,7 @@ export default function ReferralPage() {
       setCopied(true);
       toast({
         title: "تم النسخ بنجاح",
-        description: `كود الإحالة الخاص بكم (${myReferralCode}) جاهز للمشاركة الآن.`,
+        description: `كود الدعوة الموحد (${myReferralCode}) جاهز للمشاركة.`,
       });
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -47,7 +53,7 @@ export default function ReferralPage() {
   };
 
   const handleShare = async () => {
-    const shareText = `أهلاً بك! أدعوك للتسجيل في تطبيق شبك لبيك الرقمي والاستفادة من عروض الشحن التلقائي.\n🌐 رابط الموقع: ${referralLink}\n🔑 كود الدعوة الخاص بي: ${myReferralCode}\n(أدخل الكود عند التسجيل لتحصل على 25 ل.س مجاناً!)`;
+    const shareText = `أهلاً بك! أدعوك للتسجيل في تطبيق شبك لبيك الرقمي والاستفادة من عروض الشحن التلقائي.\n🌐 رابط الموقع: ${referralLink}\n🔑 كود الدعوة الموحد: ${myReferralCode}\n(أدخل الكود عند التسجيل لتحصل على 25 ل.س مجاناً!)`;
     
     const shareData = {
       title: 'شبك لبيك الرقمي',
@@ -110,15 +116,15 @@ export default function ReferralPage() {
           <div>
             <h1 className="text-3xl font-black font-headline text-slate-900 tracking-tight">برنامج المكافآت</h1>
             <p className="text-muted-foreground text-sm font-medium mt-2 max-w-sm mx-auto leading-relaxed">
-              شارك كود الدعوة الخاص بك واحصل على <span className="text-primary font-bold text-lg">25 {currency}</span> مجاناً لكل مستخدم ينضم للمنصة من خلالك.
+              شارك كود الدعوة الموحد الخاص بالمنصة واحصل على مكافآت فورية عند انضمام مستخدمين جدد.
             </p>
           </div>
         </div>
 
         <Card className="border-none shadow-2xl rounded-[32px] bg-white overflow-hidden relative border-t-4 border-primary">
           <CardHeader className="text-center pb-2">
-            <CardTitle className="text-slate-800 font-bold">كود الإحالة الخاص بكم</CardTitle>
-            <CardDescription>استخدم هذا الكود للحصول على رصيد إضافي</CardDescription>
+            <CardTitle className="text-slate-800 font-bold">كود الدعوة الموحد</CardTitle>
+            <CardDescription>استخدم هذا الكود عند التسجيل للحصول على رصيد إضافي</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 p-8">
             <div className="flex flex-col items-center gap-4">
@@ -148,7 +154,7 @@ export default function ReferralPage() {
              <Sparkles className="h-4 w-4" /> آلية عمل المكافأة
            </h4>
            <p className="text-xs text-slate-600 leading-relaxed font-medium">
-             عند استخدام كود الدعوة الخاص بكم من قبل مستخدم جديد، سيتم إضافة <span className="font-bold text-primary">25 ليرة</span> لمحفظتكم فوراً، كما سيحصل المستخدم الجديد على مكافأة ترحيبية بقيمة <span className="font-bold text-primary">25 ليرة</span>.
+             عند استخدام كود الدعوة الموحد <span className="font-bold text-primary">ADMEN</span>، سيحصل المستخدم الجديد على <span className="font-bold text-primary">25 ليرة</span> فوراً كهدية ترحيبية، وسيتم دعم حساب المدير بـ <span className="font-bold text-primary">25 ليرة</span> أيضاً.
            </p>
         </div>
       </main>

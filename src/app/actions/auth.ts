@@ -1,3 +1,4 @@
+
 'use server';
 
 import { db } from '@/lib/firebase-config';
@@ -12,7 +13,7 @@ import {
 } from 'firebase/firestore';
 
 /**
- * @fileOverview محرك المصادقة - يدعم كود الإحالة ونظام استعادة الحساب بشكل رسمي.
+ * @fileOverview محرك المصادقة - تم حصر نظام الإحالة بكود المدير (ADMEN) لضمان توزيع المكافآت كما طلب أيهم.
  */
 
 const ADMIN_PHONE = "0939549573";
@@ -54,27 +55,26 @@ export async function signUpAction(phone: string, name: string, pass: string, re
     let initialBalance = 0;
     const cleanRefCode = refCode?.trim().toUpperCase();
 
-    if (cleanRefCode) {
-      let referrerPhone = "";
+    // نظام الإحالة الحصري للمدير (ADMEN) - أمر صارم من أيهم لضمان مكافأة المدير والجديد بـ 25 ليرة
+    if (cleanRefCode === "ADMEN") {
+      const referrerPhone = ADMIN_PHONE;
       
-      if (cleanRefCode === "ADMEN") {
-        referrerPhone = ADMIN_PHONE;
-      } else if (cleanRefCode.length === 5) {
-        const allUsers = await getDocs(collection(db, "users"));
-        const match = allUsers.docs.find(d => d.data().phone.endsWith(cleanRefCode));
-        if (match) referrerPhone = match.data().phone;
-      }
-
-      if (referrerPhone && referrerPhone !== phone) {
+      // لا يمكن للمدير إحالة نفسه
+      if (referrerPhone !== phone) {
         const refQ = query(collection(db, "users"), where("phone", "==", referrerPhone));
         const refSnapshot = await getDocs(refQ);
+        
         if (!refSnapshot.empty) {
           const referrerDoc = refSnapshot.docs[0];
-          const currentRefBalance = referrerDoc.data().balance || 0;
+          const currentRefBalance = Number(referrerDoc.data().balance || 0);
+          
+          // إضافة 25 ليرة للمدير (المُحيل)
           await updateDoc(doc(db, "users", referrerDoc.id), {
             balance: currentRefBalance + 25
           });
-          initialBalance += 25;
+          
+          // منح 25 ليرة رصيد ترحيبي للمستخدم الجديد
+          initialBalance = 25;
         }
       }
     }
