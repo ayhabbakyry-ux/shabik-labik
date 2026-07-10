@@ -26,26 +26,12 @@
     --ring: 244 40% 35%;
     --radius: 0.75rem;
   }
-  .dark {
-    --background: 240 10% 4%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 4%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 4%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 244 40% 35%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 216 82% 55%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 240 5% 15%;
-    --muted-foreground: 240 5% 65%;
-    --accent: 244 40% 15%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62% 30%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5% 15%;
-    --input: 240 5% 15%;
-    --ring: 244 40% 35%;
+}
+
+/* التوافق مع الأجهزة القديمة */
+@supports not (backdrop-filter: blur(10px)) {
+  .backdrop-blur-md {
+    background-color: rgba(255, 255, 255, 0.95) !important;
   }
 }
 

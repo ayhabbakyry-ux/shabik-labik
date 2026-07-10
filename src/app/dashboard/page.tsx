@@ -1,3 +1,4 @@
+
 "use client";
 
 import { WalletCard } from "@/components/dashboard/WalletCard";
@@ -12,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
-  const { isLoggedIn, userPhone, isAdmin, notificationsEnabled, requestNotificationPermission, userName } = useUser();
+  const { isLoggedIn, userPhone, isAdmin, notificationsEnabled, isNotificationSupported, requestNotificationPermission, userName } = useUser();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const router = useRouter();
 
@@ -49,8 +50,8 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* Notification Banner for Users & Admin */}
-        {!notificationsEnabled && (
+        {/* Notification Banner - Only shown if supported by device */}
+        {isNotificationSupported && !notificationsEnabled && (
           <div className="bg-primary/10 border border-primary/20 p-4 rounded-2xl flex items-center justify-between animate-in slide-in-from-top-4 duration-500">
             <div className="flex items-center gap-3">
               <div className="bg-primary p-2 rounded-lg">

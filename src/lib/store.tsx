@@ -55,6 +55,7 @@ type UserContextType = {
   currency: string;
   checkPendingOrders: () => Promise<void>;
   notificationsEnabled: boolean;
+  isNotificationSupported: boolean;
   requestNotificationPermission: () => void;
 };
 
@@ -71,6 +72,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [passwordRequests, setPasswordRequests] = useState<any[]>([]);
   const [isCheckingOrders, setIsCheckingOrders] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [isNotificationSupported, setIsNotificationSupported] = useState(false);
   
   const prevTransactionsRef = useRef<Transaction[]>([]);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -80,6 +82,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
 
+  // فحص دعم الجهاز للميزات الحديثة عند التشغيل
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const supported = 'Notification' in window && 'serviceWorker' in navigator;
+      setIsNotificationSupported(supported);
+      if (supported) {
+        setNotificationsEnabled(Notification.permission === 'granted');
+      }
+    }
+  }, []);
+
   const playNotificationSound = useCallback(() => {
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
@@ -88,17 +101,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const triggerNotification = useCallback((title: string, body: string) => {
-    if ("Notification" in window && Notification.permission === "granted") {
-      new Notification(title, { body, icon: "https://picsum.photos/seed/genie/200/200" });
-      playNotificationSound();
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === "granted") {
+      try {
+        new Notification(title, { body, icon: "https://picsum.photos/seed/genie/200/200" });
+        playNotificationSound();
+      } catch (e) {}
     }
   }, [playNotificationSound]);
 
   const requestNotificationPermission = useCallback(() => {
-    if (!("Notification" in window)) return;
-    Notification.requestPermission().then(permission => {
-      setNotificationsEnabled(permission === "granted");
-    });
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      Notification.requestPermission().then(permission => {
+        setNotificationsEnabled(permission === "granted");
+      });
+    }
   }, []);
 
   const fetchCloudData = useCallback(async (phone: string) => {
@@ -106,7 +122,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const isAdminUser = phone.trim() === ADMIN_PHONE;
     
     try {
-      // 1. بيانات المستخدم
       const userDataRes = await getUserDataAction(phone.trim());
       if (userDataRes.success && userDataRes.data) {
         setUserBalance(userDataRes.data.balance || 0);
@@ -114,7 +129,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (userDataRes.data.name) setUserName(userDataRes.data.name);
       }
 
-      // 2. بيانات السحاب (بدون تصفير)
       if (isAdminUser) {
         const [allTxs, allReqs, allUsrs] = await Promise.all([
           getAllTransactionsAction(),
@@ -128,7 +142,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           const sorted = [...allTxs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
           setTransactions(sorted as Transaction[]);
           
-          // إشعار بالطلبات الجديدة
           const newOnes = sorted.filter(tx => tx.status === 'Pending' && !prevTransactionsRef.current.find(p => p.id === tx.id));
           if (newOnes.length > 0) triggerNotification("تحديث جديد 🔔", "لديك طلبات معلقة بانتظار المعالجة.");
           prevTransactionsRef.current = sorted as Transaction[];
@@ -201,7 +214,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setUserPhone(phone);
       setUserName(adminData.name);
       localStorage.setItem('shabik_auth', JSON.stringify(adminData));
-      await signUpAction(phone, "المدير العام", ADMIN_PASS); // التأكد من وجود سجل للمدير
+      await signUpAction(phone, "المدير العام", ADMIN_PASS);
       await fetchCloudData(phone);
       return { success: true, message: "أهلاً بك يا مدير." };
     }
@@ -292,7 +305,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     <UserContext.Provider value={{ 
       isLoggedIn, isAdmin: userPhone === ADMIN_PHONE, userPhone, userName, userBalance, profileImage, transactions, allUsers, passwordRequests,
       login, register: signUpAction, logout, deductBalance, requestDeposit, adminAction, deleteUser, requestReset, adminResetPassword,
-      changePassword, updateProfileImage, currency, checkPendingOrders, notificationsEnabled, requestNotificationPermission
+      changePassword, updateProfileImage, currency, checkPendingOrders, notificationsEnabled, isNotificationSupported, requestNotificationPermission
     }}>
       {children}
     </UserContext.Provider>
