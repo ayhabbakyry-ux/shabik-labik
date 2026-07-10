@@ -17,7 +17,6 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { PlaceHolderImages } from "@/lib/placeholder-images";
 
 export function WalletCard() {
   const { userBalance, requestDeposit, currency } = useUser();
@@ -28,8 +27,6 @@ export function WalletCard() {
   const [open, setOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const { toast } = useToast();
-
-  const balanceGenie = PlaceHolderImages.find(img => img.id === 'balance-genie');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -89,17 +86,15 @@ export function WalletCard() {
     <div className="bg-gradient-to-br from-[#1c232d] to-[#11151d] p-6 md:p-8 rounded-[32px] shadow-2xl flex flex-col items-center text-center relative overflow-hidden border border-white/5">
       <div className="absolute top-0 left-0 w-32 h-32 bg-primary/10 rounded-full -ml-16 -mt-16 blur-[60px]"></div>
       
-      {/* الصورة الجديدة المطلوبة فوق لوغو الرصيد */}
-      {balanceGenie && (
-        <div className="mb-4 animate-in fade-in zoom-in duration-700">
-          <img 
-            src={balanceGenie.imageUrl} 
-            alt="Balance Header" 
-            className="w-24 h-24 object-contain rounded-full shadow-lg border-2 border-primary/20"
-            data-ai-hint={balanceGenie.imageHint}
-          />
-        </div>
-      )}
+      {/* صورة المارد المطلوبة فوق الرصيد مباشرة */}
+      <div className="mb-6 w-full max-w-[220px] animate-in fade-in zoom-in duration-1000">
+        <img 
+          src="https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg" 
+          alt="Shabik Labik Genie" 
+          className="w-full h-auto object-cover rounded-[24px] shadow-2xl border-2 border-primary/20"
+          style={{ width: '100%', height: 'auto', objectFit: 'cover' }}
+        />
+      </div>
 
       <div className="bg-primary/20 p-4 rounded-2xl mb-4 backdrop-blur-md border border-white/5">
         <Wallet className="h-8 w-8 text-primary" />
