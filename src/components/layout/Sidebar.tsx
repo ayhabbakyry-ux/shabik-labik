@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -10,7 +11,6 @@ import {
   ShoppingCart, 
   MapPin, 
   LifeBuoy,
-  Gift,
   Star,
   Bot,
   KeyRound,
@@ -39,7 +39,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { title: "المحفظة", icon: <Wallet className="h-5 w-5" />, href: "/wallet" },
     { title: "دفعاتي المالية", icon: <Receipt className="h-5 w-5" />, href: "/payments" },
     { title: "مشترياتي", icon: <ShoppingCart className="h-5 w-5" />, href: "/history" },
-    { title: "برنامج المكافآت", icon: <Gift className="h-5 w-5 text-primary" />, href: "/referral" },
     { title: "المراكز المعتمدة", icon: <MapPin className="h-5 w-5" />, href: "/centers" },
     { title: "المساعد الذكي", icon: <Bot className="h-5 w-5" />, href: "/ai-assistant" },
     { title: "تغيير كلمة المرور", icon: <KeyRound className="h-5 w-5" />, href: "/profile/change-password" },

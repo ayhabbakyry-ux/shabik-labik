@@ -1,8 +1,9 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, Phone, Lock, User, ArrowRight, HelpCircle, Menu, Gift, Send } from "lucide-react";
+import { ShieldCheck, Phone, Lock, User, ArrowRight, HelpCircle, Menu, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +17,6 @@ export default function AuthPage() {
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
-  const [referralCode, setReferralCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   
   const { login, register, requestReset, isLoggedIn, userBalance, currency } = useUser();
@@ -55,7 +55,7 @@ export default function AuthPage() {
         setIsLoading(false);
         return;
       }
-      const result = await register(phone, name, password, referralCode);
+      const result = await register(phone, name, password);
       if (result.success) {
         toast({ title: "تم إنشاء الحساب", description: result.message });
         setIsLogin(true);
@@ -169,18 +169,6 @@ export default function AuthPage() {
                     <div className="relative">
                       <User className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input placeholder="أدخل الاسم الكامل" className="pr-10 h-12 text-right rounded-xl border-muted bg-muted/20" value={name} onChange={(e) => setName(e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-right block font-bold text-xs pr-1">كود الدعوة (اختياري)</Label>
-                    <div className="relative">
-                      <Gift className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        placeholder="أدخل كود الدعوة للحصول على رصيد" 
-                        className="pr-10 h-12 text-right rounded-xl border-muted bg-muted/20 uppercase font-mono" 
-                        value={referralCode} 
-                        onChange={(e) => setReferralCode(e.target.value)} 
-                      />
                     </div>
                   </div>
                 </>
