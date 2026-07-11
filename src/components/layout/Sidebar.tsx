@@ -35,17 +35,28 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
 
-  const menuItems = [
+  // قائمة العناصر الأساسية للجميع
+  const baseMenuItems = [
     { title: "الرئيسية", icon: <Home className="h-5 w-5" />, href: "/dashboard" },
     { title: "المحفظة", icon: <Wallet className="h-5 w-5" />, href: "/wallet" },
     { title: "دفعاتي المالية", icon: <Receipt className="h-5 w-5" />, href: "/payments" },
     { title: "مشترياتي", icon: <ShoppingCart className="h-5 w-5" />, href: "/history" },
-    { title: "برنامج المكافآت", icon: <Gift className="h-5 w-5" />, href: "/referral" },
+  ];
+
+  // عنصر برنامج المكافآت يظهر فقط للمدير في القائمة الجانبية بناءً على طلبك الصارم
+  const adminOnlyItems = isAdmin ? [
+    { title: "برنامج المكافآت", icon: <Gift className="h-5 w-5" />, href: "/referral" }
+  ] : [];
+
+  // العناصر المتبقية للجميع
+  const otherMenuItems = [
     { title: "المراكز المعتمدة", icon: <MapPin className="h-5 w-5" />, href: "/centers" },
     { title: "المساعد الذكي", icon: <Bot className="h-5 w-5" />, href: "/ai-assistant" },
     { title: "تغيير كلمة المرور", icon: <KeyRound className="h-5 w-5" />, href: "/profile/change-password" },
     { title: "الدعم الفني", icon: <LifeBuoy className="h-5 w-5" />, href: "/support" },
   ];
+
+  const menuItems = [...baseMenuItems, ...adminOnlyItems, ...otherMenuItems];
 
   const handleLevelClick = () => {
     toast({
