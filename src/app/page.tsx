@@ -149,7 +149,7 @@ export default function AuthPage() {
         <div className="bg-primary p-5 rounded-[32px] inline-block shadow-2xl mb-4 transform rotate-3">
           <ShieldCheck className="h-10 w-10 text-white" />
         </div>
-        <h1 className="text-2xl font-bold font-headline text-primary">شبك لبيك الرقمي</h1>
+        <h1 className="text-2xl font-bold font-headline text-primary">شبيك لبيك</h1>
         <p className="text-muted-foreground text-sm font-medium">المنصة الموثوقة لخدمات الشحن التلقائي</p>
       </div>
 
