@@ -2,13 +2,13 @@ import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 
 /**
- * @fileOverview إعدادات محرك Genkit - تم استخدام المكون الإضافي الحديث لضمان استقرار الذكاء الاصطناعي.
+ * @fileOverview إعدادات محرك Genkit - تم حقن المفتاح مباشرة لضمان العمل الفوري.
  */
 
 export const ai = genkit({
   plugins: [
     googleAI({ 
-      apiKey: process.env.GEMINI_API_KEY || "AIzaSyBCpbXvIDJl9C8XvVFNl8DViQEC8msCgBU",
+      apiKey: "AIzaSyBCpbXvIDJl9C8XvVFNl8DViQEC8msCgBU",
     })
   ],
 });

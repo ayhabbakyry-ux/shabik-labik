@@ -4,10 +4,9 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { db } from '@/lib/firebase-config';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { googleAI } from '@genkit-ai/google-genai';
 
 /**
- * @fileOverview مساعد الدعم الذكي - يقوم بالرد على استفسارات المستخدمين والبحث للمدير.
+ * @fileOverview مساعد الدعم الذكي - مجيب شامل على استفسارات المستخدمين مع حماية الخصوصية.
  */
 
 const SmartSupportAssistantInputSchema = z.object({
@@ -24,7 +23,7 @@ const SmartSupportAssistantOutputSchema = z.object({
 const searchUserTool = ai.defineTool(
   {
     name: 'searchUserTool',
-    description: 'يبحث عن معلومات المستخدم في قاعدة البيانات ويقدم تقريراً بالرصيد.',
+    description: 'يبحث عن معلومات المستخدم للمدير فقط.',
     inputSchema: z.object({
       phone: z.string().describe('رقم هاتف المستخدم للبحث عنه.'),
     }),
@@ -40,20 +39,16 @@ const searchUserTool = ai.defineTool(
       const phoneClean = input.phone.trim();
       const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
       const userSnap = await getDocs(userQ);
-      
-      if (userSnap.empty) {
-        return { found: false, currentBalance: 0, message: "لم يتم العثور على مستخدم مسجل بهذا الرقم في النظام." };
-      }
-
+      if (userSnap.empty) return { found: false, currentBalance: 0, message: "غير موجود." };
       const userData = userSnap.docs[0].data();
       return {
         found: true,
         userName: userData.name || phoneClean,
         currentBalance: Number(userData.balance || 0),
-        message: `تم العثور على المستخدم ${userData.name || phoneClean}. رصيده الحالي هو ${userData.balance} ليرة سورية.`
+        message: `المستخدم ${userData.name || phoneClean} رصيده ${userData.balance} ليرة.`
       };
     } catch (e) {
-      return { found: false, currentBalance: 0, message: "حدث خطأ فني أثناء محاولة جلب البيانات من السيرفر." };
+      return { found: false, currentBalance: 0, message: "خطأ فني." };
     }
   }
 );
@@ -64,18 +59,31 @@ const prompt = ai.definePrompt({
   input: { schema: SmartSupportAssistantInputSchema },
   output: { schema: SmartSupportAssistantOutputSchema },
   tools: [searchUserTool],
-  prompt: `أنت "مساعد تطبيق شبيك لبيك". تتحدث باللغة العربية الفصحى بأسلوب مهني ومحترم جداً.
+  config: {
+    safetySettings: [
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+    ]
+  },
+  prompt: `أنت "المساعد الذكي لتطبيق شبيك لبيك". تتحدث بالعربية الفصحى بأسلوب مهذب وشامل.
 
-قواعد الرد الصارمة:
-1. إذا كان السائل هو المدير (isAdmin = true) وطلب معلومات عن رقم هاتف معين، استخدم أداة searchUserTool فوراً.
-2. أجب بلغة عربية رسمية ومهذبة، وابدأ الرد بتحية مناسبة.
-3. ممنوع تماماً ذكر أي تفاصيل تقنية أو أكواد برمجة أو أسماء موديلات AI.
-4. إذا سألك المستخدم عن رصيده، أخبره برصيده الموجود في معلومات السياق أدناه.
+مهمتك: الإجابة على كل أسئلة المستخدم حول حسابه، الرصيد، الإيداع، والشحن.
 
-معلومات السياق الحالية:
-- اسم المستخدم: {{{userPhone}}}
-- رصيد المستخدم الحالي: {{{userBalance}}} ليرة
-- صفة المستخدم: {{#if isAdmin}}المدير العام (أيهم){{else}}عميل مسجل{{/if}}
+قواعد صارمة جداً (أوامر المدير أيهم):
+1. أجب على كل شيء يسأله المستخدم بلباقة.
+2. إذا سألك المستخدم عن رصيده أو حسابه، استخدم البيانات التالية: رقم هاتفك هو {{{userPhone}}} ورصيدك الحالي هو {{{userBalance}}} ليرة سورية.
+3. طرق الإيداع المتاحة: (سيريتل كاش: 0939549573)، (إم تي إن كاش: 0943899403)، (شام كاش: 5d093f196b8cd72873f06d5dbbfb2d43). يتم الإيداع عبر قسم "المحفظة" ثم إرسال صورة الإشعار.
+4. طريقة الشحن: يتم الشحن تلقائياً عبر قسم "الخدمات الرقمية" في اللوحة الرئيسية باختيار اللعبة أو الشركة المطلوبة وإدخال الـ ID.
+5. **ممنوع منعاً باتاً** إخبار المستخدم من هو المدير أو كشف هويته (أيهم). قل فقط أنك "مساعد منصة شبيك لبيك".
+6. **ممنوع منعاً باتاً** إعطاء معلومات عن مستخدمين آخرين لأي شخص باستثناء المدير (isAdmin = true).
+7. إذا كان المستخدم هو المدير (isAdmin = true)، يمكنك استخدام searchUserTool للبحث عن المستخدمين الآخرين.
+
+سياق المستخدم:
+- الهاتف: {{{userPhone}}}
+- الرصيد: {{{userBalance}}}
+- هل هو المدير: {{#if isAdmin}}نعم (أيهم){{else}}لا (عميل){{/if}}
 
 استفسار المستخدم: {{{userQuery}}}`
 });
@@ -83,14 +91,10 @@ const prompt = ai.definePrompt({
 export async function smartSupportAssistant(input: z.infer<typeof SmartSupportAssistantInputSchema>) {
   try {
     const { output } = await prompt(input);
-    
-    if (!output || !output.assistantResponse) {
-      throw new Error("AI Empty Output");
-    }
-    
+    if (!output || !output.assistantResponse) throw new Error("AI Empty");
     return output;
   } catch (error: any) {
-    console.error("AI Flow Error:", error);
+    console.error("AI Error Details:", error);
     return { assistantResponse: "أهلاً بك. أنا المساعد الذكي، حالياً أقوم بتحديث بياناتي لخدمتك بشكل أفضل. يرجى المحاولة بعد قليل أو التواصل مع الدعم الفني المباشر." };
   }
 }
