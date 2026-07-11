@@ -38,25 +38,21 @@ export async function getAllTransactionsAction() {
 
 export async function deleteUserAction(phone: string) {
   try {
-    // 1. حذف سجل المستخدم الأساسي من مجموعة users
     const q = query(collection(db, "users"), where("phone", "==", phone));
     const snap = await getDocs(q);
     const deletions = snap.docs.map(d => deleteDoc(doc(db, "users", d.id)));
     await Promise.all(deletions);
 
-    // 2. حذف أي طلبات استعادة كلمة مرور معلقة لهذا الرقم لضمان نظافة النظام تماماً
     const reqQ = query(collection(db, "password_requests"), where("phone", "==", phone));
     const reqSnap = await getDocs(reqQ);
     const reqDeletions = reqSnap.docs.map(d => deleteDoc(doc(db, "password_requests", d.id)));
     await Promise.all(reqDeletions);
 
-    // 3. حذف سجل العمليات المالية لهذا الرقم لضمان حذف الحساب نهائياً من كافة السجلات
     const txQ = query(collection(db, "transactions"), where("userPhone", "==", phone));
     const txSnap = await getDocs(txQ);
     const txDeletions = txSnap.docs.map(d => deleteDoc(doc(db, "transactions", d.id)));
     await Promise.all(txDeletions);
 
-    console.log(`تم مسح الحساب ${phone} وكل بياناته المرتبطة من النظام نهائياً.`);
     return { success: true };
   } catch (error) {
     console.error("Admin: Delete User Error", error);
@@ -159,6 +155,24 @@ export async function completePasswordResetAction(phone: string, requestId: stri
     await deleteDoc(doc(db, "password_requests", requestId));
     return { success: true };
   } catch (error) {
+    return { success: false };
+  }
+}
+
+export async function updateUserBalanceDirectlyAction(phone: string, amount: number, operation: 'add' | 'subtract') {
+  try {
+    const userQ = query(collection(db, "users"), where("phone", "==", phone));
+    const userSnap = await getDocs(userQ);
+    if (!userSnap.empty) {
+      const userDoc = userSnap.docs[0];
+      const currentBalance = Number(userDoc.data().balance || 0);
+      const newBalance = operation === 'add' ? currentBalance + amount : Math.max(0, currentBalance - amount);
+      await updateDoc(doc(db, "users", userDoc.id), { balance: newBalance });
+      return { success: true, newBalance };
+    }
+    return { success: false, message: "المستخدم غير موجود" };
+  } catch (error) {
+    console.error("Admin: Update Balance Error", error);
     return { success: false };
   }
 }

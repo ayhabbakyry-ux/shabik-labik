@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -12,7 +11,8 @@ import {
   getUserDataAction,
   getPasswordRequestsAction,
   completePasswordResetAction,
-  getAllTransactionsAction
+  getAllTransactionsAction,
+  updateUserBalanceDirectlyAction
 } from '@/app/actions/admin';
 import { changePasswordAction, updateProfileImageAction } from '@/app/actions/profile';
 
@@ -47,6 +47,7 @@ type UserContextType = {
   deductBalance: (amount: number, productDetails: string, initialStatus?: 'Pending' | 'Completed', externalId?: string) => Promise<void>;
   requestDeposit: (amount: number, proofImage: string) => Promise<void>;
   adminAction: (txId: string, action: 'approve' | 'reject') => Promise<void>;
+  updateBalanceAdmin: (phone: string, amount: number, operation: 'add' | 'subtract') => Promise<void>;
   deleteUser: (phone: string) => Promise<void>;
   requestReset: (phone: string) => Promise<{ success: boolean; message: string }>;
   adminResetPassword: (phone: string, requestId: string) => Promise<void>;
@@ -284,6 +285,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (res.success) await fetchCloudData(userPhone);
   };
 
+  const updateBalanceAdmin = async (phone: string, amount: number, operation: 'add' | 'subtract') => {
+    const res = await updateUserBalanceDirectlyAction(phone, amount, operation);
+    if (res.success) await fetchCloudData(userPhone);
+  };
+
   const deleteUser = async (phone: string) => {
     const res = await deleteUserAction(phone);
     if (res.success) await fetchCloudData(userPhone);
@@ -304,7 +310,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   return (
     <UserContext.Provider value={{ 
       isLoggedIn, isAdmin: userPhone === ADMIN_PHONE, userPhone, userName, userBalance, profileImage, transactions, allUsers, passwordRequests,
-      login, register: signUpAction, logout, deductBalance, requestDeposit, adminAction, deleteUser, requestReset, adminResetPassword,
+      login, register: signUpAction, logout, deductBalance, requestDeposit, adminAction, updateBalanceAdmin, deleteUser, requestReset, adminResetPassword,
       changePassword, updateProfileImage, currency, checkPendingOrders, notificationsEnabled, isNotificationSupported, requestNotificationPermission
     }}>
       {children}
