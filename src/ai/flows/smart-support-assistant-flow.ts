@@ -64,7 +64,7 @@ const prompt = ai.definePrompt({
   input: { schema: SmartSupportAssistantInputSchema },
   output: { schema: SmartSupportAssistantOutputSchema },
   tools: [searchUserTool],
-  prompt: `أنت "مساعد تطبيق شبك لبيك الرقمي". تتحدث باللغة العربية الفصحى بأسلوب مهني ومحترم جداً.
+  prompt: `أنت "مساعد تطبيق شبيك لبيك". تتحدث باللغة العربية الفصحى بأسلوب مهني ومحترم جداً.
 
 قواعد الرد الصارمة:
 1. إذا كان السائل هو المدير (isAdmin = true) وطلب معلومات عن رقم هاتف معين، استخدم أداة searchUserTool فوراً.
@@ -82,11 +82,6 @@ const prompt = ai.definePrompt({
 
 export async function smartSupportAssistant(input: z.infer<typeof SmartSupportAssistantInputSchema>) {
   try {
-    // التأكد من وجود مفتاح API قبل الاستدعاء
-    if (!process.env.GEMINI_API_KEY) {
-      return { assistantResponse: "مرحباً بك. المساعد الذكي يحتاج لضبط مفتاح الـ API في إعدادات السيرفر ليعمل بشكل صحيح." };
-    }
-
     const { output } = await prompt(input);
     
     if (!output || !output.assistantResponse) {
