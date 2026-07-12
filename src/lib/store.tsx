@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -87,6 +88,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
   const VAPID_KEY = "BDvYkX3Xq4u3U7YyH5R8E7J2p9G1L6M5K9S2W4X8Q7P1V6B3N5M8"; 
 
+  const getIconForService = (type: string, details: string) => {
+    const text = (type + (details || "")).toLowerCase();
+    if (text.includes("سيريتل") || text.includes("syriatel")) return "https://i.postimg.cc/9MwTgJxR/Screenshot-20260712-221408.png";
+    if (text.includes("mtn") || text.includes("ام تي ان")) return "https://i.postimg.cc/LXQfNGBF/Screenshot-20260712-221317.png";
+    if (text.includes("pubg") || text.includes("ببجي")) return "https://i.postimg.cc/Kz7cYTjq/Screenshot-20260712-221644.png";
+    if (text.includes("free") || text.includes("فري")) return "https://i.postimg.cc/HWPRyx5d/Screenshot-20260712-221757.png";
+    if (text.includes("bigo") || text.includes("بيجو")) return "https://i.postimg.cc/QxmBb2Xw/Screenshot-20260712-221513.png";
+    if (text.includes("tik") || text.includes("تيك")) return "https://i.postimg.cc/J0vR6523/Screenshot-20260712-224351.png";
+    if (text.includes("likee") || text.includes("لايكي")) return "https://i.postimg.cc/j2FjVbL5/Screenshot-20260712-224255.png";
+    if (text.includes("jawaker") || text.includes("جواكر")) return "https://i.postimg.cc/G2SRtjrQ/Screenshot-20260712-224536.png";
+    return "https://picsum.photos/seed/genie/200/200";
+  };
+
   const playNotificationSound = useCallback(() => {
     try {
       if (typeof Audio !== 'undefined') {
@@ -96,22 +110,21 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {}
   }, []);
 
-  const triggerNotification = useCallback(async (title: string, body: string) => {
+  const triggerNotification = useCallback(async (title: string, body: string, iconUrl?: string) => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       if (Notification.permission === "granted") {
         try {
-          // محاولة إظهار الإشعار عبر الـ Service Worker لضمان الظهور المرئي
           if ('serviceWorker' in navigator) {
             const registration = await navigator.serviceWorker.ready;
             await registration.showNotification(title, {
               body,
-              icon: "https://picsum.photos/seed/genie/200/200",
+              icon: iconUrl || "https://picsum.photos/seed/genie/200/200",
               badge: "https://picsum.photos/seed/genie/100/100",
               vibrate: [200, 100, 200],
               tag: 'shabik-notification'
             });
           } else {
-            new Notification(title, { body });
+            new Notification(title, { body, icon: iconUrl });
           }
           playNotificationSound();
         } catch (e) {
@@ -140,7 +153,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (messaging) {
           onMessage(messaging, (payload) => {
             if (payload.notification) {
-              triggerNotification(payload.notification.title || "تنبيه جديد", payload.notification.body || "");
+              triggerNotification(payload.notification.title || "تنبيه جديد", payload.notification.body || "", payload.notification.image || payload.notification.icon);
             }
           });
         }
@@ -195,14 +208,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (prevTransactionsRef.current.length > 0) {
         sorted.forEach(newTx => {
           const oldTx = prevTransactionsRef.current.find(p => p.id === newTx.id);
+          const serviceIcon = getIconForService(newTx.type, newTx.details || "");
           
           if (oldTx && oldTx.status === 'Pending' && newTx.status !== 'Pending') {
             const statusLabel = newTx.status === 'Completed' ? "مقبول ✅" : "مرفوض ❌";
-            triggerNotification(`تحديث الطلب: ${newTx.type}`, `حالة طلبك أصبحت: ${statusLabel}`);
+            triggerNotification(`تحديث الطلب: ${newTx.type}`, `حالة طلبك أصبحت: ${statusLabel}`, serviceIcon);
           } 
           else if (!oldTx && isAdminUser && newTx.status === 'Pending') {
             const typeLabel = newTx.type === 'إيداع محفظة' ? "طلب إيداع 💰" : "طلب شحن 🎮";
-            triggerNotification(`طلب جديد معلق`, `المستخدم ${newTx.userName || newTx.userPhone} أرسل ${typeLabel}.`);
+            triggerNotification(`طلب جديد معلق`, `المستخدم ${newTx.userName || newTx.userPhone} أرسل ${typeLabel}.`, serviceIcon);
           }
         });
       }
