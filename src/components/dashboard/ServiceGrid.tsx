@@ -54,7 +54,15 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
       colorClass: "text-green-600",
       icon: Gamepad2,
       items: [
-        { id: "pubg", name: "ببجي موبايل", filter: "PUBG", icon: Gamepad2, color: "text-green-600", bg: "bg-green-50" },
+        { 
+          id: "pubg", 
+          name: "ببجي موبايل", 
+          filter: "PUBG", 
+          icon: Gamepad2, 
+          color: "text-green-600", 
+          bg: "bg-green-50",
+          imageUrl: "https://i.postimg.cc/Kz7cYTjq/Screenshot-20260712-221644.png"
+        },
         { id: "freefire", name: "فري فاير", filter: "Free Fire", icon: Zap, color: "text-orange-600", bg: "bg-orange-50" },
         { id: "jawaker", name: "الجواكر", filter: "Jawaker", icon: Sword, color: "text-indigo-600", bg: "bg-indigo-50" },
       ]
