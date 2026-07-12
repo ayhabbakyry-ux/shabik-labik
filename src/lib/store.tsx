@@ -190,11 +190,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setAllUsers(allUsrs || []);
       }
 
+      // جلب كافة العمليات لضمان ظهور الإيداعات والشحن
       const currentTxs = isAdminUser 
         ? await getAllTransactionsAction() 
         : await getUserTransactionsAction(phoneClean);
 
-      const sorted = [...(currentTxs || [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      // الترتيب الصارم: الأحدث فوق دائماً بالاعتماد على ISOString
+      const sorted = [...(currentTxs || [])].sort((a, b) => b.date.localeCompare(a.date));
       
       if (prevTransactionsRef.current.length > 0) {
         sorted.forEach(newTx => {
@@ -207,6 +209,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
               triggerNotification(`تحديث حالة الطلب`, `طلبك (${newTx.type}) أصبح: ${statusLabel}`, serviceIcon);
             }
           } else {
+            // إشعار المدير عند وصول إيداع جديد
             if (isAdminUser) {
               triggerNotification(`طلب جديد 🚨`, `المستخدم ${newTx.userName || newTx.userPhone} أرسل طلباً جديداً: ${newTx.type}`, serviceIcon);
             } else {
