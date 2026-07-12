@@ -1,7 +1,8 @@
+
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
-// إعدادات الفايربيز الخاصة بمشروع شبيك لبيك
+// إعدادات الفايربيز للـ Service Worker
 const firebaseConfig = {
   apiKey: "AIzaSyBCpBxbVjDl9C8XvVFN18DV",
   authDomain: "studio-4603707742-d33ce.firebaseapp.com",
@@ -14,13 +15,13 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// استقبال الإشعارات في الخلفية
+// استقبال الإشعارات في الخلفية (عندما يكون المتصفح مغلقاً)
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
   const notificationTitle = payload.notification.title;
   const notificationOptions = {
     body: payload.notification.body,
-    icon: 'https://picsum.photos/seed/genie/200/200'
+    icon: '/favicon.ico'
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);

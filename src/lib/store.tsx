@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -85,28 +86,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
 
-  // VAPID Key (يجب استبداله بالمفتاح الحقيقي من كونسول الفايربيز ليعمل الإشعار)
+  // VAPID Key للمشروع
   const VAPID_KEY = "BDvYkX3Xq4u3U7YyH5R8E7J2p9G1L6M5K9S2W4X8Q7P1V6B3N5M8"; 
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const supported = 'Notification' in window && 'serviceWorker' in navigator;
-      setIsNotificationSupported(supported);
-      if (supported) {
-        setNotificationsEnabled(Notification.permission === 'granted');
-        
-        // تسجيل استقبال الإشعارات في المقدمة
-        if (messaging) {
-          onMessage(messaging, (payload) => {
-            console.log('Message received. ', payload);
-            if (payload.notification) {
-              triggerNotification(payload.notification.title || "تنبيه", payload.notification.body || "");
-            }
-          });
-        }
-      }
-    }
-  }, []);
 
   const playNotificationSound = useCallback(() => {
     try {
@@ -126,6 +107,26 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [playNotificationSound]);
 
+  // تهيئة الإشعارات عند التحميل
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const supported = 'Notification' in window && 'serviceWorker' in navigator;
+      setIsNotificationSupported(supported);
+      if (supported) {
+        setNotificationsEnabled(Notification.permission === 'granted');
+        
+        if (messaging) {
+          onMessage(messaging, (payload) => {
+            console.log('FCM Foreground Message received: ', payload);
+            if (payload.notification) {
+              triggerNotification(payload.notification.title || "تحديث الحالة", payload.notification.body || "");
+            }
+          });
+        }
+      }
+    }
+  }, [triggerNotification]);
+
   const requestNotificationPermission = useCallback(async () => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       const permission = await Notification.requestPermission();
@@ -135,17 +136,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         try {
           const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY });
           if (currentToken) {
-            console.log("FCM Registration Token:", currentToken);
-            // هنا يمكن إرسال التوكن للسيرفر لاحقاً
-          } else {
-            console.log('No registration token available. Request permission to generate one.');
+            console.log("FCM Device Registration Token:", currentToken);
           }
         } catch (err) {
-          console.log('An error occurred while retrieving token. ', err);
+          console.error('Error retrieving FCM token:', err);
         }
       }
     }
-  }, [messaging]);
+  }, []);
 
   const fetchCloudData = useCallback(async (phone: string) => {
     if (!phone) return;
@@ -159,31 +157,39 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (userDataRes.data.name) setUserName(userDataRes.data.name);
       }
 
+      let currentTxs: Transaction[] = [];
       if (isAdminUser) {
         const [allTxs, allReqs, allUsrs] = await Promise.all([
           getAllTransactionsAction(),
           getPasswordRequestsAction(),
           getAllUsersAction()
         ]);
-
         if (allUsrs) setAllUsers(allUsrs);
         if (allReqs) setPasswordRequests(allReqs);
-        if (allTxs) {
-          const sorted = [...allTxs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-          setTransactions(sorted as Transaction[]);
-          
-          const newOnes = sorted.filter(tx => tx.status === 'Pending' && !prevTransactionsRef.current.find(p => p.id === tx.id));
-          if (newOnes.length > 0) triggerNotification("تحديث جديد 🔔", "لديك طلبات معلقة بانتظار المعالجة.");
-          prevTransactionsRef.current = sorted as Transaction[];
-        }
+        currentTxs = (allTxs || []) as Transaction[];
       } else {
         const userTxs = await getUserTransactionsAction(phone.trim());
-        if (userTxs) {
-          const sorted = [...userTxs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-          setTransactions(sorted);
-          prevTransactionsRef.current = sorted;
-        }
+        currentTxs = (userTxs || []) as Transaction[];
       }
+
+      const sorted = [...currentTxs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      // نظام المراقبة الصارم لتغيير الحالات (Pending -> Completed/Rejected)
+      if (prevTransactionsRef.current.length > 0) {
+        sorted.forEach(newTx => {
+          const oldTx = prevTransactionsRef.current.find(p => p.id === newTx.id);
+          if (oldTx && oldTx.status === 'Pending' && newTx.status !== 'Pending') {
+            const statusMsg = newTx.status === 'Completed' ? "تم قبول طلبك بنجاح ✅" : "تم رفض طلبك، عاد الرصيد لمحفظتك ❌";
+            triggerNotification(`تحديث لطلب: ${newTx.type}`, statusMsg);
+          } else if (!oldTx && isAdminUser && newTx.status === 'Pending') {
+            triggerNotification("طلب جديد 🔔", `هناك طلب إيداع جديد من ${newTx.userName}`);
+          }
+        });
+      }
+
+      setTransactions(sorted);
+      prevTransactionsRef.current = sorted;
+
     } catch (err) {}
   }, [ADMIN_PHONE, triggerNotification]);
 
@@ -230,7 +236,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       pollingIntervalRef.current = setInterval(() => {
         fetchCloudData(userPhone);
         checkPendingOrders();
-      }, 20000); 
+      }, 15000); 
     }
     return () => { if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current); };
   }, [isLoggedIn, userPhone, fetchCloudData, checkPendingOrders]);
