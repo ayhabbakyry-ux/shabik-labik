@@ -38,9 +38,11 @@ export async function syncBalanceAction(phone: string, newBalance: number) {
 
 export async function recordTransactionAction(tx: Omit<Transaction, 'id'>) {
   try {
+    // التأكد من استخدام ISOString لضمان الترتيب الصحيح
     const docRef = await addDoc(collection(db, "transactions"), {
       ...tx,
       userPhone: tx.userPhone?.trim(),
+      date: tx.date || new Date().toISOString(),
       createdAt: new Date().toISOString()
     });
     return { success: true, id: docRef.id };
@@ -63,7 +65,8 @@ export async function getUserTransactionsAction(phone: string) {
       ...doc.data()
     })) as Transaction[];
     
-    return txs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // الترتيب الصارم: الأحدث فوق
+    return txs.sort((a, b) => b.date.localeCompare(a.date));
   } catch (error) {
     console.error("Fetch Txs Error:", error);
     return [];

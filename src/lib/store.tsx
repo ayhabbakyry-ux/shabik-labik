@@ -174,6 +174,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const isAdminUser = phoneClean === ADMIN_PHONE;
     
     try {
+      // 1. جلب بيانات الحساب
       const userDataRes = await getUserDataAction(phoneClean);
       if (userDataRes.success && userDataRes.data) {
         setUserBalance(userDataRes.data.balance || 0);
@@ -181,6 +182,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (userDataRes.data.name) setUserName(userDataRes.data.name);
       }
 
+      // 2. جلب الطلبات وكلمات المرور للمدير
       if (isAdminUser) {
         const [allReqs, allUsrs] = await Promise.all([
           getPasswordRequestsAction(),
@@ -190,30 +192,35 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setAllUsers(allUsrs || []);
       }
 
-      // جلب كافة العمليات لضمان ظهور الإيداعات والشحن
+      // 3. جلب كافة العمليات (شحن + إيداع)
+      // المدير يرى كل شيء، المستخدم يرى سجلاته فقط
       const currentTxs = isAdminUser 
         ? await getAllTransactionsAction() 
         : await getUserTransactionsAction(phoneClean);
 
-      // الترتيب الصارم: الأحدث فوق دائماً بالاعتماد على ISOString
+      // 4. الترتيب الصارم: الأحدث فوق دائماً بالاعتماد على ISOString
       const sorted = [...(currentTxs || [])].sort((a, b) => b.date.localeCompare(a.date));
       
+      // 5. منطق الإشعارات
       if (prevTransactionsRef.current.length > 0) {
         sorted.forEach(newTx => {
           const oldTx = prevTransactionsRef.current.find(p => p.id === newTx.id);
           const serviceIcon = getIconForService(newTx.type, newTx.details || "");
           
           if (oldTx) {
+            // تحديث حالة طلب موجود
             if (oldTx.status !== newTx.status) {
               const statusLabel = newTx.status === 'Completed' ? "مقبول ✅" : newTx.status === 'Rejected' ? "مرفوض ❌" : "قيد الانتظار ⏳";
               triggerNotification(`تحديث حالة الطلب`, `طلبك (${newTx.type}) أصبح: ${statusLabel}`, serviceIcon);
             }
           } else {
-            // إشعار المدير عند وصول إيداع جديد
+            // طلب جديد كلياً
             if (isAdminUser) {
+              // إشعار للمدير عن إيداع أو شحن جديد
               triggerNotification(`طلب جديد 🚨`, `المستخدم ${newTx.userName || newTx.userPhone} أرسل طلباً جديداً: ${newTx.type}`, serviceIcon);
             } else {
-              triggerNotification(`تأكيد إرسال الطلب`, `طلبك (${newTx.type}) قيد المراجعة الآن.`, serviceIcon);
+              // إشعار للزبون بتأكيد استلام طلبه
+              triggerNotification(`تأكيد إرسال الطلب`, `تم استلام طلبك (${newTx.type}) وهو قيد المراجعة الآن.`, serviceIcon);
             }
           }
         });
@@ -271,6 +278,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isLoggedIn && userPhone) {
+      // Polling كل 5 ثوانٍ لضمان وصول الإشعارات فوراً
       pollingIntervalRef.current = setInterval(() => fetchCloudData(userPhone), 5000);
     }
     return () => { if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current); };
@@ -284,6 +292,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setUserPhone(phoneClean);
       setUserName(adminData.name);
       localStorage.setItem('shabik_auth', JSON.stringify(adminData));
+      // ضمان وجود حساب المدير في الداتابيز
       await signUpAction(phoneClean, "المدير العام", ADMIN_PASS);
       await fetchCloudData(phoneClean, true);
       return { success: true, message: "أهلاً بك يا مدير." };
@@ -323,6 +332,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       balanceBefore: before,
       balanceAfter: newBal
     });
+    // تحديث فوري بعد الشحن
     await fetchCloudData(userPhone, true);
   };
 
@@ -337,6 +347,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       details: "طلب إيداع رصيد",
       proofImage
     });
+    // تحديث فوري بعد الإيداع لضمان ظهوره للزبون والمدير
     await fetchCloudData(userPhone, true);
   };
 
