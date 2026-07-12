@@ -9,14 +9,12 @@ import {
   getDocs, 
   addDoc, 
   updateDoc, 
-  doc,
-  orderBy,
-  limit
+  doc
 } from 'firebase/firestore';
 import { Transaction } from '@/lib/store';
 
 /**
- * @fileOverview محرك العمليات المالية السحابي - يضمن تسجيل كل ليرة في Firestore.
+ * @fileOverview محرك العمليات المالية السحابي - يضمن تسجيل كل ليرة في Firestore بدقة متناهية.
  */
 
 export async function syncBalanceAction(phone: string, newBalance: number) {
@@ -63,7 +61,6 @@ export async function getUserTransactionsAction(phone: string) {
       ...doc.data()
     })) as Transaction[];
     
-    // ترتيب يدوي لأن الفايربيز يحتاج Index للترتيب المعقد
     return txs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   } catch (error) {
     console.error("Fetch Txs Error:", error);
