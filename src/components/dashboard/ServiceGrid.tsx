@@ -65,7 +65,15 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
       icon: SmartphoneNfc,
       items: [
         { id: "tiktok", name: "تيك توك", filter: "TikTok", icon: SmartphoneNfc, color: "text-pink-600", bg: "bg-pink-50" },
-        { id: "bigo", name: "بيجو لايف", filter: "Bigo", icon: Radio, color: "text-teal-600", bg: "bg-teal-50" },
+        { 
+          id: "bigo", 
+          name: "بيجو لايف", 
+          filter: "Bigo", 
+          icon: Radio, 
+          color: "text-teal-600", 
+          bg: "bg-teal-50",
+          imageUrl: "https://i.postimg.cc/QxmBb2Xw/Screenshot-20260712-221513.png"
+        },
         { id: "likee", name: "لايكي", filter: "Likee", icon: SmartphoneNfc, color: "text-purple-600", bg: "bg-purple-50" },
       ]
     }
