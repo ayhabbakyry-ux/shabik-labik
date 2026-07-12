@@ -61,6 +61,7 @@ type UserContextType = {
   notificationsEnabled: boolean;
   isNotificationSupported: boolean;
   requestNotificationPermission: () => void;
+  refreshCloudData: () => Promise<void>;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -105,7 +106,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       if (typeof Audio !== 'undefined') {
         const audio = new Audio(NOTIFICATION_SOUND);
-        audio.play().catch((e) => console.log("Sound error:", e));
+        audio.play().catch(() => {});
       }
     } catch (e) {}
   }, []);
@@ -141,7 +142,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setIsNotificationSupported(supported);
       if (supported) {
         setNotificationsEnabled(Notification.permission === 'granted');
-        navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' }).catch(err => console.error('SW Failed:', err));
         if (messaging) {
           onMessage(messaging, (payload) => {
             if (payload.notification) {
@@ -174,7 +174,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const isAdminUser = phoneClean === ADMIN_PHONE;
     
     try {
-      // 1. جلب بيانات المستخدم
       const userDataRes = await getUserDataAction(phoneClean);
       if (userDataRes.success && userDataRes.data) {
         setUserBalance(userDataRes.data.balance || 0);
@@ -182,7 +181,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (userDataRes.data.name) setUserName(userDataRes.data.name);
       }
 
-      // 2. جلب بيانات الإدارة إذا كان المدير
       if (isAdminUser) {
         const [allReqs, allUsrs] = await Promise.all([
           getPasswordRequestsAction(),
@@ -192,33 +190,27 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setAllUsers(allUsrs || []);
       }
 
-      // 3. جلب المعاملات (جميعها للمدير، خاصة بالزبون للزبون)
       const currentTxs = isAdminUser 
         ? await getAllTransactionsAction() 
         : await getUserTransactionsAction(phoneClean);
 
       const sorted = [...(currentTxs || [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
-      // 4. نظام المراقبة والإشعارات الصارم
       if (prevTransactionsRef.current.length > 0) {
         sorted.forEach(newTx => {
           const oldTx = prevTransactionsRef.current.find(p => p.id === newTx.id);
           const serviceIcon = getIconForService(newTx.type, newTx.details || "");
           
           if (oldTx) {
-            // تحديث حالة موجودة مسبقاً
             if (oldTx.status !== newTx.status) {
               const statusLabel = newTx.status === 'Completed' ? "مقبول ✅" : newTx.status === 'Rejected' ? "مرفوض ❌" : "قيد الانتظار ⏳";
               triggerNotification(`تحديث حالة الطلب`, `طلبك (${newTx.type}) أصبح: ${statusLabel}`, serviceIcon);
             }
           } else {
-            // طلب جديد تماماً
             if (isAdminUser) {
-              // إشعار للمدير عن أي حركة جديدة في النظام
-              triggerNotification(`طلب جديد معلق 🚨`, `المستخدم ${newTx.userName || newTx.userPhone} أرسل طلباً جديداً (${newTx.type}).`, serviceIcon);
+              triggerNotification(`طلب جديد 🚨`, `المستخدم ${newTx.userName || newTx.userPhone} أرسل طلباً جديداً: ${newTx.type}`, serviceIcon);
             } else {
-              // إشعار للزبون بتأكيد إرسال طلبه
-              triggerNotification(`تم إرسال الطلب`, `طلبك (${newTx.type}) قيد المراجعة الآن.`, serviceIcon);
+              triggerNotification(`تأكيد إرسال الطلب`, `طلبك (${newTx.type}) قيد المراجعة الآن.`, serviceIcon);
             }
           }
         });
@@ -232,6 +224,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       isFetchingRef.current = false;
     }
   }, [ADMIN_PHONE, triggerNotification]);
+
+  const refreshCloudData = async () => {
+    if (userPhone) await fetchCloudData(userPhone, true);
+  };
 
   const checkPendingOrders = useCallback(async () => {
     if (!isLoggedIn || isCheckingOrders) return;
@@ -272,7 +268,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isLoggedIn && userPhone) {
-      pollingIntervalRef.current = setInterval(() => fetchCloudData(userPhone), 10000);
+      pollingIntervalRef.current = setInterval(() => fetchCloudData(userPhone), 5000);
     }
     return () => { if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current); };
   }, [isLoggedIn, userPhone, fetchCloudData]);
@@ -338,7 +334,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       details: "طلب إيداع رصيد",
       proofImage
     });
-    // تحديث قسري فور الإيداع لضمان ظهوره للزبون والمدير
     await fetchCloudData(userPhone, true);
   };
 
@@ -373,7 +368,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     <UserContext.Provider value={{ 
       isLoggedIn, isAdmin: userPhone === ADMIN_PHONE, userPhone, userName, userBalance, profileImage, transactions, allUsers, passwordRequests,
       login, register: signUpAction, logout, deductBalance, requestDeposit, adminAction, updateBalanceAdmin, deleteUser, requestReset, adminResetPassword,
-      changePassword, updateProfileImage, currency, checkPendingOrders, notificationsEnabled, isNotificationSupported, requestNotificationPermission
+      changePassword, updateProfileImage, currency, checkPendingOrders, notificationsEnabled, isNotificationSupported, requestNotificationPermission, refreshCloudData
     }}>
       {children}
     </UserContext.Provider>
