@@ -72,7 +72,15 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
           bg: "bg-orange-50",
           imageUrl: "https://i.postimg.cc/HWPRyx5d/Screenshot-20260712-221757.png"
         },
-        { id: "jawaker", name: "الجواكر", filter: "Jawaker", icon: Sword, color: "text-indigo-600", bg: "bg-indigo-50" },
+        { 
+          id: "jawaker", 
+          name: "الجواكر", 
+          filter: "Jawaker", 
+          icon: Sword, 
+          color: "text-indigo-600", 
+          bg: "bg-indigo-50",
+          imageUrl: "https://i.postimg.cc/G2SRtjrQ/Screenshot-20260712-224536.png"
+        },
       ]
     },
     {
