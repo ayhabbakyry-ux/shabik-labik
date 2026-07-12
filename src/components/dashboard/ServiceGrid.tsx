@@ -90,7 +90,15 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
           bg: "bg-teal-50",
           imageUrl: "https://i.postimg.cc/QxmBb2Xw/Screenshot-20260712-221513.png"
         },
-        { id: "likee", name: "لايكي", filter: "Likee", icon: SmartphoneNfc, color: "text-purple-600", bg: "bg-purple-50" },
+        { 
+          id: "likee", 
+          name: "لايكي", 
+          filter: "Likee", 
+          icon: SmartphoneNfc, 
+          color: "text-purple-600", 
+          bg: "bg-purple-50",
+          imageUrl: "https://i.postimg.cc/j2FjVbL5/Screenshot-20260712-224255.png"
+        },
       ]
     }
   ];
