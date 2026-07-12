@@ -19,7 +19,7 @@ import { Transaction } from '@/lib/store';
 
 export async function syncBalanceAction(phone: string, newBalance: number) {
   try {
-    const q = query(collection(db, "users"), where("phone", "==", phone));
+    const q = query(collection(db, "users"), where("phone", "==", phone.trim()));
     const querySnapshot = await getDocs(q);
     
     if (!querySnapshot.empty) {
@@ -40,6 +40,7 @@ export async function recordTransactionAction(tx: Omit<Transaction, 'id'>) {
   try {
     const docRef = await addDoc(collection(db, "transactions"), {
       ...tx,
+      userPhone: tx.userPhone?.trim(),
       createdAt: new Date().toISOString()
     });
     return { success: true, id: docRef.id };
@@ -51,9 +52,10 @@ export async function recordTransactionAction(tx: Omit<Transaction, 'id'>) {
 
 export async function getUserTransactionsAction(phone: string) {
   try {
+    const phoneClean = phone.trim();
     const q = query(
       collection(db, "transactions"), 
-      where("userPhone", "==", phone)
+      where("userPhone", "==", phoneClean)
     );
     const querySnapshot = await getDocs(q);
     const txs = querySnapshot.docs.map(doc => ({
