@@ -80,7 +80,15 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
       colorClass: "text-pink-600",
       icon: SmartphoneNfc,
       items: [
-        { id: "tiktok", name: "تيك توك", filter: "TikTok", icon: SmartphoneNfc, color: "text-pink-600", bg: "bg-pink-50" },
+        { 
+          id: "tiktok", 
+          name: "تيك توك", 
+          filter: "TikTok", 
+          icon: SmartphoneNfc, 
+          color: "text-pink-600", 
+          bg: "bg-pink-50",
+          imageUrl: "https://i.postimg.cc/J0vR6523/Screenshot-20260712-224351.png"
+        },
         { 
           id: "bigo", 
           name: "بيجو لايف", 
