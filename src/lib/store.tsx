@@ -26,6 +26,7 @@ export type Transaction = {
   amount: number;
   status: 'Pending' | 'Completed' | 'Rejected';
   date: string;
+  createdAt?: string;
   userName?: string;
   userPhone?: string;
   details?: string;
@@ -194,10 +195,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         ? await getAllTransactionsAction() 
         : await getUserTransactionsAction(phoneClean);
 
-      // الترتيب الصارم: الأحدث فوق دائماً
+      // الترتيب الصارم بنسبة 100%: الأحدث فوق دائماً بالاعتماد على ISOString
       const sorted = [...(currentTxs || [])].sort((a, b) => {
-        const dateA = a.date || "";
-        const dateB = b.date || "";
+        const dateA = a.createdAt || a.date || "";
+        const dateB = b.createdAt || b.date || "";
         return dateB.localeCompare(dateA);
       });
       
@@ -212,10 +213,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
               triggerNotification(`تحديث حالة الطلب`, `طلبك (${newTx.type}) أصبح: ${statusLabel}`, serviceIcon);
             }
           } else {
+            // تنبيه للمدير عند وجود طلب إيداع أو شحن جديد
             if (isAdminUser) {
               triggerNotification(`طلب جديد 🚨`, `المستخدم ${newTx.userName || newTx.userPhone} أرسل طلباً جديداً: ${newTx.type}`, serviceIcon);
-            } else {
-              triggerNotification(`تأكيد إرسال الطلب`, `تم استلام طلبك (${newTx.type}) بنجاح وهو قيد المراجعة.`, serviceIcon);
             }
           }
         });
@@ -273,6 +273,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isLoggedIn && userPhone) {
+      // مراقبة البيانات كل 5 ثوانٍ لضمان وصول الإيداعات والطلبات فوراً
       pollingIntervalRef.current = setInterval(() => fetchCloudData(userPhone), 5000);
     }
     return () => { if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current); };
@@ -311,6 +312,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const deductBalance = async (amount: number, productDetails: string, initialStatus: 'Pending' | 'Completed' = 'Completed', externalId?: string) => {
     const before = userBalance;
     const newBal = Math.max(0, userBalance - amount);
+    const now = new Date().toISOString();
     setUserBalance(newBal);
     await syncBalanceAction(userPhone, newBal);
     await recordTransactionAction({
@@ -318,7 +320,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       type: 'طلب شحن',
       amount,
       status: initialStatus,
-      date: new Date().toISOString(),
+      date: now,
+      createdAt: now,
       userName,
       userPhone,
       details: productDetails,
@@ -329,16 +332,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const requestDeposit = async (amount: number, proofImage: string) => {
+    const now = new Date().toISOString();
     await recordTransactionAction({
       type: 'إيداع محفظة',
       amount,
       status: 'Pending',
-      date: new Date().toISOString(),
+      date: now,
+      createdAt: now,
       userName,
       userPhone,
       details: "طلب إيداع رصيد",
       proofImage
     });
+    // تحديث فوري لضمان الظهور في السجلات
     await fetchCloudData(userPhone, true);
   };
 

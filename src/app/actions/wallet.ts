@@ -43,7 +43,8 @@ export async function recordTransactionAction(tx: Omit<Transaction, 'id'>) {
       ...tx,
       userPhone: tx.userPhone?.trim(),
       date: tx.date || now,
-      createdAt: now
+      createdAt: tx.createdAt || tx.date || now,
+      userName: tx.userName || "مستخدم"
     });
     return { success: true, id: docRef.id };
   } catch (error) {
@@ -65,8 +66,12 @@ export async function getUserTransactionsAction(phone: string) {
       ...doc.data()
     })) as Transaction[];
     
-    // الترتيب الصارم: الأحدث فوق دائماً
-    return txs.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    // الترتيب الصارم: الأحدث فوق دائماً بالاعتماد على ISOString
+    return txs.sort((a, b) => {
+      const dateA = a.createdAt || a.date || "";
+      const dateB = b.createdAt || b.date || "";
+      return dateB.localeCompare(dateA);
+    });
   } catch (error) {
     console.error("Fetch Txs Error:", error);
     return [];

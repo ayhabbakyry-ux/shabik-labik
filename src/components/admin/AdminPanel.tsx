@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useUser } from "@/lib/store";
@@ -23,14 +24,15 @@ export function AdminPanel() {
   const { 
     transactions, adminAction, currency, allUsers = [], deleteUser, 
     passwordRequests = [], adminResetPassword, notificationsEnabled, requestNotificationPermission,
-    updateBalanceAdmin
+    updateBalanceAdmin, refreshCloudData
   } = useUser();
   const { toast } = useToast();
 
   const [userSearch, setUserSearch] = useState("");
   const [balanceAdjustments, setBalanceAdjustments] = useState<Record<string, string>>({});
 
-  const pendingTxs = transactions?.filter(t => t.status === 'Pending' && t.type === 'إيداع محفظة') || [];
+  // جلب كافة الإيداعات المعلقة بدقة
+  const pendingTxs = transactions?.filter(t => t.status === 'Pending' && (t.type === 'إيداع محفظة' || t.type === 'طلب إيداع')) || [];
 
   const filteredUsers = allUsers.filter(u => 
     (u.name || "").toLowerCase().includes(userSearch.toLowerCase()) || 
@@ -85,11 +87,18 @@ export function AdminPanel() {
   return (
     <div className="space-y-6 w-full max-w-7xl mx-auto" dir="rtl">
       {/* Notifications Control */}
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center gap-4">
+        <Button 
+          onClick={refreshCloudData}
+          variant="outline"
+          className="rounded-2xl gap-2 font-bold shadow-sm"
+        >
+          <RefreshCw className="h-4 w-4" /> تحديث البيانات يدوياً
+        </Button>
         <Button 
           onClick={toggleNotifications}
           variant={notificationsEnabled ? "default" : "outline"}
-          className={`rounded-2xl gap-2 font-bold shadow-sm transition-all ${notificationsEnabled ? 'bg-green-600 hover:bg-green-700' : ''}`}
+          className={`rounded-2xl gap-2 font-bold shadow-sm transition-all ${notificationsEnabled ? 'bg-green-600 hover:bg-green-700 text-white' : ''}`}
         >
           {notificationsEnabled ? <BellRing className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
           {notificationsEnabled ? "تنبيهات الصوت نشطة" : "تفعيل تنبيهات الصوت"}
@@ -172,7 +181,7 @@ export function AdminPanel() {
                     )}
                     <div className="flex gap-2">
                       <Button variant="outline" className="flex-1 border-red-100 text-red-600 font-bold rounded-xl" onClick={() => handleAdminAction(tx.id, 'reject')}>رفض</Button>
-                      <Button className="flex-1 bg-green-600 hover:bg-green-700 font-bold rounded-xl" onClick={() => handleAdminAction(tx.id, 'approve')}>قبول</Button>
+                      <Button className="flex-1 bg-green-600 hover:bg-green-700 font-bold rounded-xl text-white" onClick={() => handleAdminAction(tx.id, 'approve')}>قبول</Button>
                     </div>
                   </div>
                 </CardContent>

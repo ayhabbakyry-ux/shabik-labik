@@ -33,7 +33,7 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { transactions, currency, checkPendingOrders } = useUser();
+  const { transactions, currency, checkPendingOrders, refreshCloudData } = useUser();
   const { toast } = useToast();
   
   const [currentTab, setCurrentTab] = useState<'orders' | 'notifications'>(initialTab);
@@ -53,6 +53,7 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
     try {
+      await refreshCloudData();
       await checkPendingOrders();
       toast({ 
         title: "تم التحديث", 
@@ -91,7 +92,14 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
     }
   };
 
-  const filteredTransactions = transactions.filter(tx => 
+  // ترتيب صارم بنسبة 100%: الأحدث فوق دائماً بالاعتماد على ISOString
+  const sortedTransactions = [...transactions].sort((a, b) => {
+    const dateA = a.createdAt || a.date || "";
+    const dateB = b.createdAt || b.date || "";
+    return dateB.localeCompare(dateA);
+  });
+
+  const filteredTransactions = sortedTransactions.filter(tx => 
     tx.type.includes(searchQuery) || 
     (tx.details || '').includes(searchQuery) || 
     tx.id.includes(searchQuery) ||
@@ -166,7 +174,7 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
                       <div className="p-4 flex justify-between items-start">
                         <div className="text-right space-y-1">
                           <p className="font-bold text-sm text-primary">{tx.type}</p>
-                          <p className="text-[10px] text-gray-400 font-mono">{formatDate(tx.date)}</p>
+                          <p className="text-[10px] text-gray-400 font-mono">{formatDate(tx.createdAt || tx.date)}</p>
                           <p className="text-[11px] text-gray-300 font-medium leading-relaxed">{tx.details}</p>
                           
                           {tx.balanceBefore !== undefined && (
