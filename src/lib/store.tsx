@@ -107,7 +107,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       if (typeof Audio !== 'undefined') {
         const audio = new Audio(NOTIFICATION_SOUND);
-        audio.play().catch(e => console.log("Sound play blocked:", e));
+        audio.play().catch(e => {
+          // Fallback for mobile devices that require user interaction
+          console.log("Audio playback deferred or blocked by mobile system");
+        });
       }
     } catch (e) {}
   }, []);
@@ -124,7 +127,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
               icon: iconUrl || "https://picsum.photos/seed/genie/200/200",
               badge: "https://picsum.photos/seed/genie/100/100",
               vibrate: [200, 100, 200],
-              tag: 'shabik-notification',
+              tag: 'shabik-notification-' + Date.now(),
               requireInteraction: true
             });
           } else {
@@ -146,13 +149,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (messaging) {
           onMessage(messaging, (payload) => {
             if (payload.notification) {
-              triggerNotification(payload.notification.title || "تنبيه جديد", payload.notification.body || "", payload.notification.image || payload.notification.icon);
+              const icon = payload.notification.image || payload.notification.icon || getIconForService(payload.notification.title || "", payload.notification.body || "");
+              triggerNotification(payload.notification.title || "تنبيه جديد", payload.notification.body || "", icon);
             }
           });
         }
       }
+
+      // Mobile fix: Refresh data when tab becomes visible
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible' && userPhone) {
+          fetchCloudData(userPhone, true);
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }
-  }, [triggerNotification]);
+  }, [triggerNotification, userPhone]);
 
   const requestNotificationPermission = useCallback(async () => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -175,7 +188,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const isAdminUser = phoneClean === ADMIN_PHONE;
     
     try {
-      // جلب بيانات المستخدم الأساسية
       const userDataRes = await getUserDataAction(phoneClean);
       if (userDataRes.success && userDataRes.data) {
         setUserBalance(userDataRes.data.balance || 0);
@@ -183,7 +195,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (userDataRes.data.name) setUserName(userDataRes.data.name);
       }
 
-      // إذا كان مديراً، جلب طلبات الاستعادة وقائمة المستخدمين
       if (isAdminUser) {
         const [allReqs, allUsrs] = await Promise.all([
           getPasswordRequestsAction(),
@@ -193,34 +204,29 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setAllUsers(allUsrs || []);
       }
 
-      // جلب كافة العمليات (شحن + إيداع)
       const currentTxsRaw = isAdminUser 
         ? await getAllTransactionsAction() 
         : await getUserTransactionsAction(phoneClean);
 
       const currentTxs = (currentTxsRaw || []) as Transaction[];
       
-      // ترتيب تنازلي صارم (الأحدث فوق)
       const sorted = [...currentTxs].sort((a, b) => {
-        const dateA = a.createdAt || a.date || "";
-        const dateB = b.createdAt || b.date || "";
+        const dateA = a.createdAt || a.date || "1970-01-01T00:00:00.000Z";
+        const dateB = b.createdAt || b.date || "1970-01-01T00:00:00.000Z";
         return dateB.localeCompare(dateA);
       });
       
-      // مراقبة العمليات الجديدة لإرسال إشعارات
       if (prevTransactionsRef.current.length > 0) {
         sorted.forEach(newTx => {
           const oldTx = prevTransactionsRef.current.find(p => p.id === newTx.id);
           const serviceIcon = getIconForService(newTx.type, newTx.details || "");
           
           if (oldTx) {
-            // تحديث حالة طلب موجود
             if (oldTx.status !== newTx.status) {
               const statusLabel = newTx.status === 'Completed' ? "مقبول ✅" : newTx.status === 'Rejected' ? "مرفوض ❌" : "قيد الانتظار ⏳";
               triggerNotification(`تحديث حالة الطلب`, `طلب ${newTx.type} أصبح: ${statusLabel}`, serviceIcon);
             }
           } else {
-            // طلب جديد تماماً
             if (isAdminUser && newTx.status === 'Pending') {
               triggerNotification(`طلب جديد 🚨`, `المستخدم ${newTx.userName || newTx.userPhone} أرسل طلباً جديداً: ${newTx.type}`, serviceIcon);
             } else if (!isAdminUser && newTx.userPhone === phoneClean) {
@@ -282,6 +288,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isLoggedIn && userPhone) {
+      // Shorter interval for active use, especially on mobile
       pollingIntervalRef.current = setInterval(() => fetchCloudData(userPhone), 5000);
     }
     return () => { if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current); };
@@ -336,6 +343,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       balanceBefore: before,
       balanceAfter: newBal
     });
+    // Immediate refresh after critical action
     await fetchCloudData(userPhone, true);
   };
 
