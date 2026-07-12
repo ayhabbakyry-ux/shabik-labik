@@ -194,6 +194,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         ? await getAllTransactionsAction() 
         : await getUserTransactionsAction(phoneClean);
 
+      // الترتيب الصارم: الأحدث فوق دائماً
       const sorted = [...(currentTxs || [])].sort((a, b) => {
         const dateA = a.date || "";
         const dateB = b.date || "";
@@ -214,7 +215,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             if (isAdminUser) {
               triggerNotification(`طلب جديد 🚨`, `المستخدم ${newTx.userName || newTx.userPhone} أرسل طلباً جديداً: ${newTx.type}`, serviceIcon);
             } else {
-              triggerNotification(`تأكيد إرسال الطلب`, `تم استلام طلبك (${newTx.type}) وهو قيد المراجعة الآن.`, serviceIcon);
+              triggerNotification(`تأكيد إرسال الطلب`, `تم استلام طلبك (${newTx.type}) بنجاح وهو قيد المراجعة.`, serviceIcon);
             }
           }
         });
