@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -97,17 +96,26 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {}
   }, []);
 
-  const triggerNotification = useCallback((title: string, body: string) => {
+  const triggerNotification = useCallback(async (title: string, body: string) => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       if (Notification.permission === "granted") {
         try {
-          new Notification(title, { 
-            body, 
-            icon: "https://picsum.photos/seed/genie/200/200",
-            badge: "https://picsum.photos/seed/genie/100/100"
-          });
+          // محاولة إظهار الإشعار عبر الـ Service Worker لضمان الظهور المرئي
+          if ('serviceWorker' in navigator) {
+            const registration = await navigator.serviceWorker.ready;
+            await registration.showNotification(title, {
+              body,
+              icon: "https://picsum.photos/seed/genie/200/200",
+              badge: "https://picsum.photos/seed/genie/100/100",
+              vibrate: [200, 100, 200],
+              tag: 'shabik-notification'
+            });
+          } else {
+            new Notification(title, { body });
+          }
           playNotificationSound();
         } catch (e) {
+          console.error("Notification display error:", e);
           playNotificationSound();
         }
       }

@@ -1,4 +1,3 @@
-
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
@@ -14,11 +13,13 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  const notificationTitle = payload.notification?.title || "تحديث من شبيك لبيك";
+  console.log('Received background message ', payload);
+  const notificationTitle = payload.notification.title || "تنبيه من شبيك لبيك";
   const notificationOptions = {
-    body: payload.notification?.body || "لديك تحديث جديد في حالة طلبك.",
-    icon: "https://picsum.photos/seed/genie/200/200",
-    badge: "https://picsum.photos/seed/genie/100/100"
+    body: payload.notification.body,
+    icon: 'https://picsum.photos/seed/genie/200/200',
+    badge: 'https://picsum.photos/seed/genie/100/100',
+    vibrate: [200, 100, 200]
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
