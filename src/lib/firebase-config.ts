@@ -1,9 +1,10 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getMessaging } from "firebase/messaging";
 
 /**
- * @fileOverview إعدادات الفايربيز الأساسية - تم حقن المفاتيح الحقيقية لضمان عمل السيرفر أونلاين وتخطي حظر سوريا.
+ * @fileOverview إعدادات الفايربيز الأساسية - تم تحديثها لدعم الإشعارات (Messaging).
  */
 
 const firebaseConfig = {
@@ -18,5 +19,6 @@ const firebaseConfig = {
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+const messaging = typeof window !== "undefined" ? getMessaging(app) : null;
 
-export { db, auth };
+export { db, auth, messaging, firebaseConfig };

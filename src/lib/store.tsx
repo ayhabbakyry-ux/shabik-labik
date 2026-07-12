@@ -15,6 +15,8 @@ import {
   updateUserBalanceDirectlyAction
 } from '@/app/actions/admin';
 import { changePasswordAction, updateProfileImageAction } from '@/app/actions/profile';
+import { messaging } from '@/lib/firebase-config';
+import { getToken, onMessage } from 'firebase/messaging';
 
 export type Transaction = {
   id: string;
@@ -83,12 +85,25 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
 
+  // VAPID Key (يجب استبداله بالمفتاح الحقيقي من كونسول الفايربيز ليعمل الإشعار)
+  const VAPID_KEY = "BDvYkX3Xq4u3U7YyH5R8E7J2p9G1L6M5K9S2W4X8Q7P1V6B3N5M8"; 
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const supported = 'Notification' in window && 'serviceWorker' in navigator;
       setIsNotificationSupported(supported);
       if (supported) {
         setNotificationsEnabled(Notification.permission === 'granted');
+        
+        // تسجيل استقبال الإشعارات في المقدمة
+        if (messaging) {
+          onMessage(messaging, (payload) => {
+            console.log('Message received. ', payload);
+            if (payload.notification) {
+              triggerNotification(payload.notification.title || "تنبيه", payload.notification.body || "");
+            }
+          });
+        }
       }
     }
   }, []);
@@ -111,13 +126,26 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [playNotificationSound]);
 
-  const requestNotificationPermission = useCallback(() => {
+  const requestNotificationPermission = useCallback(async () => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
-      Notification.requestPermission().then(permission => {
-        setNotificationsEnabled(permission === "granted");
-      });
+      const permission = await Notification.requestPermission();
+      setNotificationsEnabled(permission === "granted");
+      
+      if (permission === "granted" && messaging) {
+        try {
+          const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY });
+          if (currentToken) {
+            console.log("FCM Registration Token:", currentToken);
+            // هنا يمكن إرسال التوكن للسيرفر لاحقاً
+          } else {
+            console.log('No registration token available. Request permission to generate one.');
+          }
+        } catch (err) {
+          console.log('An error occurred while retrieving token. ', err);
+        }
+      }
     }
-  }, []);
+  }, [messaging]);
 
   const fetchCloudData = useCallback(async (phone: string) => {
     if (!phone) return;
