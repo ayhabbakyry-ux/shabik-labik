@@ -11,6 +11,7 @@ type ServiceItem = {
   icon: any;
   color: string;
   bg: string;
+  imageUrl?: string;
 };
 
 type Section = {
@@ -27,7 +28,15 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
       colorClass: "text-primary",
       icon: Phone,
       items: [
-        { id: "mtn_units", name: "إم تي إن وحدات", filter: "MTN", icon: Smartphone, color: "text-yellow-600", bg: "bg-yellow-50" },
+        { 
+          id: "mtn_units", 
+          name: "إم تي إن وحدات", 
+          filter: "MTN", 
+          icon: Smartphone, 
+          color: "text-yellow-600", 
+          bg: "bg-yellow-50",
+          imageUrl: "https://i.postimg.cc/LXQfNGBF/Screenshot-20260712-221317.png"
+        },
         { id: "syr_units", name: "سيريتل وحدات", filter: "Syriatel", icon: Smartphone, color: "text-red-600", bg: "bg-red-50" },
         { id: "elux", name: "ELUX", filter: "ELUX", icon: SmartphoneNfc, color: "text-blue-600", bg: "bg-blue-50" },
       ]
@@ -71,8 +80,12 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
               >
                 <Card className="hover:shadow-md transition-all cursor-pointer group active:scale-95 border-none bg-white overflow-hidden">
                   <CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-3">
-                    <div className={`w-20 h-20 rounded-full ${service.bg} flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner`}>
-                      <service.icon className={`h-10 w-10 ${service.color}`} />
+                    <div className={`w-20 h-20 rounded-full ${service.bg} flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner overflow-hidden`}>
+                      {service.imageUrl ? (
+                        <img src={service.imageUrl} alt={service.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <service.icon className={`h-10 w-10 ${service.color}`} />
+                      )}
                     </div>
                     <p className="text-[13px] font-bold leading-tight text-foreground group-hover:text-primary transition-colors">
                       {service.name}
