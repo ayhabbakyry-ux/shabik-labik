@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -85,8 +84,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
-
-  // VAPID Key للمشروع
   const VAPID_KEY = "BDvYkX3Xq4u3U7YyH5R8E7J2p9G1L6M5K9S2W4X8Q7P1V6B3N5M8"; 
 
   const playNotificationSound = useCallback(() => {
@@ -99,22 +96,40 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const triggerNotification = useCallback((title: string, body: string) => {
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === "granted") {
-      try {
-        new Notification(title, { body, icon: "https://picsum.photos/seed/genie/200/200" });
-        playNotificationSound();
-      } catch (e) {}
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === "granted") {
+        try {
+          new Notification(title, { 
+            body, 
+            icon: "https://picsum.photos/seed/genie/200/200",
+            badge: "https://picsum.photos/seed/genie/100/100"
+          });
+          playNotificationSound();
+        } catch (e) {
+          console.error("Native notification failed, fallback to sound only");
+          playNotificationSound();
+        }
+      }
     }
   }, [playNotificationSound]);
 
-  // تهيئة الإشعارات عند التحميل
+  // إعداد الإشعارات والـ Service Worker
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const supported = 'Notification' in window && 'serviceWorker' in navigator;
       setIsNotificationSupported(supported);
+      
       if (supported) {
         setNotificationsEnabled(Notification.permission === 'granted');
         
+        // تسجيل الـ Service Worker لضمان عمل الخلفية
+        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+          .then((registration) => {
+            console.log('Service Worker registered with scope:', registration.scope);
+          }).catch((err) => {
+            console.error('Service Worker registration failed:', err);
+          });
+
         if (messaging) {
           onMessage(messaging, (payload) => {
             console.log('FCM Foreground Message received: ', payload);
@@ -174,15 +189,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
       const sorted = [...currentTxs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
-      // نظام المراقبة الصارم لتغيير الحالات (Pending -> Completed/Rejected)
+      // نظام المراقبة الصارم لتغير الحالات (Trigger)
       if (prevTransactionsRef.current.length > 0) {
         sorted.forEach(newTx => {
           const oldTx = prevTransactionsRef.current.find(p => p.id === newTx.id);
+          // الحالة 1: تغير حالة طلب من الانتظار إلى مكتمل أو مرفوض
           if (oldTx && oldTx.status === 'Pending' && newTx.status !== 'Pending') {
             const statusMsg = newTx.status === 'Completed' ? "تم قبول طلبك بنجاح ✅" : "تم رفض طلبك، عاد الرصيد لمحفظتك ❌";
             triggerNotification(`تحديث لطلب: ${newTx.type}`, statusMsg);
-          } else if (!oldTx && isAdminUser && newTx.status === 'Pending') {
-            triggerNotification("طلب جديد 🔔", `هناك طلب إيداع جديد من ${newTx.userName}`);
+          } 
+          // الحالة 2: للمدير فقط - طلب إيداع جديد
+          else if (!oldTx && isAdminUser && newTx.status === 'Pending' && newTx.type === 'إيداع محفظة') {
+            triggerNotification("طلب إيداع جديد 🔔", `هناك طلب إيداع من ${newTx.userName} بقيمة ${newTx.amount}`);
           }
         });
       }
@@ -190,7 +208,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setTransactions(sorted);
       prevTransactionsRef.current = sorted;
 
-    } catch (err) {}
+    } catch (err) {
+      console.error("Sync Error:", err);
+    }
   }, [ADMIN_PHONE, triggerNotification]);
 
   const checkPendingOrders = useCallback(async () => {
@@ -206,8 +226,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (data.success && data.status) {
           const remote = String(data.status).toLowerCase().trim();
           let final: 'Completed' | 'Rejected' | null = null;
-          if (['accept', 'موافق', 'مقبول', 'نجاح'].includes(remote)) final = 'Completed';
-          else if (['reject', 'رفض'].includes(remote)) final = 'Rejected';
+          if (['accept', 'موافق', 'مقبول', 'نجاح', 'completed'].includes(remote)) final = 'Completed';
+          else if (['reject', 'رفض', 'rejected'].includes(remote)) final = 'Rejected';
           
           if (final) {
             await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
