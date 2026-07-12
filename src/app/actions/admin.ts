@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 
 /**
- * @fileOverview أفعال الإدارة السحابية - تنفيذ العمليات من جهة الخادم لضمان الأمان.
+ * @fileOverview أفعال الإدارة السحابية - تم توثيق جلب كافة العمليات لضمان عدم ضياع أي إيداع.
  */
 
 export async function getAllUsersAction() {
@@ -29,8 +29,11 @@ export async function getAllUsersAction() {
 
 export async function getAllTransactionsAction() {
   try {
+    // جلب كافة العمليات دون استثناء لضمان ظهور الإيداعات الجديدة في لوحة الإدارة
     const txSnap = await getDocs(collection(db, "transactions"));
-    return txSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+    const data = txSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+    console.log("Admin Action: Fetched total transactions:", data.length);
+    return data;
   } catch (error) {
     console.error("Admin: Fetch All Transactions Error", error);
     return [];

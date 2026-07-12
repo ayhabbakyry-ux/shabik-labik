@@ -133,6 +133,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         } catch (e) {
           playNotificationSound();
         }
+      } else {
+        playNotificationSound();
       }
     }
   }, [playNotificationSound]);
@@ -175,6 +177,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const isAdminUser = phoneClean === ADMIN_PHONE;
     
     try {
+      // 1. جلب بيانات المستخدم الأساسية
       const userDataRes = await getUserDataAction(phoneClean);
       if (userDataRes.success && userDataRes.data) {
         setUserBalance(userDataRes.data.balance || 0);
@@ -182,6 +185,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (userDataRes.data.name) setUserName(userDataRes.data.name);
       }
 
+      // 2. جلب بيانات الإدارة إذا كان المستخدم هو المدير
       if (isAdminUser) {
         const [allReqs, allUsrs] = await Promise.all([
           getPasswordRequestsAction(),
@@ -191,31 +195,40 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setAllUsers(allUsrs || []);
       }
 
-      const currentTxs = isAdminUser 
+      // 3. جلب العمليات (الكل للمدير، والخاصة للزبون)
+      const currentTxsRaw = isAdminUser 
         ? await getAllTransactionsAction() 
         : await getUserTransactionsAction(phoneClean);
 
-      // الترتيب الصارم بنسبة 100%: الأحدث فوق دائماً بالاعتماد على ISOString
-      const sorted = [...(currentTxs || [])].sort((a, b) => {
+      const currentTxs = currentTxsRaw || [];
+
+      // 4. الترتيب الصارم: الأحدث فوق دائماً
+      const sorted = [...currentTxs].sort((a, b) => {
         const dateA = a.createdAt || a.date || "";
         const dateB = b.createdAt || b.date || "";
         return dateB.localeCompare(dateA);
       });
       
+      // 5. مراقبة الإشعارات
       if (prevTransactionsRef.current.length > 0) {
         sorted.forEach(newTx => {
           const oldTx = prevTransactionsRef.current.find(p => p.id === newTx.id);
           const serviceIcon = getIconForService(newTx.type, newTx.details || "");
           
           if (oldTx) {
+            // تنبيه عند تغير الحالة للزبون والمدير
             if (oldTx.status !== newTx.status) {
               const statusLabel = newTx.status === 'Completed' ? "مقبول ✅" : newTx.status === 'Rejected' ? "مرفوض ❌" : "قيد الانتظار ⏳";
-              triggerNotification(`تحديث حالة الطلب`, `طلبك (${newTx.type}) أصبح: ${statusLabel}`, serviceIcon);
+              triggerNotification(`تحديث حالة الطلب`, `طلب ${newTx.type} أصبح: ${statusLabel}`, serviceIcon);
             }
           } else {
-            // تنبيه للمدير عند وجود طلب إيداع أو شحن جديد
+            // تنبيه للمدير عند وجود أي عملية جديدة في النظام
             if (isAdminUser) {
               triggerNotification(`طلب جديد 🚨`, `المستخدم ${newTx.userName || newTx.userPhone} أرسل طلباً جديداً: ${newTx.type}`, serviceIcon);
+            }
+            // تنبيه للزبون عند تسجيل طلبه بنجاح
+            if (!isAdminUser && newTx.userPhone === phoneClean) {
+              triggerNotification(`تم تسجيل طلبك`, `طلبك (${newTx.type}) قيد المراجعة الآن.`, serviceIcon);
             }
           }
         });
@@ -273,7 +286,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isLoggedIn && userPhone) {
-      // مراقبة البيانات كل 5 ثوانٍ لضمان وصول الإيداعات والطلبات فوراً
+      // مراقبة قسرية كل 5 ثوانٍ لضمان عدم ضياع أي طلب إيداع
       pollingIntervalRef.current = setInterval(() => fetchCloudData(userPhone), 5000);
     }
     return () => { if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current); };
@@ -344,7 +357,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       details: "طلب إيداع رصيد",
       proofImage
     });
-    // تحديث فوري لضمان الظهور في السجلات
+    // تحديث قسري فوري لضمان الظهور
     await fetchCloudData(userPhone, true);
   };
 
