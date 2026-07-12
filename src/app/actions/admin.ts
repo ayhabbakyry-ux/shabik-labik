@@ -29,7 +29,7 @@ export async function getAllUsersAction() {
 
 export async function getAllTransactionsAction() {
   try {
-    // جلب كافة العمليات دون استثناء لضمان ظهور الإيداعات الجديدة في لوحة الإدارة
+    // جلب كافة العمليات من قاعدة البيانات لضمان ظهور كافة الإيداعات والطلبات للمدير
     const txSnap = await getDocs(collection(db, "transactions"));
     const data = txSnap.docs.map(d => ({ ...d.data(), id: d.id }));
     console.log("Admin Action: Fetched total transactions:", data.length);

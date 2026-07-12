@@ -55,7 +55,7 @@ type UserContextType = {
   deleteUser: (phone: string) => Promise<void>;
   requestReset: (phone: string) => Promise<{ success: boolean; message: string }>;
   adminResetPassword: (phone: string, requestId: string) => Promise<void>;
-  changePassword: (currentPass: string, newPass: string) => Promise<{ success: boolean; message: string }>;
+  changePassword: (currentPass: string, namePass: string) => Promise<{ success: boolean; message: string }>;
   updateProfileImage: (imageData: string) => Promise<{ success: boolean; message?: string }>;
   currency: string;
   checkPendingOrders: () => Promise<void>;
@@ -175,6 +175,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const isAdminUser = phoneClean === ADMIN_PHONE;
     
     try {
+      // جلب بيانات المستخدم الأساسية
       const userDataRes = await getUserDataAction(phoneClean);
       if (userDataRes.success && userDataRes.data) {
         setUserBalance(userDataRes.data.balance || 0);
@@ -182,6 +183,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (userDataRes.data.name) setUserName(userDataRes.data.name);
       }
 
+      // إذا كان مديراً، جلب طلبات الاستعادة وقائمة المستخدمين
       if (isAdminUser) {
         const [allReqs, allUsrs] = await Promise.all([
           getPasswordRequestsAction(),
@@ -191,28 +193,34 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setAllUsers(allUsrs || []);
       }
 
+      // جلب كافة العمليات (شحن + إيداع)
       const currentTxsRaw = isAdminUser 
         ? await getAllTransactionsAction() 
         : await getUserTransactionsAction(phoneClean);
 
       const currentTxs = (currentTxsRaw || []) as Transaction[];
+      
+      // ترتيب تنازلي صارم (الأحدث فوق)
       const sorted = [...currentTxs].sort((a, b) => {
         const dateA = a.createdAt || a.date || "";
         const dateB = b.createdAt || b.date || "";
         return dateB.localeCompare(dateA);
       });
       
+      // مراقبة العمليات الجديدة لإرسال إشعارات
       if (prevTransactionsRef.current.length > 0) {
         sorted.forEach(newTx => {
           const oldTx = prevTransactionsRef.current.find(p => p.id === newTx.id);
           const serviceIcon = getIconForService(newTx.type, newTx.details || "");
           
           if (oldTx) {
+            // تحديث حالة طلب موجود
             if (oldTx.status !== newTx.status) {
               const statusLabel = newTx.status === 'Completed' ? "مقبول ✅" : newTx.status === 'Rejected' ? "مرفوض ❌" : "قيد الانتظار ⏳";
               triggerNotification(`تحديث حالة الطلب`, `طلب ${newTx.type} أصبح: ${statusLabel}`, serviceIcon);
             }
           } else {
+            // طلب جديد تماماً
             if (isAdminUser && newTx.status === 'Pending') {
               triggerNotification(`طلب جديد 🚨`, `المستخدم ${newTx.userName || newTx.userPhone} أرسل طلباً جديداً: ${newTx.type}`, serviceIcon);
             } else if (!isAdminUser && newTx.userPhone === phoneClean) {
