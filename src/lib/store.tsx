@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -90,7 +91,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       if (typeof Audio !== 'undefined') {
         const audio = new Audio(NOTIFICATION_SOUND);
-        audio.play().catch(() => {});
+        audio.play().catch((e) => console.log("Sound play error (interaction required):", e));
       }
     } catch (e) {}
   }, []);
@@ -106,14 +107,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           });
           playNotificationSound();
         } catch (e) {
-          console.error("Native notification failed, fallback to sound only");
           playNotificationSound();
         }
       }
     }
   }, [playNotificationSound]);
 
-  // إعداد الإشعارات والـ Service Worker
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const supported = 'Notification' in window && 'serviceWorker' in navigator;
@@ -122,19 +121,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (supported) {
         setNotificationsEnabled(Notification.permission === 'granted');
         
-        // تسجيل الـ Service Worker لضمان عمل الخلفية
-        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+        navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' })
           .then((registration) => {
-            console.log('Service Worker registered with scope:', registration.scope);
+            console.log('SW Registered:', registration.scope);
           }).catch((err) => {
-            console.error('Service Worker registration failed:', err);
+            console.error('SW Registration Failed:', err);
           });
 
         if (messaging) {
           onMessage(messaging, (payload) => {
-            console.log('FCM Foreground Message received: ', payload);
+            console.log('Foreground Push Received:', payload);
             if (payload.notification) {
-              triggerNotification(payload.notification.title || "تحديث الحالة", payload.notification.body || "");
+              triggerNotification(payload.notification.title || "تنبيه جديد", payload.notification.body || "");
             }
           });
         }
@@ -151,10 +149,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         try {
           const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY });
           if (currentToken) {
-            console.log("FCM Device Registration Token:", currentToken);
+            console.log("SUCCESS -> FCM Token Generated:", currentToken);
           }
         } catch (err) {
-          console.error('Error retrieving FCM token:', err);
+          console.error('Error generating token:', err);
         }
       }
     }
@@ -189,18 +187,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
       const sorted = [...currentTxs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
-      // نظام المراقبة الصارم لتغير الحالات (Trigger)
+      // نظام مراقبة الحالات الصارم (Status Triggers) لجميع الحالات (Pending, Completed, Rejected)
       if (prevTransactionsRef.current.length > 0) {
         sorted.forEach(newTx => {
           const oldTx = prevTransactionsRef.current.find(p => p.id === newTx.id);
-          // الحالة 1: تغير حالة طلب من الانتظار إلى مكتمل أو مرفوض
+          
+          // 1. مراقبة التغير من الانتظار إلى أي حالة نهائية (للمستخدم)
           if (oldTx && oldTx.status === 'Pending' && newTx.status !== 'Pending') {
-            const statusMsg = newTx.status === 'Completed' ? "تم قبول طلبك بنجاح ✅" : "تم رفض طلبك، عاد الرصيد لمحفظتك ❌";
-            triggerNotification(`تحديث لطلب: ${newTx.type}`, statusMsg);
+            const statusLabel = newTx.status === 'Completed' ? "مقبول ✅" : "مرفوض ❌";
+            triggerNotification(`تحديث الطلب: ${newTx.type}`, `حالة طلبك أصبحت: ${statusLabel}`);
           } 
-          // الحالة 2: للمدير فقط - طلب إيداع جديد
-          else if (!oldTx && isAdminUser && newTx.status === 'Pending' && newTx.type === 'إيداع محفظة') {
-            triggerNotification("طلب إيداع جديد 🔔", `هناك طلب إيداع من ${newTx.userName} بقيمة ${newTx.amount}`);
+          // 2. مراقبة طلبات الإيداع الجديدة (للمدير)
+          else if (!oldTx && isAdminUser && newTx.type === 'إيداع محفظة' && newTx.status === 'Pending') {
+            triggerNotification("طلب إيداع جديد 💰", `المستخدم ${newTx.userName || 'غير مسمى'} أرسل طلب إيداع جديد.`);
+          }
+          // 3. مراقبة طلبات الشحن الجديدة (للمدير)
+          else if (!oldTx && isAdminUser && newTx.type === 'طلب شحن' && newTx.status === 'Pending') {
+            triggerNotification("طلب شحن معلق 🎮", `هناك طلب شحن جديد يحتاج مراجعة.`);
           }
         });
       }
@@ -209,7 +212,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       prevTransactionsRef.current = sorted;
 
     } catch (err) {
-      console.error("Sync Error:", err);
+      console.error("Fetch Cloud Error:", err);
     }
   }, [ADMIN_PHONE, triggerNotification]);
 
@@ -226,8 +229,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (data.success && data.status) {
           const remote = String(data.status).toLowerCase().trim();
           let final: 'Completed' | 'Rejected' | null = null;
-          if (['accept', 'موافق', 'مقبول', 'نجاح', 'completed'].includes(remote)) final = 'Completed';
-          else if (['reject', 'رفض', 'rejected'].includes(remote)) final = 'Rejected';
+          if (['accept', 'موافق', 'مقبول', 'نجاح', 'completed', 'success'].includes(remote)) final = 'Completed';
+          else if (['reject', 'رفض', 'rejected', 'failed'].includes(remote)) final = 'Rejected';
           
           if (final) {
             await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);

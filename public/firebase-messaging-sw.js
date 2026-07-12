@@ -1,6 +1,8 @@
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
+import { initializeApp } from "firebase/app";
+import { getMessaging, onBackgroundMessage } from "firebase/messaging/sw";
+
+// إعدادات الفايربيز الموحدة لاستقبال إشعارات الخلفية
 const firebaseConfig = {
   apiKey: "AIzaSyBCpBxbVjDl9C8XvVFN18DV",
   authDomain: "studio-4603707742-d33ce.firebaseapp.com",
@@ -10,16 +12,18 @@ const firebaseConfig = {
   appId: "1:723678552538:web:579e6791a1211c7998e0e3"
 };
 
-firebase.initializeApp(firebaseConfig);
-const messaging = firebase.messaging();
+const app = initializeApp(firebaseConfig);
+const messaging = getMessaging(app);
 
-messaging.onBackgroundMessage((payload) => {
+// التعامل مع الإشعارات عندما يكون الموقع مغلقاً (Background)
+onBackgroundMessage(messaging, (payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
   const notificationTitle = payload.notification.title || 'تحديث من شبيك لبيك';
   const notificationOptions = {
-    body: payload.notification.body || 'لديك تحديث جديد في حالة طلبك.',
+    body: payload.notification.body || 'لديك تحديث جديد في حسابك.',
     icon: 'https://picsum.photos/seed/genie/200/200',
-    badge: 'https://picsum.photos/seed/genie/100/100'
+    badge: 'https://picsum.photos/seed/genie/100/100',
+    vibrate: [200, 100, 200]
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
