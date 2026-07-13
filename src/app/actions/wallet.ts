@@ -42,8 +42,8 @@ export async function recordTransactionAction(tx: Omit<Transaction, 'id'>) {
     const docRef = await addDoc(collection(db, "transactions"), {
       ...tx,
       userPhone: tx.userPhone?.trim(),
-      date: now, // ضمان صيغة ISO الموحدة للترتيب الصارم
-      createdAt: now,
+      date: tx.date || now,
+      createdAt: tx.createdAt || now, // ضمان صيغة ISO الموحدة للترتيب الصارم
       userName: tx.userName || "مستخدم"
     });
     return { success: true, id: docRef.id };
@@ -66,7 +66,6 @@ export async function getUserTransactionsAction(phone: string) {
       ...doc.data()
     })) as Transaction[];
     
-    // الترتيب الصارم هنا أيضاً لضمان وصول البيانات مرتبة للمتجر
     return txs.sort((a, b) => {
       const dateA = a.createdAt || a.date || "";
       const dateB = b.createdAt || b.date || "";
