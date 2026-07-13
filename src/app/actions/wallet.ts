@@ -14,7 +14,7 @@ import {
 import { Transaction } from '@/lib/store';
 
 /**
- * @fileOverview محرك العمليات المالية السحابي - يضمن تسجيل كل ليرة في Firestore بدقة متناهية.
+ * @fileOverview محرك العمليات المالية السحابي - يضمن تسجيل كل ليرة وتوقيت كل عملية بدقة ISO 8601.
  */
 
 export async function syncBalanceAction(phone: string, newBalance: number) {
@@ -42,8 +42,8 @@ export async function recordTransactionAction(tx: Omit<Transaction, 'id'>) {
     const docRef = await addDoc(collection(db, "transactions"), {
       ...tx,
       userPhone: tx.userPhone?.trim(),
-      date: tx.date || now,
-      createdAt: now, // ضمان تسجيل التوقيت العالمي للفرز الصارم
+      date: now, // ضمان صيغة ISO الموحدة للترتيب الصارم
+      createdAt: now,
       userName: tx.userName || "مستخدم"
     });
     return { success: true, id: docRef.id };
@@ -66,6 +66,7 @@ export async function getUserTransactionsAction(phone: string) {
       ...doc.data()
     })) as Transaction[];
     
+    // الترتيب الصارم هنا أيضاً لضمان وصول البيانات مرتبة للمتجر
     return txs.sort((a, b) => {
       const dateA = a.createdAt || a.date || "";
       const dateB = b.createdAt || b.date || "";

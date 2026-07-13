@@ -10,11 +10,12 @@ import {
   doc, 
   updateDoc, 
   deleteDoc, 
-  getDoc 
+  getDoc,
+  orderBy
 } from 'firebase/firestore';
 
 /**
- * @fileOverview أفعال الإدارة السحابية - تم توثيق جلب كافة العمليات لضمان عدم ضياع أي إيداع.
+ * @fileOverview أفعال الإدارة السحابية - مع جلب شامل للبيانات لضمان عدم ضياع أي إيداع زبون.
  */
 
 export async function getAllUsersAction() {
@@ -29,11 +30,9 @@ export async function getAllUsersAction() {
 
 export async function getAllTransactionsAction() {
   try {
-    // جلب كافة العمليات من قاعدة البيانات لضمان ظهور كافة الإيداعات والطلبات للمدير
+    // جلب كافة العمليات من Firestore لضمان ظهور كل شيء للمدير
     const txSnap = await getDocs(collection(db, "transactions"));
-    const data = txSnap.docs.map(d => ({ ...d.data(), id: d.id }));
-    console.log("Admin Action: Fetched total transactions:", data.length);
-    return data;
+    return txSnap.docs.map(d => ({ ...d.data(), id: d.id }));
   } catch (error) {
     console.error("Admin: Fetch All Transactions Error", error);
     return [];
@@ -46,20 +45,8 @@ export async function deleteUserAction(phone: string) {
     const snap = await getDocs(q);
     const deletions = snap.docs.map(d => deleteDoc(doc(db, "users", d.id)));
     await Promise.all(deletions);
-
-    const reqQ = query(collection(db, "password_requests"), where("phone", "==", phone));
-    const reqSnap = await getDocs(reqQ);
-    const reqDeletions = reqSnap.docs.map(d => deleteDoc(doc(db, "password_requests", d.id)));
-    await Promise.all(reqDeletions);
-
-    const txQ = query(collection(db, "transactions"), where("userPhone", "==", phone));
-    const txSnap = await getDocs(txQ);
-    const txDeletions = txSnap.docs.map(d => deleteDoc(doc(db, "transactions", d.id)));
-    await Promise.all(txDeletions);
-
     return { success: true };
   } catch (error) {
-    console.error("Admin: Delete User Error", error);
     return { success: false };
   }
 }
@@ -68,10 +55,10 @@ export async function processAdminAction(txId: string, action: 'approve' | 'reje
   try {
     const txRef = doc(db, "transactions", txId);
     const txSnap = await getDoc(txRef);
-    if (!txSnap.exists()) return { success: false, message: "العملية المطلوبة غير موجودة في النظام." };
+    if (!txSnap.exists()) return { success: false, message: "الطلب غير موجود." };
     
     const txData = txSnap.data();
-    if (txData.status !== 'Pending') return { success: false, message: "لقد تمت معالجة هذا الطلب مسبقاً." };
+    if (txData.status !== 'Pending') return { success: false, message: "تمت المعالجة مسبقاً." };
 
     if (action === 'approve') {
       const userQ = query(collection(db, "users"), where("phone", "==", txData.userPhone));
@@ -79,8 +66,7 @@ export async function processAdminAction(txId: string, action: 'approve' | 'reje
       if (!userSnap.empty) {
         const userDoc = userSnap.docs[0];
         const currentBalance = Number(userDoc.data().balance || 0);
-        const addedAmount = Number(txData.amount);
-        await updateDoc(doc(db, "users", userDoc.id), { balance: currentBalance + addedAmount });
+        await updateDoc(doc(db, "users", userDoc.id), { balance: currentBalance + Number(txData.amount) });
       }
       await updateDoc(txRef, { status: 'Completed' });
     } else {
@@ -88,23 +74,13 @@ export async function processAdminAction(txId: string, action: 'approve' | 'reje
     }
     return { success: true };
   } catch (error) {
-    console.error("Admin: Action Error", error);
-    return { success: false, message: "حدث خطأ أثناء معالجة الطلب." };
+    return { success: false };
   }
 }
 
 export async function updateTransactionStatusServer(orderId: string, status: 'Completed' | 'Rejected', amount: number, phone: string) {
   try {
     const txRef = doc(db, "transactions", orderId);
-    const txSnap = await getDoc(txRef);
-    
-    if (!txSnap.exists()) return { success: false, message: "الطلب غير موجود في السجلات." };
-    const txData = txSnap.data();
-    
-    if (txData.status !== 'Pending') {
-      return { success: false, message: "الطلب تمت معالجته مسبقاً." };
-    }
-
     await updateDoc(txRef, { status });
     
     if (status === 'Rejected') {
@@ -113,16 +89,11 @@ export async function updateTransactionStatusServer(orderId: string, status: 'Co
       if (!userSnap.empty) {
         const userDoc = userSnap.docs[0];
         const currentBal = Number(userDoc.data().balance || 0);
-        const refundAmt = Number(amount);
-        const restoredBalance = currentBal + refundAmt;
-        
-        await updateDoc(doc(db, "users", userDoc.id), { balance: restoredBalance });
-        return { success: true, newBalance: restoredBalance };
+        await updateDoc(doc(db, "users", userDoc.id), { balance: currentBal + amount });
       }
     }
     return { success: true };
   } catch (error) {
-    console.error("Server: Update Status Error", error);
     return { success: false };
   }
 }
@@ -172,11 +143,10 @@ export async function updateUserBalanceDirectlyAction(phone: string, amount: num
       const currentBalance = Number(userDoc.data().balance || 0);
       const newBalance = operation === 'add' ? currentBalance + amount : Math.max(0, currentBalance - amount);
       await updateDoc(doc(db, "users", userDoc.id), { balance: newBalance });
-      return { success: true, newBalance };
+      return { success: true };
     }
-    return { success: false, message: "المستخدم غير موجود" };
+    return { success: false };
   } catch (error) {
-    console.error("Admin: Update Balance Error", error);
     return { success: false };
   }
 }

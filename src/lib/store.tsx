@@ -105,12 +105,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const playNotificationSound = useCallback(() => {
     try {
-      if (typeof Audio !== 'undefined') {
-        const audio = new Audio(NOTIFICATION_SOUND);
-        audio.play().catch(e => {
-          console.log("Audio deferred: User interaction required");
-        });
-      }
+      const audio = new Audio(NOTIFICATION_SOUND);
+      audio.volume = 1.0;
+      audio.play().catch(() => console.log("Sound interaction deferred"));
     } catch (e) {}
   }, []);
 
@@ -124,17 +121,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             await registration.showNotification(title, {
               body,
               icon: iconUrl || "https://picsum.photos/seed/genie/200/200",
-              badge: "https://picsum.photos/seed/genie/100/100",
               vibrate: [200, 100, 200],
-              tag: 'shabik-notification-' + Date.now(),
-              requireInteraction: true
+              requireInteraction: true,
+              tag: 'shabik-' + Date.now()
             });
           } else {
             new Notification(title, { body, icon: iconUrl });
           }
-        } catch (e) {
-          console.error("Notification Error:", e);
-        }
+        } catch (e) {}
       }
     }
   }, [playNotificationSound]);
@@ -148,6 +142,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const isAdminUser = phoneClean === ADMIN_PHONE;
     
     try {
+      // جلب بيانات المستخدم الأساسية
       const userDataRes = await getUserDataAction(phoneClean);
       if (userDataRes.success && userDataRes.data) {
         setUserBalance(userDataRes.data.balance || 0);
@@ -155,49 +150,57 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (userDataRes.data.name) setUserName(userDataRes.data.name);
       }
 
+      // إذا كان مديراً، جلب كل شيء
       if (isAdminUser) {
-        const [allReqs, allUsrs] = await Promise.all([
+        const [allReqs, allUsrs, allTxs] = await Promise.all([
           getPasswordRequestsAction(),
-          getAllUsersAction()
+          getAllUsersAction(),
+          getAllTransactionsAction()
         ]);
         setPasswordRequests(allReqs || []);
         setAllUsers(allUsrs || []);
-      }
-
-      const currentTxsRaw = isAdminUser 
-        ? await getAllTransactionsAction() 
-        : await getUserTransactionsAction(phoneClean);
-
-      const currentTxs = (currentTxsRaw || []) as Transaction[];
-      
-      const sorted = [...currentTxs].sort((a, b) => {
-        const dateA = a.createdAt || a.date || "1970-01-01T00:00:00.000Z";
-        const dateB = b.createdAt || b.date || "1970-01-01T00:00:00.000Z";
-        return dateB.localeCompare(dateA);
-      });
-      
-      if (prevTransactionsRef.current.length > 0) {
-        sorted.forEach(newTx => {
-          const oldTx = prevTransactionsRef.current.find(p => p.id === newTx.id);
-          const serviceIcon = getIconForService(newTx.type, newTx.details || "");
-          
-          if (oldTx) {
-            if (oldTx.status !== newTx.status) {
-              const statusLabel = newTx.status === 'Completed' ? "مقبول ✅" : newTx.status === 'Rejected' ? "مرفوض ❌" : "قيد الانتظار ⏳";
-              triggerNotification(`تحديث حالة الطلب`, `طلب ${newTx.type} أصبح: ${statusLabel}`, serviceIcon);
-            }
-          } else {
-            if (isAdminUser && newTx.status === 'Pending') {
-              triggerNotification(`طلب جديد 🚨`, `المستخدم ${newTx.userName || newTx.userPhone} أرسل طلباً جديداً: ${newTx.type}`, serviceIcon);
-            } else if (!isAdminUser && newTx.userPhone === phoneClean) {
-              triggerNotification(`تم تسجيل طلبك`, `طلبك (${newTx.type}) قيد المراجعة الآن.`, serviceIcon);
-            }
-          }
+        
+        const sortedAll = (allTxs || []).sort((a: any, b: any) => {
+          const tA = a.createdAt || a.date || "";
+          const tB = b.createdAt || b.date || "";
+          return tB.localeCompare(tA);
         });
-      }
 
-      setTransactions(sorted);
-      prevTransactionsRef.current = sorted;
+        // فحص الإشعارات للمدير
+        if (prevTransactionsRef.current.length > 0) {
+          sortedAll.forEach((newTx: any) => {
+            const exists = prevTransactionsRef.current.some(p => p.id === newTx.id);
+            if (!exists && newTx.status === 'Pending') {
+              const icon = getIconForService(newTx.type, newTx.details || "");
+              triggerNotification(`طلب جديد 🚨`, `${newTx.userName || newTx.userPhone}: ${newTx.type}`, icon);
+            }
+          });
+        }
+        setTransactions(sortedAll);
+        prevTransactionsRef.current = sortedAll;
+      } else {
+        // للزبون العادي
+        const userTxs = await getUserTransactionsAction(phoneClean);
+        const sortedUser = (userTxs || []).sort((a: any, b: any) => {
+          const tA = a.createdAt || a.date || "";
+          const tB = b.createdAt || b.date || "";
+          return tB.localeCompare(tA);
+        });
+
+        // فحص الإشعارات للزبون
+        if (prevTransactionsRef.current.length > 0) {
+          sortedUser.forEach((newTx: any) => {
+            const oldTx = prevTransactionsRef.current.find(p => p.id === newTx.id);
+            if (oldTx && oldTx.status !== newTx.status) {
+              const statusLabel = newTx.status === 'Completed' ? "مقبول ✅" : newTx.status === 'Rejected' ? "مرفوض ❌" : "معلق";
+              const icon = getIconForService(newTx.type, newTx.details || "");
+              triggerNotification(`تحديث الحالة`, `طلبك (${newTx.type}) أصبح: ${statusLabel}`, icon);
+            }
+          });
+        }
+        setTransactions(sortedUser);
+        prevTransactionsRef.current = sortedUser;
+      }
     } catch (err) {
       console.error("Fetch Cloud Error:", err);
     } finally {
@@ -213,38 +216,21 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined') {
       const supported = 'Notification' in window && 'serviceWorker' in navigator;
       setIsNotificationSupported(supported);
-      if (supported) {
-        setNotificationsEnabled(Notification.permission === 'granted');
-        if (messaging) {
-          onMessage(messaging, (payload) => {
-            if (payload.notification) {
-              const icon = payload.notification.image || payload.notification.icon || getIconForService(payload.notification.title || "", payload.notification.body || "");
-              triggerNotification(payload.notification.title || "تنبيه جديد", payload.notification.body || "", icon);
-            }
-          });
-        }
-      }
-
-      // تحسين للأجهزة التي تعطل المهام في الخلفية (Samsung/Infinix)
-      const handleVisibilityChange = () => {
+      
+      const handleVisibility = () => {
         if (document.visibilityState === 'visible' && userPhone) {
           fetchCloudData(userPhone, true);
         }
       };
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.addEventListener('visibilitychange', handleVisibility);
+      return () => document.removeEventListener('visibilitychange', handleVisibility);
     }
-  }, [triggerNotification, userPhone, fetchCloudData]);
+  }, [userPhone, fetchCloudData]);
 
   const requestNotificationPermission = useCallback(async () => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       const permission = await Notification.requestPermission();
       setNotificationsEnabled(permission === "granted");
-      if (permission === "granted" && messaging) {
-        try {
-          await getToken(messaging, { vapidKey: VAPID_KEY });
-        } catch (err) {}
-      }
     }
   }, []);
 
@@ -295,12 +281,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const login = async (phone: string, password: string) => {
     const phoneClean = phone.trim();
     if (phoneClean === ADMIN_PHONE && password === ADMIN_PASS) {
-      const adminData = { phone: phoneClean, name: "المدير العام", balance: 0 };
+      const adminData = { phone: phoneClean, name: "المدير العام" };
       setIsLoggedIn(true);
       setUserPhone(phoneClean);
       setUserName(adminData.name);
       localStorage.setItem('shabik_auth', JSON.stringify(adminData));
-      await signUpAction(phoneClean, "المدير العام", ADMIN_PASS);
       await fetchCloudData(phoneClean, true);
       return { success: true, message: "أهلاً بك يا مدير." };
     }
@@ -320,12 +305,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setIsLoggedIn(false);
     setUserPhone("");
     localStorage.removeItem('shabik_auth');
+    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
   };
 
   const deductBalance = async (amount: number, productDetails: string, initialStatus: 'Pending' | 'Completed' = 'Completed', externalId?: string) => {
     const before = userBalance;
-    const newBal = Math.max(0, userBalance - amount);
     const now = new Date().toISOString();
+    const newBal = Math.max(0, userBalance - amount);
     setUserBalance(newBal);
     await syncBalanceAction(userPhone, newBal);
     await recordTransactionAction({
