@@ -194,7 +194,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setUserBalance(data.balance || 0);
         setProfileImage(data.profileImage || null);
       }
-    }, (err) => console.error("User Snapshot Error:", err));
+    }, (err) => {
+      console.error("User Snapshot Error:", err);
+      refreshCloudData();
+    });
     unsubscribes.push(unsubUser);
 
     let txQuery;
@@ -293,10 +296,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const now = new Date().toISOString();
     const newBal = Math.max(0, userBalance - amount);
     
-    // التحديث المحلي الفوري للواجهة
     setUserBalance(newBal);
     
-    // الخطوة الأولى: الحفظ في Firestore فوراً وبأعلى سرعة
     try {
       await recordTransactionAction({
         external_order_id: externalId || "",
@@ -315,11 +316,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error("Critical DB Error (Deduct):", e);
     }
-
-    // الخطوة الثانية: أي منطق إضافي معزول تماماً
-    try {
-      // هنا يمكن إضافة إشعارات أو توكن مستقبلاً بشكل آمن
-    } catch (s) {}
   };
 
   const requestDeposit = async (amount: number, proofImage: string) => {
@@ -338,14 +334,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         details: "طلب إيداع رصيد من المحفظة",
         proofImage
       });
-    } catch (dbError) {
+    } catch (dbError: any) {
+      alert("عطل في الفايربيز: " + (dbError.message || dbError));
       console.error("Critical DB Error (Deposit):", dbError);
     }
 
     // الخطوة الثانية: أي منطق إضافي للإشعارات أو التوكن معزول تماماً وتجاهل الأخطاء
     try {
       // منطق التوكن أو الصور هنا مستقبلاً لن يعطل الحفظ أعلاه
-    } catch (silentError) {
+    } catch (silentError: any) {
+      alert("عطل في التوكن: " + (silentError.message || silentError));
       // تجاهل بصمت لضمان نجاح العملية المالية على Samsung
     }
   };

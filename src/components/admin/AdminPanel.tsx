@@ -30,7 +30,6 @@ export function AdminPanel() {
   const [userSearch, setUserSearch] = useState("");
   const [balanceAdjustments, setBalanceAdjustments] = useState<Record<string, string>>({});
 
-  // آلية التحديث الدوري (Auto-Polling) كخطة بديلة قوية كل 15 ثانية
   useEffect(() => {
     const pollInterval = setInterval(() => {
       refreshCloudData();
@@ -238,7 +237,7 @@ export function AdminPanel() {
                 </TableHeader>
                 <TableBody>
                   {filteredUsers.map((user) => (
-                    <TableRow key={user.id}>
+                    <TableRow key={user.id || user.phone}>
                       <TableCell className="text-right font-bold py-4">
                         <p>{user.name}</p>
                         <p className="text-[10px] text-muted-foreground font-mono">{user.phone}</p>

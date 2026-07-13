@@ -1,10 +1,10 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { initializeFirestore, getFirestore } from "firebase/firestore";
+import { initializeFirestore, getFirestore, Firestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getMessaging } from "firebase/messaging";
 
 /**
- * @fileOverview إعدادات الفايربيز الأساسية - تم تثبيت خيار Long Polling حصرياً لحل مشاكل الاتصال في أجهزة الأندرويد ومنع تعارض الإعدادات.
+ * @fileOverview إعدادات الفايربيز الأساسية - تم تحسين التهيئة لمنع Internal Server Error.
  */
 
 const firebaseConfig = {
@@ -18,10 +18,15 @@ const firebaseConfig = {
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// استخدام experimentalForceLongPolling حصراً لمنع تعارض الإعدادات ولحل مشاكل Samsung/Infinix
-const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-});
+// تهيئة Firestore بطريقة تمنع تكرار التهيئة وتدعم أجهزة سامسونج
+let db: Firestore;
+try {
+  db = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+  });
+} catch (e) {
+  db = getFirestore(app);
+}
 
 const auth = getAuth(app);
 const messaging = typeof window !== "undefined" ? getMessaging(app) : null;
