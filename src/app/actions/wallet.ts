@@ -13,7 +13,7 @@ import {
 import { Transaction } from '@/lib/store';
 
 /**
- * @fileOverview محرك العمليات المالية السحابي - يضمن تسجيل كل ليرة وتوقيت كل عملية بدقة ISO 8601.
+ * @fileOverview محرك العمليات المالية السحابي - يضمن كشف الأخطاء الحقيقية بدلاً من انهيار السيرفر.
  */
 
 export async function syncBalanceAction(phone: string, newBalance: number) {
@@ -48,7 +48,7 @@ export async function recordTransactionAction(tx: Omit<Transaction, 'id'>) {
     return { success: true, id: docRef.id };
   } catch (error: any) {
     console.error("Critical Server Error (recordTransactionAction):", error);
-    // إرجاع الخطأ الحقيقي بدلاً من انهيار السيرفر
+    // إرجاع الخطأ الحقيقي بدلاً من انهيار السيرفر (500)
     return { success: false, error: error.message || String(error) };
   }
 }

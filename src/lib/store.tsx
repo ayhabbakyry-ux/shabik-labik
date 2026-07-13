@@ -94,7 +94,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
 
   const playNotificationSound = useCallback(() => {
-    if (!isAudioUnlocked) return;
+    if (typeof window === "undefined" || !isAudioUnlocked) return;
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
       audio.volume = 1.0;
@@ -103,6 +103,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [isAudioUnlocked]);
 
   const unlockAudio = () => {
+    if (typeof window === "undefined") return;
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
       audio.volume = 0;
@@ -113,9 +114,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const triggerNotification = useCallback((title: string, body: string) => {
+    if (typeof window === "undefined") return;
     try {
       playNotificationSound();
-      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === "granted") {
+      if ('Notification' in window && Notification.permission === "granted") {
         new Notification(title, { body });
       }
     } catch (e) {}
@@ -159,25 +161,29 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [isLoggedIn, userPhone]);
 
   useEffect(() => {
-    const saved = localStorage.getItem('shabik_auth');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      setIsLoggedIn(true);
-      setUserPhone(parsed.phone);
-      setUserName(parsed.name);
-    }
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      setIsNotificationSupported(true);
-      setNotificationsEnabled(Notification.permission === "granted");
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('shabik_auth');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setIsLoggedIn(true);
+        setUserPhone(parsed.phone);
+        setUserName(parsed.name);
+      }
+      if ('Notification' in window) {
+        setIsNotificationSupported(true);
+        setNotificationsEnabled(Notification.permission === "granted");
+      }
     }
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isLoggedIn) {
+      if (typeof document !== "undefined" && document.visibilityState === 'visible' && isLoggedIn) {
         refreshCloudData();
       }
     };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    if (typeof document !== "undefined") {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
   }, [isLoggedIn, refreshCloudData]);
 
   useEffect(() => {
@@ -272,7 +278,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setIsLoggedIn(true);
       setUserPhone(phoneClean);
       setUserName(adminData.name);
-      localStorage.setItem('shabik_auth', JSON.stringify(adminData));
+      if (typeof window !== "undefined") {
+        localStorage.setItem('shabik_auth', JSON.stringify(adminData));
+      }
       return { success: true, message: "مرحباً بك يا مدير." };
     }
     const result = await signInAction(phoneClean, password);
@@ -280,7 +288,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setIsLoggedIn(true);
       setUserPhone(result.user.phone);
       setUserName(result.user.name);
-      localStorage.setItem('shabik_auth', JSON.stringify(result.user));
+      if (typeof window !== "undefined") {
+        localStorage.setItem('shabik_auth', JSON.stringify(result.user));
+      }
     }
     return result;
   };
@@ -288,7 +298,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setIsLoggedIn(false);
     setUserPhone("");
-    localStorage.removeItem('shabik_auth');
+    if (typeof window !== "undefined") {
+      localStorage.removeItem('shabik_auth');
+    }
   };
 
   const deductBalance = async (amount: number, productDetails: string, initialStatus: 'Pending' | 'Completed' = 'Completed', externalId?: string) => {
@@ -312,19 +324,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         balanceBefore: before,
         balanceAfter: newBal
       });
-      if (!res.success) {
+      if (!res.success && typeof window !== "undefined") {
         alert("الخطأ الحقيقي من السيرفر هو: " + (res.error || "فشل غير معروف"));
       }
       await syncBalanceAction(userPhone, newBal);
     } catch (e: any) {
-      alert("عطل في الاتصال: " + e.message);
+      if (typeof window !== "undefined") {
+        alert("عطل في الاتصال: " + e.message);
+      }
     }
   };
 
   const requestDeposit = async (amount: number, proofImage: string) => {
     const now = new Date().toISOString();
     
-    // الخطوة الأولى والأساسية: محاولة الحفظ وكشف الخطأ
     try {
       const result = await recordTransactionAction({
         type: 'إيداع محفظة',
@@ -339,22 +352,27 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (!result.success) {
-        // إظهار الخطأ الحقيقي القادم من السيرفر فوراً
-        alert("الخطأ الحقيقي من السيرفر هو: " + result.error);
+        if (typeof window !== "undefined") {
+          alert("الخطأ الحقيقي من السيرفر هو: " + result.error);
+        }
         return;
       }
       
     } catch (error: any) {
-      alert("عطل فادح في الفايربيز: " + (error.message || error));
+      if (typeof window !== "undefined") {
+        alert("عطل فادح في الفايربيز: " + (error.message || error));
+      }
       console.error(error);
       return;
     }
 
-    // الخطوة الثانية: الإشعارات (معزولة وصامتة)
-    try {
-      // إشعار مستقبلي
-    } catch (tokenError: any) {
-      console.error("Token Alert Silenced:", tokenError.message);
+    // عزل كود الإشعارات لضمان عدم تعليق العملية على هواتف Samsung
+    if (typeof window !== "undefined") {
+      try {
+        // أي عمليات إضافية هنا
+      } catch (tokenError: any) {
+        console.error("Token Alert Silenced:", tokenError.message);
+      }
     }
   };
 
