@@ -7,7 +7,6 @@ import {
   query, 
   where, 
   onSnapshot, 
-  orderBy,
   doc,
   getDocs,
   limit
@@ -93,6 +92,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
 
+  // حماية الصوت من العمل على السيرفر
   const playNotificationSound = useCallback(() => {
     if (typeof window === "undefined" || !isAudioUnlocked) return;
     try {
@@ -113,6 +113,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {}
   };
 
+  // حماية الإشعارات من العمل على السيرفر
   const triggerNotification = useCallback((title: string, body: string) => {
     if (typeof window === "undefined") return;
     try {
@@ -173,21 +174,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setIsNotificationSupported(true);
         setNotificationsEnabled(Notification.permission === "granted");
       }
-    }
 
-    const handleVisibilityChange = () => {
-      if (typeof document !== "undefined" && document.visibilityState === 'visible' && isLoggedIn) {
-        refreshCloudData();
-      }
-    };
-    if (typeof document !== "undefined") {
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible' && isLoggedIn) {
+          refreshCloudData();
+        }
+      };
       document.addEventListener('visibilitychange', handleVisibilityChange);
       return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }
   }, [isLoggedIn, refreshCloudData]);
 
   useEffect(() => {
-    if (!isLoggedIn || !userPhone) return;
+    if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
 
     const unsubscribes: (() => void)[] = [];
     const phoneClean = userPhone.trim();
@@ -339,6 +338,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const now = new Date().toISOString();
     
     try {
+      // كتابة البيانات هي الخطوة الأولى والصارمة
       const result = await recordTransactionAction({
         type: 'إيداع محفظة',
         amount,
@@ -358,21 +358,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       
+      // عزل كود الإشعارات والتوكن لمنع الانهيار على أجهزة سامسونج
+      if (typeof window !== "undefined") {
+        try {
+          // أي منطق إضافي للتوكن يوضع هنا
+        } catch (tokenError: any) {
+          alert("عطل في التوكن: " + tokenError.message);
+        }
+      }
+      
     } catch (error: any) {
       if (typeof window !== "undefined") {
-        alert("عطل فادح في الفايربيز: " + (error.message || error));
+        alert("عطل في الفايربيز: " + error.message);
       }
       console.error(error);
-      return;
-    }
-
-    // عزل كود الإشعارات لضمان عدم تعليق العملية على هواتف Samsung
-    if (typeof window !== "undefined") {
-      try {
-        // أي عمليات إضافية هنا
-      } catch (tokenError: any) {
-        console.error("Token Alert Silenced:", tokenError.message);
-      }
     }
   };
 

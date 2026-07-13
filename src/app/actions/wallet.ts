@@ -48,7 +48,7 @@ export async function recordTransactionAction(tx: Omit<Transaction, 'id'>) {
     return { success: true, id: docRef.id };
   } catch (error: any) {
     console.error("Critical Server Error (recordTransactionAction):", error);
-    // إرجاع الخطأ الحقيقي بدلاً من انهيار السيرفر (500)
+    // إرجاع الخطأ الحقيقي بدلاً من انهيار السيرفر (500) لنكشفه على شاشة السامسونج
     return { success: false, error: error.message || String(error) };
   }
 }

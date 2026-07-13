@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useUser } from "@/lib/store";
@@ -238,7 +237,7 @@ export function AdminPanel() {
                 </TableHeader>
                 <TableBody>
                   {filteredUsers.map((user) => (
-                    <TableRow key={user.id || user.phone}>
+                    <TableRow key={user.id}>
                       <TableCell className="text-right font-bold py-4">
                         <p>{user.name}</p>
                         <p className="text-[10px] text-muted-foreground font-mono">{user.phone}</p>

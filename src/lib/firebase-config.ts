@@ -21,7 +21,7 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 let db: Firestore;
 if (typeof window !== "undefined") {
   try {
-    // تفعيل Long Polling حصرياً للمتصفح لضمان استقرار أجهزة سامسونج
+    // تفعيل Long Polling حصرياً للمتصفح لضمان استقرار أجهزة سامسونج ومنع انهيار السيرفر
     db = initializeFirestore(app, {
       experimentalForceLongPolling: true,
     });
