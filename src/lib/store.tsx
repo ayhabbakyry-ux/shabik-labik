@@ -97,7 +97,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
       audio.volume = 1.0;
-      audio.play().catch(() => console.log("Sound interaction deferred by browser policy"));
+      audio.play().catch(() => console.log("Audio deferred"));
     } catch (e) {}
   }, [isAudioUnlocked]);
 
@@ -107,8 +107,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       audio.volume = 0;
       audio.play().then(() => {
         setIsAudioUnlocked(true);
-        console.log("System Audio Unlocked");
-      }).catch(e => console.error("Audio Unlock Failed", e));
+      }).catch(e => console.error(e));
     } catch (e) {}
   };
 
@@ -148,19 +147,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const phoneClean = userPhone.trim();
     const isAdminUser = phoneClean === ADMIN_PHONE;
 
-    // 1. مراقب الرصيد
+    // 1. مراقب الرصيد والبروفايل
     const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
-    const unsubUser = onSnapshot(userQ, (snap) => {
+    unsubscribes.push(onSnapshot(userQ, (snap) => {
       if (!snap.empty) {
         const data = snap.docs[0].data();
         setUserBalance(data.balance || 0);
         setProfileImage(data.profileImage || null);
         if (data.name) setUserName(data.name);
       }
-    });
-    unsubscribes.push(unsubUser);
+    }));
 
-    // 2. مراقب العمليات - جلب شامل لضمان عدم اختفاء أي شيء
+    // 2. مراقب العمليات (Real-time الصارم)
     let txQuery;
     if (isAdminUser) {
       txQuery = query(collection(db, "transactions"), orderBy("createdAt", "desc"));
@@ -168,17 +166,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       txQuery = query(collection(db, "transactions"), where("userPhone", "==", phoneClean));
     }
 
-    const unsubTxs = onSnapshot(txQuery, (snap) => {
+    unsubscribes.push(onSnapshot(txQuery, (snap) => {
       const newTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
       
-      // ترتيب يدوي صارم بناءً على ISOString لضمان أعلى دقة
+      // الترتيب الصارم: الأحدث فوق
       newTxs.sort((a, b) => {
         const dateA = a.createdAt || a.date || "";
         const dateB = b.createdAt || b.date || "";
         return dateB.localeCompare(dateA);
       });
 
-      // منطق الإشعارات الفوري
+      // منطق الإشعارات الفوري عند التغيير
       if (prevTransactionsRef.current.length > 0) {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
@@ -186,7 +184,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             if (isAdminUser && tx.status === 'Pending') {
               triggerNotification("طلب إيداع جديد 💰", `من: ${tx.userName || tx.userPhone} بقيمة ${tx.amount}`);
             } else if (!isAdminUser && tx.userPhone === phoneClean) {
-              triggerNotification("تم تسجيل طلبك", `العملية ${tx.type} قيد المراجعة.`);
+              triggerNotification("تم استلام طلبك", `العملية ${tx.type} قيد المراجعة.`);
             }
           } else if (change.type === "modified") {
             const tx = change.doc.data() as Transaction;
@@ -200,19 +198,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       
       setTransactions(newTxs);
       prevTransactionsRef.current = newTxs;
-    });
-    unsubscribes.push(unsubTxs);
+    }));
 
     if (isAdminUser) {
-      const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
+      unsubscribes.push(onSnapshot(collection(db, "users"), (snap) => {
         setAllUsers(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      });
-      unsubscribes.push(unsubUsers);
+      }));
 
-      const unsubPass = onSnapshot(collection(db, "password_requests"), (snap) => {
+      unsubscribes.push(onSnapshot(collection(db, "password_requests"), (snap) => {
         setPasswordRequests(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      });
-      unsubscribes.push(unsubPass);
+      }));
     }
 
     return () => unsubscribes.forEach(unsub => unsub());
@@ -256,45 +251,40 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const now = new Date().toISOString();
     const newBal = Math.max(0, userBalance - amount);
     
-    // تسجيل العملية فوراً
+    // تحديث محلي فوري للسرعة
     setUserBalance(newBal);
-    try {
-      await syncBalanceAction(userPhone, newBal);
-      await recordTransactionAction({
-        external_order_id: externalId || "",
-        type: 'طلب شحن',
-        amount,
-        status: initialStatus,
-        date: now,
-        createdAt: now,
-        userName,
-        userPhone,
-        details: productDetails,
-        balanceBefore: before,
-        balanceAfter: newBal
-      });
-    } catch (e) {
-      console.error("Deduct Balance Error:", e);
-    }
+    
+    // تسجيل في الخلفية دون تعطيل الواجهة
+    syncBalanceAction(userPhone, newBal);
+    recordTransactionAction({
+      external_order_id: externalId || "",
+      type: 'طلب شحن',
+      amount,
+      status: initialStatus,
+      date: now,
+      createdAt: now,
+      userName,
+      userPhone,
+      details: productDetails,
+      balanceBefore: before,
+      balanceAfter: newBal
+    });
   };
 
   const requestDeposit = async (amount: number, proofImage: string) => {
     const now = new Date().toISOString();
-    try {
-      await recordTransactionAction({
-        type: 'إيداع محفظة',
-        amount,
-        status: 'Pending',
-        date: now,
-        createdAt: now,
-        userName,
-        userPhone,
-        details: "طلب إيداع رصيد من المحفظة",
-        proofImage
-      });
-    } catch (e) {
-      console.error("Deposit Error:", e);
-    }
+    // إرسال فوري دون انتظار أي توابع تقنية
+    recordTransactionAction({
+      type: 'إيداع محفظة',
+      amount,
+      status: 'Pending',
+      date: now,
+      createdAt: now,
+      userName,
+      userPhone,
+      details: "طلب إيداع رصيد من المحفظة",
+      proofImage
+    });
   };
 
   const adminAction = async (txId: string, action: 'approve' | 'reject') => {
@@ -335,8 +325,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshCloudData = async () => {
-    console.log("Forcing Data Sync for Mobile Stability...");
-    // onSnapshot handles real-time, but manual check ensures data consistency on resume
+    // onSnapshot يتكفل بالتزامن الفوري، هذه الدالة للتأكيد اليدوي إذا لزم الأمر
   };
 
   return (
@@ -353,6 +342,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
 export function useUser() {
   const context = useContext(UserContext);
-  if (context === undefined) throw new Error('useUser context is missing');
+  if (context === undefined) throw new Error('useUser missing');
   return context;
 }
