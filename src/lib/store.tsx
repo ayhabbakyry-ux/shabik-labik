@@ -16,8 +16,6 @@ import {
   updateUserBalanceDirectlyAction
 } from '@/app/actions/admin';
 import { changePasswordAction, updateProfileImageAction } from '@/app/actions/profile';
-import { messaging } from '@/lib/firebase-config';
-import { getToken, onMessage } from 'firebase/messaging';
 
 export type Transaction = {
   id: string;
@@ -88,7 +86,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
-  const VAPID_KEY = "BDvYkX3Xq4u3U7YyH5R8E7J2p9G1L6M5K9S2W4X8Q7P1V6B3N5M8"; 
 
   const getIconForService = (type: string, details: string) => {
     const text = (type + (details || "")).toLowerCase();
@@ -113,23 +110,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const triggerNotification = useCallback(async (title: string, body: string, iconUrl?: string) => {
     playNotificationSound();
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission === "granted") {
-        try {
-          if ('serviceWorker' in navigator) {
-            const registration = await navigator.serviceWorker.ready;
-            await registration.showNotification(title, {
-              body,
-              icon: iconUrl || "https://picsum.photos/seed/genie/200/200",
-              vibrate: [200, 100, 200],
-              requireInteraction: true,
-              tag: 'shabik-' + Date.now()
-            });
-          } else {
-            new Notification(title, { body, icon: iconUrl });
-          }
-        } catch (e) {}
-      }
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === "granted") {
+      new Notification(title, { body, icon: iconUrl || "https://picsum.photos/seed/genie/200/200" });
     }
   }, [playNotificationSound]);
 
@@ -142,7 +124,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const isAdminUser = phoneClean === ADMIN_PHONE;
     
     try {
-      // جلب بيانات المستخدم الأساسية
+      // 1. بيانات المستخدم
       const userDataRes = await getUserDataAction(phoneClean);
       if (userDataRes.success && userDataRes.data) {
         setUserBalance(userDataRes.data.balance || 0);
@@ -150,72 +132,60 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (userDataRes.data.name) setUserName(userDataRes.data.name);
       }
 
-      // إذا كان مديراً، جلب كل شيء
+      // 2. العمليات المالية (للمدير أو الزبون)
+      let allTxs: any[] = [];
       if (isAdminUser) {
-        const [allReqs, allUsrs, allTxs] = await Promise.all([
+        const [allReqs, allUsrs, transactions] = await Promise.all([
           getPasswordRequestsAction(),
           getAllUsersAction(),
           getAllTransactionsAction()
         ]);
         setPasswordRequests(allReqs || []);
         setAllUsers(allUsrs || []);
-        
-        const sortedAll = (allTxs || []).sort((a: any, b: any) => {
-          const tA = a.createdAt || a.date || "";
-          const tB = b.createdAt || b.date || "";
-          return tB.localeCompare(tA);
-        });
-
-        // فحص الإشعارات للمدير
-        if (prevTransactionsRef.current.length > 0) {
-          sortedAll.forEach((newTx: any) => {
-            const exists = prevTransactionsRef.current.some(p => p.id === newTx.id);
-            if (!exists && newTx.status === 'Pending') {
-              const icon = getIconForService(newTx.type, newTx.details || "");
-              triggerNotification(`طلب جديد 🚨`, `${newTx.userName || newTx.userPhone}: ${newTx.type}`, icon);
-            }
-          });
-        }
-        setTransactions(sortedAll);
-        prevTransactionsRef.current = sortedAll;
+        allTxs = transactions || [];
       } else {
-        // للزبون العادي
-        const userTxs = await getUserTransactionsAction(phoneClean);
-        const sortedUser = (userTxs || []).sort((a: any, b: any) => {
-          const tA = a.createdAt || a.date || "";
-          const tB = b.createdAt || b.date || "";
-          return tB.localeCompare(tA);
-        });
-
-        // فحص الإشعارات للزبون
-        if (prevTransactionsRef.current.length > 0) {
-          sortedUser.forEach((newTx: any) => {
-            const oldTx = prevTransactionsRef.current.find(p => p.id === newTx.id);
-            if (oldTx && oldTx.status !== newTx.status) {
-              const statusLabel = newTx.status === 'Completed' ? "مقبول ✅" : newTx.status === 'Rejected' ? "مرفوض ❌" : "معلق";
-              const icon = getIconForService(newTx.type, newTx.details || "");
-              triggerNotification(`تحديث الحالة`, `طلبك (${newTx.type}) أصبح: ${statusLabel}`, icon);
-            }
-          });
-        }
-        setTransactions(sortedUser);
-        prevTransactionsRef.current = sortedUser;
+        allTxs = await getUserTransactionsAction(phoneClean);
       }
+
+      // فرز صارم: الأحدث فوق دائماً
+      const sortedTxs = (allTxs || []).sort((a: any, b: any) => {
+        const tA = a.createdAt || a.date || "";
+        const tB = b.createdAt || b.date || "";
+        return tB.localeCompare(tA);
+      }) as Transaction[];
+
+      // فحص الإشعارات (اكتشاف الإيداعات الجديدة للمدير أو تحديثات الزبائن)
+      if (prevTransactionsRef.current.length > 0) {
+        sortedTxs.forEach((newTx) => {
+          const oldTx = prevTransactionsRef.current.find(p => p.id === newTx.id);
+          if (!oldTx && isAdminUser && newTx.status === 'Pending') {
+            // إشعار إيداع جديد للمدير
+            triggerNotification(`طلب إيداع جديد 💰`, `${newTx.userName || newTx.userPhone}: ${newTx.amount} ${currency}`, getIconForService(newTx.type, newTx.details || ""));
+          } else if (oldTx && oldTx.status !== newTx.status) {
+            // إشعار تغيير حالة للزبون
+            const statusLabel = newTx.status === 'Completed' ? "تم القبول ✅" : newTx.status === 'Rejected' ? "تم الرفض ❌" : "معلق";
+            triggerNotification(`تحديث الطلب`, `أصبح طلبك (${newTx.type}) في حالة: ${statusLabel}`, getIconForService(newTx.type, newTx.details || ""));
+          }
+        });
+      }
+
+      setTransactions(sortedTxs);
+      prevTransactionsRef.current = sortedTxs;
     } catch (err) {
-      console.error("Fetch Cloud Error:", err);
+      console.error("Critical Cloud Fetch Error:", err);
     } finally {
       isFetchingRef.current = false;
     }
-  }, [ADMIN_PHONE, triggerNotification]);
+  }, [ADMIN_PHONE, currency, triggerNotification]);
 
   const refreshCloudData = async () => {
     if (userPhone) await fetchCloudData(userPhone, true);
   };
 
+  // معالجة أجهزة Infinix/Samsung: تحديث عند عودة النشاط
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const supported = 'Notification' in window && 'serviceWorker' in navigator;
-      setIsNotificationSupported(supported);
+      setIsNotificationSupported('Notification' in window);
       
       const handleVisibility = () => {
         if (document.visibilityState === 'visible' && userPhone) {
@@ -226,6 +196,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       return () => document.removeEventListener('visibilitychange', handleVisibility);
     }
   }, [userPhone, fetchCloudData]);
+
+  // تحديث دوري احتياطي (Polling) كل 15 ثانية لضمان العمل في الخلفية
+  useEffect(() => {
+    if (isLoggedIn && userPhone) {
+      fetchCloudData(userPhone, true);
+      pollingIntervalRef.current = setInterval(() => fetchCloudData(userPhone), 15000);
+    }
+    return () => { if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current); };
+  }, [isLoggedIn, userPhone, fetchCloudData]);
 
   const requestNotificationPermission = useCallback(async () => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -259,24 +238,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
     setIsCheckingOrders(false);
   }, [isLoggedIn, isCheckingOrders, transactions, userPhone, fetchCloudData]);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('shabik_auth');
-    if (saved) {
-      const data = JSON.parse(saved);
-      setIsLoggedIn(true);
-      setUserPhone(data.phone);
-      setUserName(data.name);
-      fetchCloudData(data.phone, true);
-    }
-  }, [fetchCloudData]);
-
-  useEffect(() => {
-    if (isLoggedIn && userPhone) {
-      pollingIntervalRef.current = setInterval(() => fetchCloudData(userPhone), 5000);
-    }
-    return () => { if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current); };
-  }, [isLoggedIn, userPhone, fetchCloudData]);
 
   const login = async (phone: string, password: string) => {
     const phoneClean = phone.trim();
@@ -340,9 +301,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       createdAt: now,
       userName,
       userPhone,
-      details: "طلب إيداع رصيد",
+      details: "طلب إيداع رصيد من المحفظة",
       proofImage
     });
+    // تحديث قسري لضمان ظهور الطلب فوراً
     await fetchCloudData(userPhone, true);
   };
 
@@ -386,6 +348,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
 export function useUser() {
   const context = useContext(UserContext);
-  if (context === undefined) throw new Error('useUser error');
+  if (context === undefined) throw new Error('useUser context is missing');
   return context;
 }
