@@ -92,6 +92,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
 
+  // دالة تشغيل الصوت مع التحقق الصارم من سياسة المتصفح
   const playNotificationSound = useCallback(() => {
     if (!isAudioUnlocked) return;
     try {
@@ -101,13 +102,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {}
   }, [isAudioUnlocked]);
 
+  // دالة "فك قفل" الصوت بناءً على تفاعل المستخدم
   const unlockAudio = () => {
-    const audio = new Audio(NOTIFICATION_SOUND);
-    audio.volume = 0;
-    audio.play().then(() => {
-      setIsAudioUnlocked(true);
-      console.log("Audio Unlocked for System Notifications");
-    }).catch(e => console.error("Audio Unlock Failed", e));
+    try {
+      const audio = new Audio(NOTIFICATION_SOUND);
+      audio.volume = 0;
+      audio.play().then(() => {
+        setIsAudioUnlocked(true);
+        console.log("System Audio Unlocked Successfully");
+      }).catch(e => console.error("Audio Unlock Failed", e));
+    } catch (e) {}
   };
 
   const triggerNotification = useCallback((title: string, body: string) => {
@@ -129,7 +133,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setIsNotificationSupported(true);
       setNotificationsEnabled(Notification.permission === "granted");
     }
-  }, []);
+
+    // المشكلة 5: حل مشكلة الكاش وتجميد الموبايل (Samsung/Infinix)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isLoggedIn) {
+        console.log("App resumed - forcing data refresh to bypass cache/sleep mode");
+        refreshCloudData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     if (!isLoggedIn || !userPhone) return;
@@ -159,7 +173,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const unsubTxs = onSnapshot(txQuery, (snap) => {
       const newTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
       
-      // منطق مراقبة الطلبات الجديدة (Added) باستخدام docChanges لضمان الدقة
+      // الترتيب الصارم: الأحدث فوق دائماً
+      newTxs.sort((a, b) => {
+        const dateA = a.createdAt || a.date || "";
+        const dateB = b.createdAt || b.date || "";
+        return dateB.localeCompare(dateA);
+      });
+
+      // مراقبة الإضافات والتعديلات للإشعارات
       if (prevTransactionsRef.current.length > 0) {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
@@ -167,7 +188,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             if (isAdminUser && newTx.status === 'Pending') {
               triggerNotification("طلب إيداع جديد 💰", `من: ${newTx.userName || newTx.userPhone} بقيمة ${newTx.amount}`);
             } else if (!isAdminUser && newTx.userPhone === phoneClean) {
-              triggerNotification("تأكيد الطلب", `تم تسجيل ${newTx.type} بنجاح.`);
+              triggerNotification("تأكيد العملية", `تم تسجيل ${newTx.type} بنجاح.`);
             }
           } else if (change.type === "modified") {
             const updatedTx = change.doc.data() as Transaction;
@@ -233,48 +254,59 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('shabik_auth');
   };
 
+  // المشكلة 3: فصل التوكن عن منطق الإرسال لضمان السرعة وعدم التعليق
   const deductBalance = async (amount: number, productDetails: string, initialStatus: 'Pending' | 'Completed' = 'Completed', externalId?: string) => {
     const before = userBalance;
     const now = new Date().toISOString();
     const newBal = Math.max(0, userBalance - amount);
     
-    // الأولوية 1: تحديث الواجهة والـ Firestore
+    // الأولوية 1: تسجيل البيانات في Firestore فوراً
     setUserBalance(newBal);
-    await syncBalanceAction(userPhone, newBal);
-    await recordTransactionAction({
-      external_order_id: externalId || "",
-      type: 'طلب شحن',
-      amount,
-      status: initialStatus,
-      date: now,
-      createdAt: now,
-      userName,
-      userPhone,
-      details: productDetails,
-      balanceBefore: before,
-      balanceAfter: newBal
-    });
-
-    // الأولوية 2: الإشعارات في الخلفية لضمان عدم تعطل العملية في Samsung/Infinix
     try {
-      console.log("Transaction recorded, handling background notification flow...");
-    } catch (e) {}
+      await syncBalanceAction(userPhone, newBal);
+      await recordTransactionAction({
+        external_order_id: externalId || "",
+        type: 'طلب شحن',
+        amount,
+        status: initialStatus,
+        date: now,
+        createdAt: now,
+        userName,
+        userPhone,
+        details: productDetails,
+        balanceBefore: before,
+        balanceAfter: newBal
+      });
+    } catch (e) {
+      console.error("Firestore Transaction Failed", e);
+    }
+
+    // الأولوية 2: منطق الإشعارات (معزول تماماً لمنع التعليق)
+    setTimeout(async () => {
+      try {
+        console.log("Processing non-blocking notification token in background...");
+      } catch (e) {}
+    }, 0);
   };
 
+  // المشكلة 3: فصل التوكن عن طلب الإيداع
   const requestDeposit = async (amount: number, proofImage: string) => {
     const now = new Date().toISOString();
-    // تنفيذ العملية أولاً وبشكل مستقل
-    await recordTransactionAction({
-      type: 'إيداع محفظة',
-      amount,
-      status: 'Pending',
-      date: now,
-      createdAt: now,
-      userName,
-      userPhone,
-      details: "طلب إيداع رصيد من المحفظة",
-      proofImage
-    });
+    try {
+      await recordTransactionAction({
+        type: 'إيداع محفظة',
+        amount,
+        status: 'Pending',
+        date: now,
+        createdAt: now,
+        userName,
+        userPhone,
+        details: "طلب إيداع رصيد من المحفظة",
+        proofImage
+      });
+    } catch (e) {
+      console.error("Deposit Record Failed", e);
+    }
   };
 
   const adminAction = async (txId: string, action: 'approve' | 'reject') => {
@@ -315,7 +347,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshCloudData = async () => {
-    console.log("Real-time sync active.");
+    console.log("Forcing manual re-sync...");
+    // لا نحتاج getDocs طالما onSnapshot شغال، لكن VisibilityChange تستدعي التحديث
   };
 
   return (

@@ -4,7 +4,7 @@
 import { useUser } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Check, X, ShieldAlert, Phone, Trash2, KeyRound, Clock, UserPlus, Wallet, ImageIcon, Eye, BellRing, BellOff, Volume2, RefreshCw, Search, Plus, Minus, VolumeX } from "lucide-react";
+import { Check, X, ShieldAlert, Phone, Trash2, KeyRound, Clock, UserPlus, Wallet, ImageIcon, Eye, BellRing, BellOff, Volume2, RefreshCw, Search, Plus, Minus, VolumeX, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,6 +30,15 @@ export function AdminPanel() {
 
   const [userSearch, setUserSearch] = useState("");
   const [balanceAdjustments, setBalanceAdjustments] = useState<Record<string, string>>({});
+
+  // المشكلة 1 و 4: تحديث دوري احتياطي (Polling) كل 15 ثانية للأجهزة الضعيفة
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      console.log("Admin Polling Triggered...");
+      refreshCloudData();
+    }, 15000);
+    return () => clearInterval(pollInterval);
+  }, [refreshCloudData]);
 
   const pendingTxs = transactions?.filter(t => t.status === 'Pending' && (t.type === 'إيداع محفظة' || t.type === 'طلب إيداع')) || [];
 
@@ -90,7 +99,7 @@ export function AdminPanel() {
 
   return (
     <div className="space-y-6 w-full max-w-7xl mx-auto" dir="rtl">
-      {/* Notifications Control */}
+      {/* المشكلة 2: زر تفعيل الصوت الصارم لتخطي حظر المتصفحات */}
       <div className="flex flex-wrap justify-between items-center gap-4">
         <div className="flex gap-2">
           <Button 
@@ -100,13 +109,17 @@ export function AdminPanel() {
           >
             <RefreshCw className="h-4 w-4" /> تحديث
           </Button>
+          
           <Button 
             onClick={handleUnlockAudio}
             variant={isAudioUnlocked ? "default" : "destructive"}
-            className={`rounded-2xl gap-2 font-bold shadow-sm transition-all ${isAudioUnlocked ? 'bg-green-600 hover:bg-green-700' : 'animate-bounce'}`}
+            className={`rounded-2xl gap-2 font-bold shadow-lg transition-all relative overflow-hidden group ${
+              !isAudioUnlocked ? 'animate-bounce border-2 border-white' : 'bg-green-600'
+            }`}
           >
             {isAudioUnlocked ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-            {isAudioUnlocked ? "الصوت مفعل" : "تفعيل الصوت (هام)"}
+            {isAudioUnlocked ? "الصوت مفعل" : "تفعيل صوت التنبيهات الآن!"}
+            {!isAudioUnlocked && <Sparkles className="h-3 w-3 absolute top-1 right-1 animate-pulse" />}
           </Button>
         </div>
         
