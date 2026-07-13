@@ -121,7 +121,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [playNotificationSound]);
 
-  // مزامنة يدوية قسرية للأجهزة التي تقتل المستمعات الفورية
   const refreshCloudData = useCallback(async () => {
     if (!isLoggedIn || !userPhone) return;
     
@@ -129,7 +128,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const phoneClean = userPhone.trim();
       const isAdminUser = phoneClean === ADMIN_PHONE;
       
-      // جلب يدوي للبيانات كخطة بديلة
       const userQ = query(collection(db, "users"), where("phone", "==", phoneClean), limit(1));
       const userSnap = await getDocs(userQ);
       if (!userSnap.empty) {
@@ -166,7 +164,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setNotificationsEnabled(Notification.permission === "granted");
     }
 
-    // أهم جزء لأجهزة سامسونج وإنفينيكس: إعادة المزامنة عند عودة المستخدم للتطبيق
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && isLoggedIn) {
         refreshCloudData();
@@ -183,18 +180,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const phoneClean = userPhone.trim();
     const isAdminUser = phoneClean === ADMIN_PHONE;
 
-    // 1. مراقب الرصيد والبروفايل
     const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
-    unsubscribes.push(onSnapshot(userQ, (snap) => {
+    const unsubUser = onSnapshot(userQ, (snap) => {
       if (!snap.empty) {
         const data = snap.docs[0].data();
         setUserBalance(data.balance || 0);
         setProfileImage(data.profileImage || null);
         if (data.name) setUserName(data.name);
       }
-    }));
+    }, (error) => console.error("User Snapshot Error:", error));
+    unsubscribes.push(unsubUser);
 
-    // 2. مراقب العمليات (Real-time الفوري الصارم)
     let txQuery;
     if (isAdminUser) {
       txQuery = query(collection(db, "transactions"), orderBy("createdAt", "desc"), limit(100));
@@ -202,17 +198,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       txQuery = query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"), limit(50));
     }
 
-    unsubscribes.push(onSnapshot(txQuery, (snap) => {
+    const unsubTxs = onSnapshot(txQuery, (snap) => {
       const newTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
       
-      // الترتيب الصارم: الأحدث فوق باستخدام مقارنة النصوص ISO
       newTxs.sort((a, b) => {
         const dateA = a.createdAt || a.date || "";
         const dateB = b.createdAt || b.date || "";
         return dateB.localeCompare(dateA);
       });
 
-      // منطق الإشعارات الفوري - يتجاهل أول جلب للبيانات
       if (!isInitialLoad.current) {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
@@ -235,20 +229,25 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setTransactions(newTxs);
       prevTransactionsRef.current = newTxs;
       isInitialLoad.current = false;
-    }));
+    }, (error) => console.error("Tx Snapshot Error:", error));
+    unsubscribes.push(unsubTxs);
 
     if (isAdminUser) {
-      unsubscribes.push(onSnapshot(collection(db, "users"), (snap) => {
+      const unsubAllUsers = onSnapshot(collection(db, "users"), (snap) => {
         setAllUsers(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      }));
+      }, (error) => console.error("All Users Snapshot Error:", error));
+      unsubscribes.push(unsubAllUsers);
 
-      unsubscribes.push(onSnapshot(collection(db, "password_requests"), (snap) => {
+      const unsubPass = onSnapshot(collection(db, "password_requests"), (snap) => {
         setPasswordRequests(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      }));
+      }, (error) => console.error("Pass Requests Snapshot Error:", error));
+      unsubscribes.push(unsubPass);
     }
 
     return () => {
-      unsubscribes.forEach(unsub => unsub());
+      unsubscribes.forEach(unsub => {
+        try { unsub(); } catch (e) {}
+      });
       isInitialLoad.current = true;
     };
   }, [isLoggedIn, userPhone, triggerNotification]);
@@ -291,10 +290,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const now = new Date().toISOString();
     const newBal = Math.max(0, userBalance - amount);
     
-    // تحديث محلي فوري
     setUserBalance(newBal);
     
-    // تسجيل العملية في Firestore بشكل مستقل تماماً
     try {
       await recordTransactionAction({
         external_order_id: externalId || "",
@@ -317,7 +314,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const requestDeposit = async (amount: number, proofImage: string) => {
     const now = new Date().toISOString();
-    // إرسال فوري دون انتظار أي توابع تقنية
     try {
       await recordTransactionAction({
         type: 'إيداع محفظة',

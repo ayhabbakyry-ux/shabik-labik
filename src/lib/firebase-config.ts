@@ -1,14 +1,14 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, getFirestore, CACHE_SIZE_UNLIMITED } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getMessaging } from "firebase/messaging";
 
 /**
- * @fileOverview إعدادات الفايربيز الأساسية - تم تحديثها لدعم الإشعارات (Messaging).
+ * @fileOverview إعدادات الفايربيز الأساسية - تم تفعيل الاكتشاف التلقائي لـ Long Polling لحل مشاكل الاتصال في أجهزة الأندرويد والشبكات الضعيفة.
  */
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBCpBxbVjDl9C8XvVFN18DV",
+  apiKey: "AIzaSyBCpbXvIDJl9C8XvVFNl8DViQEC8msCgBU",
   authDomain: "studio-4603707742-d33ce.firebaseapp.com",
   projectId: "studio-4603707742-d33ce",
   storageBucket: "studio-4603707742-d33ce.appspot.com",
@@ -17,7 +17,13 @@ const firebaseConfig = {
 };
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const db = getFirestore(app);
+
+// تفعيل إعدادات قوية للتعامل مع الشبكات الضعيفة وأجهزة الأندرويد
+// تم استخدام experimentalAutoDetectLongPolling فقط لتجنب التعارض مع الخيارات الأخرى
+const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+});
+
 const auth = getAuth(app);
 const messaging = typeof window !== "undefined" ? getMessaging(app) : null;
 
