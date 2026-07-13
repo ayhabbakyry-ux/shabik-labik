@@ -4,7 +4,7 @@ import { getAuth } from "firebase/auth";
 import { getMessaging } from "firebase/messaging";
 
 /**
- * @fileOverview إعدادات الفايربيز الأساسية - تم تفعيل Long Polling قسرياً لحل مشكلة انقطاع الاتصال في أجهزة الأندرويد.
+ * @fileOverview إعدادات الفايربيز الأساسية - تم تثبيت خيار Long Polling حصرياً لحل مشاكل الاتصال في أجهزة الأندرويد ومنع تعارض الإعدادات.
  */
 
 const firebaseConfig = {
@@ -18,8 +18,7 @@ const firebaseConfig = {
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// استخدام Force Long Polling حصراً لمنع أخطاء 'Listen stream transport errored' في هواتف سامسونج وإنفينيكس
-// تم حذف خيارات التعارض لضمان استقرار الاتصال 100%
+// استخدام experimentalForceLongPolling حصراً لمنع خطأ التعارض مع auto-detect
 const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
 });
