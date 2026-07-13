@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -300,7 +299,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setUserBalance(newBal);
     
     try {
-      await recordTransactionAction({
+      const res = await recordTransactionAction({
         external_order_id: externalId || "",
         type: 'طلب شحن',
         amount,
@@ -313,18 +312,21 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         balanceBefore: before,
         balanceAfter: newBal
       });
+      if (!res.success) {
+        alert("الخطأ الحقيقي من السيرفر هو: " + (res.error || "فشل غير معروف"));
+      }
       await syncBalanceAction(userPhone, newBal);
-    } catch (e) {
-      console.error("Critical DB Error (Deduct):", e);
+    } catch (e: any) {
+      alert("عطل في الاتصال: " + e.message);
     }
   };
 
   const requestDeposit = async (amount: number, proofImage: string) => {
     const now = new Date().toISOString();
     
-    // الخطوة الأولى: الحفظ في Firestore فوراً وبأعلى سرعة (المطلب الأساسي للعميل)
+    // الخطوة الأولى والأساسية: محاولة الحفظ وكشف الخطأ
     try {
-      await recordTransactionAction({
+      const result = await recordTransactionAction({
         type: 'إيداع محفظة',
         amount,
         status: 'Pending',
@@ -335,16 +337,24 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         details: "طلب إيداع رصيد من المحفظة",
         proofImage
       });
+
+      if (!result.success) {
+        // إظهار الخطأ الحقيقي القادم من السيرفر فوراً
+        alert("الخطأ الحقيقي من السيرفر هو: " + result.error);
+        return;
+      }
+      
     } catch (error: any) {
-      alert("عطل في الفايربيز: " + (error.message || error));
+      alert("عطل فادح في الفايربيز: " + (error.message || error));
       console.error(error);
+      return;
     }
 
-    // الخطوة الثانية: أي منطق إضافي للإشعارات أو التوكن معزول تماماً وتجاهل الأخطاء
+    // الخطوة الثانية: الإشعارات (معزولة وصامتة)
     try {
-      // هنا يمكن إضافة كود جلب التوكن مستقبلاً إذا لزم الأمر
+      // إشعار مستقبلي
     } catch (tokenError: any) {
-      alert("عطل في التوكن: " + (tokenError.message || tokenError));
+      console.error("Token Alert Silenced:", tokenError.message);
     }
   };
 

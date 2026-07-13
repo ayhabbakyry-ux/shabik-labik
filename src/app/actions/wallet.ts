@@ -1,4 +1,3 @@
-
 'use server';
 
 import { db } from '@/lib/firebase-config';
@@ -30,9 +29,9 @@ export async function syncBalanceAction(phone: string, newBalance: number) {
       return { success: true };
     }
     return { success: false, message: "المستخدم غير موجود" };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Sync Balance Error:", error);
-    return { success: false };
+    return { success: false, error: error.message || String(error) };
   }
 }
 
@@ -43,13 +42,14 @@ export async function recordTransactionAction(tx: Omit<Transaction, 'id'>) {
       ...tx,
       userPhone: tx.userPhone?.trim(),
       date: tx.date || now,
-      createdAt: tx.createdAt || now, // ضمان صيغة ISO الموحدة للترتيب الصارم
+      createdAt: tx.createdAt || now, 
       userName: tx.userName || "مستخدم"
     });
     return { success: true, id: docRef.id };
-  } catch (error) {
-    console.error("Record Tx Error:", error);
-    return { success: false };
+  } catch (error: any) {
+    console.error("Critical Server Error (recordTransactionAction):", error);
+    // إرجاع الخطأ الحقيقي بدلاً من انهيار السيرفر
+    return { success: false, error: error.message || String(error) };
   }
 }
 
@@ -66,7 +66,6 @@ export async function getUserTransactionsAction(phone: string) {
       ...doc.data()
     })) as Transaction[];
     
-    // الترتيب الصارم: الأحدث فوق دائماً
     return txs.sort((a, b) => {
       const dateA = a.createdAt || a.date || "";
       const dateB = b.createdAt || b.date || "";
