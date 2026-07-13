@@ -1,10 +1,11 @@
+
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { initializeFirestore, getFirestore, Firestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getMessaging } from "firebase/messaging";
 
 /**
- * @fileOverview إعدادات الفايربيز الأساسية - تم تحسين التهيئة لمنع Internal Server Error.
+ * @fileOverview إعدادات الفايربيز الأساسية - تم تحسين التهيئة لمنع Internal Server Error وعزل إعدادات الموبايل.
  */
 
 const firebaseConfig = {
@@ -18,13 +19,19 @@ const firebaseConfig = {
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// تهيئة Firestore بطريقة تمنع تكرار التهيئة وتدعم أجهزة سامسونج
+// تهيئة Firestore بطريقة تمنع الانهيار الداخلي (Internal Server Error) وتدعم أجهزة سامسونج
 let db: Firestore;
-try {
-  db = initializeFirestore(app, {
-    experimentalForceLongPolling: true,
-  });
-} catch (e) {
+if (typeof window !== "undefined") {
+  try {
+    // على المتصفح فقط: نستخدم Long Polling لضمان استقرار أجهزة سامسونج وإنفينيكس
+    db = initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+    });
+  } catch (e) {
+    db = getFirestore(app);
+  }
+} else {
+  // على السيرفر: نستخدم التهيئة العادية لمنع أخطاء الـ 500
   db = getFirestore(app);
 }
 

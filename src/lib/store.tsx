@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -334,17 +335,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         details: "طلب إيداع رصيد من المحفظة",
         proofImage
       });
-    } catch (dbError: any) {
-      alert("عطل في الفايربيز: " + (dbError.message || dbError));
-      console.error("Critical DB Error (Deposit):", dbError);
+    } catch (error: any) {
+      alert("عطل في الفايربيز: " + (error.message || error));
+      console.error(error);
     }
 
     // الخطوة الثانية: أي منطق إضافي للإشعارات أو التوكن معزول تماماً وتجاهل الأخطاء
     try {
-      // منطق التوكن أو الصور هنا مستقبلاً لن يعطل الحفظ أعلاه
-    } catch (silentError: any) {
-      alert("عطل في التوكن: " + (silentError.message || silentError));
-      // تجاهل بصمت لضمان نجاح العملية المالية على Samsung
+      // هنا يمكن إضافة كود جلب التوكن مستقبلاً إذا لزم الأمر
+    } catch (tokenError: any) {
+      alert("عطل في التوكن: " + (tokenError.message || tokenError));
     }
   };
 
