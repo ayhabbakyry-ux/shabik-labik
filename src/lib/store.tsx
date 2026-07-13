@@ -113,10 +113,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const triggerNotification = useCallback((title: string, body: string) => {
-    playNotificationSound();
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === "granted") {
-      new Notification(title, { body });
-    }
+    try {
+      playNotificationSound();
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === "granted") {
+        new Notification(title, { body });
+      }
+    } catch (e) {}
   }, [playNotificationSound]);
 
   const refreshCloudData = useCallback(async () => {
@@ -230,8 +232,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setTransactions(newTxs);
       isInitialLoad.current = false;
     }, (err) => {
-      console.error("TX Snapshot Error (Transport Issue):", err);
-      // في حال حدوث خطأ في الاتصال، نقوم بتحديث البيانات يدوياً كخطة بديلة
+      console.error("TX Snapshot Error:", err);
       refreshCloudData();
     });
     unsubscribes.push(unsubTxs);
@@ -292,8 +293,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const now = new Date().toISOString();
     const newBal = Math.max(0, userBalance - amount);
     
+    // التحديث المحلي الفوري للواجهة
     setUserBalance(newBal);
     
+    // الخطوة الأولى: الحفظ في Firestore فوراً وبأعلى سرعة
     try {
       await recordTransactionAction({
         external_order_id: externalId || "",
@@ -310,12 +313,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       });
       await syncBalanceAction(userPhone, newBal);
     } catch (e) {
-      console.error("Deduct Balance Error:", e);
+      console.error("Critical DB Error (Deduct):", e);
     }
+
+    // الخطوة الثانية: أي منطق إضافي معزول تماماً
+    try {
+      // هنا يمكن إضافة إشعارات أو توكن مستقبلاً بشكل آمن
+    } catch (s) {}
   };
 
   const requestDeposit = async (amount: number, proofImage: string) => {
     const now = new Date().toISOString();
+    
+    // الخطوة الأولى: الحفظ في Firestore فوراً وبأعلى سرعة (المطلب الأساسي للعميل)
     try {
       await recordTransactionAction({
         type: 'إيداع محفظة',
@@ -328,8 +338,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         details: "طلب إيداع رصيد من المحفظة",
         proofImage
       });
-    } catch (e) {
-      console.error("Request Deposit Error:", e);
+    } catch (dbError) {
+      console.error("Critical DB Error (Deposit):", dbError);
+    }
+
+    // الخطوة الثانية: أي منطق إضافي للإشعارات أو التوكن معزول تماماً وتجاهل الأخطاء
+    try {
+      // منطق التوكن أو الصور هنا مستقبلاً لن يعطل الحفظ أعلاه
+    } catch (silentError) {
+      // تجاهل بصمت لضمان نجاح العملية المالية على Samsung
     }
   };
 

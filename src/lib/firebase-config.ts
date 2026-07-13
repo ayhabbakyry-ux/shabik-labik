@@ -18,7 +18,7 @@ const firebaseConfig = {
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// استخدام experimentalForceLongPolling حصراً لمنع خطأ التعارض مع auto-detect
+// استخدام experimentalForceLongPolling حصراً لمنع تعارض الإعدادات ولحل مشاكل Samsung/Infinix
 const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
 });
