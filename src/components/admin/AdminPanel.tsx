@@ -4,7 +4,7 @@
 import { useUser } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Check, X, ShieldAlert, Phone, Trash2, KeyRound, Clock, UserPlus, Wallet, ImageIcon, Eye, BellRing, BellOff, Volume2, RefreshCw, Search, Plus, Minus } from "lucide-react";
+import { Check, X, ShieldAlert, Phone, Trash2, KeyRound, Clock, UserPlus, Wallet, ImageIcon, Eye, BellRing, BellOff, Volume2, RefreshCw, Search, Plus, Minus, VolumeX } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,14 +24,13 @@ export function AdminPanel() {
   const { 
     transactions, adminAction, currency, allUsers = [], deleteUser, 
     passwordRequests = [], adminResetPassword, notificationsEnabled, requestNotificationPermission,
-    updateBalanceAdmin, refreshCloudData
+    updateBalanceAdmin, refreshCloudData, isAudioUnlocked, unlockAudio
   } = useUser();
   const { toast } = useToast();
 
   const [userSearch, setUserSearch] = useState("");
   const [balanceAdjustments, setBalanceAdjustments] = useState<Record<string, string>>({});
 
-  // جلب كافة الإيداعات المعلقة بدقة
   const pendingTxs = transactions?.filter(t => t.status === 'Pending' && (t.type === 'إيداع محفظة' || t.type === 'طلب إيداع')) || [];
 
   const filteredUsers = allUsers.filter(u => 
@@ -46,6 +45,11 @@ export function AdminPanel() {
     } else {
       toast({ title: "تم تفعيل التنبيهات الصوتية ✅" });
     }
+  };
+
+  const handleUnlockAudio = () => {
+    unlockAudio();
+    toast({ title: "تم تفعيل الصوت", description: "ستسمع تنبيهاً عند وصول أي إيداع جديد فوراً." });
   };
 
   const handleDelete = async (phone: string) => {
@@ -87,21 +91,32 @@ export function AdminPanel() {
   return (
     <div className="space-y-6 w-full max-w-7xl mx-auto" dir="rtl">
       {/* Notifications Control */}
-      <div className="flex justify-between items-center gap-4">
-        <Button 
-          onClick={refreshCloudData}
-          variant="outline"
-          className="rounded-2xl gap-2 font-bold shadow-sm"
-        >
-          <RefreshCw className="h-4 w-4" /> تحديث البيانات يدوياً
-        </Button>
+      <div className="flex flex-wrap justify-between items-center gap-4">
+        <div className="flex gap-2">
+          <Button 
+            onClick={refreshCloudData}
+            variant="outline"
+            className="rounded-2xl gap-2 font-bold shadow-sm"
+          >
+            <RefreshCw className="h-4 w-4" /> تحديث
+          </Button>
+          <Button 
+            onClick={handleUnlockAudio}
+            variant={isAudioUnlocked ? "default" : "destructive"}
+            className={`rounded-2xl gap-2 font-bold shadow-sm transition-all ${isAudioUnlocked ? 'bg-green-600 hover:bg-green-700' : 'animate-bounce'}`}
+          >
+            {isAudioUnlocked ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            {isAudioUnlocked ? "الصوت مفعل" : "تفعيل الصوت (هام)"}
+          </Button>
+        </div>
+        
         <Button 
           onClick={toggleNotifications}
           variant={notificationsEnabled ? "default" : "outline"}
-          className={`rounded-2xl gap-2 font-bold shadow-sm transition-all ${notificationsEnabled ? 'bg-green-600 hover:bg-green-700 text-white' : ''}`}
+          className={`rounded-2xl gap-2 font-bold shadow-sm transition-all ${notificationsEnabled ? 'bg-primary text-white' : ''}`}
         >
           {notificationsEnabled ? <BellRing className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
-          {notificationsEnabled ? "تنبيهات الصوت نشطة" : "تفعيل تنبيهات الصوت"}
+          {notificationsEnabled ? "التنبيهات نشطة" : "تنبيهات المتصفح"}
         </Button>
       </div>
 

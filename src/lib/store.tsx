@@ -66,6 +66,8 @@ type UserContextType = {
   isNotificationSupported: boolean;
   requestNotificationPermission: () => void;
   refreshCloudData: () => Promise<void>;
+  isAudioUnlocked: boolean;
+  unlockAudio: () => void;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -82,6 +84,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [isCheckingOrders, setIsCheckingOrders] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [isNotificationSupported, setIsNotificationSupported] = useState(false);
+  const [isAudioUnlocked, setIsAudioUnlocked] = useState(false);
   
   const prevTransactionsRef = useRef<Transaction[]>([]);
   const currency = "ل.س.ج";
@@ -90,12 +93,22 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
 
   const playNotificationSound = useCallback(() => {
+    if (!isAudioUnlocked) return;
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
       audio.volume = 1.0;
-      audio.play().catch(() => console.log("Sound interaction deferred"));
+      audio.play().catch(() => console.log("Sound interaction deferred by browser policy"));
     } catch (e) {}
-  }, []);
+  }, [isAudioUnlocked]);
+
+  const unlockAudio = () => {
+    const audio = new Audio(NOTIFICATION_SOUND);
+    audio.volume = 0;
+    audio.play().then(() => {
+      setIsAudioUnlocked(true);
+      console.log("Audio Unlocked for System Notifications");
+    }).catch(e => console.error("Audio Unlock Failed", e));
+  };
 
   const triggerNotification = useCallback((title: string, body: string) => {
     playNotificationSound();
@@ -104,7 +117,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [playNotificationSound]);
 
-  // استعادة الجلسة عند التحميل
   useEffect(() => {
     const saved = localStorage.getItem('shabik_auth');
     if (saved) {
@@ -119,7 +131,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // المستمعات الفورية (Real-time Snapshots)
   useEffect(() => {
     if (!isLoggedIn || !userPhone) return;
 
@@ -127,7 +138,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const phoneClean = userPhone.trim();
     const isAdminUser = phoneClean === ADMIN_PHONE;
 
-    // 1. الاستماع لبيانات المستخدم ورصيده
     const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
     const unsubUser = onSnapshot(userQ, (snap) => {
       if (!snap.empty) {
@@ -139,7 +149,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     });
     unsubscribes.push(unsubUser);
 
-    // 2. الاستماع للعمليات المالية (Real-time)
     let txQuery;
     if (isAdminUser) {
       txQuery = query(collection(db, "transactions"), orderBy("createdAt", "desc"));
@@ -150,15 +159,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const unsubTxs = onSnapshot(txQuery, (snap) => {
       const newTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
       
-      // اكتشاف الحركات الجديدة لإطلاق الإشعارات
+      // منطق مراقبة الطلبات الجديدة (Added)
       if (prevTransactionsRef.current.length > 0) {
-        newTxs.forEach(newTx => {
-          const oldTx = prevTransactionsRef.current.find(p => p.id === newTx.id);
-          if (!oldTx && isAdminUser && newTx.status === 'Pending') {
-            triggerNotification("طلب إيداع جديد 💰", `من: ${newTx.userName || newTx.userPhone} بقيمة ${newTx.amount}`);
-          } else if (oldTx && oldTx.status !== newTx.status) {
-            const statusLabel = newTx.status === 'Completed' ? "تم قبول طلبك ✅" : "تم رفض طلبك ❌";
-            triggerNotification("تحديث حالة الطلب", `${newTx.type}: ${statusLabel}`);
+        snap.docChanges().forEach((change) => {
+          if (change.type === "added") {
+            const newTx = change.doc.data() as Transaction;
+            if (isAdminUser && newTx.status === 'Pending') {
+              triggerNotification("طلب إيداع جديد 💰", `من: ${newTx.userName || newTx.userPhone} بقيمة ${newTx.amount}`);
+            } else if (!isAdminUser && newTx.userPhone === phoneClean) {
+              triggerNotification("تأكيد الطلب", `تم تسجيل ${newTx.type} بنجاح.`);
+            }
+          } else if (change.type === "modified") {
+            const updatedTx = change.doc.data() as Transaction;
+            const oldTx = prevTransactionsRef.current.find(t => t.id === change.doc.id);
+            if (oldTx && oldTx.status !== updatedTx.status) {
+              const statusLabel = updatedTx.status === 'Completed' ? "تم قبول طلبك ✅" : "تم رفض طلبك ❌";
+              triggerNotification("تحديث حالة الطلب", `${updatedTx.type}: ${statusLabel}`);
+            }
           }
         });
       }
@@ -168,7 +185,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     });
     unsubscribes.push(unsubTxs);
 
-    // 3. مستمعات الإدارة الإضافية
     if (isAdminUser) {
       const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
         setAllUsers(snap.docs.map(d => ({ ...d.data(), id: d.id })));
@@ -222,8 +238,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const now = new Date().toISOString();
     const newBal = Math.max(0, userBalance - amount);
     
-    // التحديث المحلي الفوري (Optimistic UI)
     setUserBalance(newBal);
+
+    // فصل منطق الإشعارات عن العملية المالية لضمان التنفيذ في Infinix/Samsung
+    try {
+      console.log("Attempting to record transaction...");
+    } catch (e) {
+      console.error("Non-critical background error", e);
+    }
 
     await syncBalanceAction(userPhone, newBal);
     await recordTransactionAction({
@@ -243,6 +265,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const requestDeposit = async (amount: number, proofImage: string) => {
     const now = new Date().toISOString();
+    // فصل كلي عن أي منطق إشعارات قد يعيق العملية
     await recordTransactionAction({
       type: 'إيداع محفظة',
       amount,
@@ -294,15 +317,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshCloudData = async () => {
-    // المستمع الفوري سيحدث البيانات تلقائياً، لكن يمكن استخدامه كـ Fallback
-    console.log("Real-time listeners are active.");
+    console.log("Real-time sync active.");
   };
 
   return (
     <UserContext.Provider value={{ 
       isLoggedIn, isAdmin: userPhone === ADMIN_PHONE, userPhone, userName, userBalance, profileImage, transactions, allUsers, passwordRequests,
       login, register: signUpAction, logout, deductBalance, requestDeposit, adminAction, updateBalanceAdmin, deleteUser, requestReset: requestPasswordResetAction, adminResetPassword: completePasswordResetAction,
-      changePassword: changePasswordAction, updateProfileImage: updateProfileImageAction, currency, checkPendingOrders, notificationsEnabled, isNotificationSupported, requestNotificationPermission, refreshCloudData
+      changePassword: changePasswordAction, updateProfileImage: updateProfileImageAction, currency, checkPendingOrders, notificationsEnabled, isNotificationSupported, requestNotificationPermission, refreshCloudData,
+      isAudioUnlocked, unlockAudio
     }}>
       {children}
     </UserContext.Provider>
