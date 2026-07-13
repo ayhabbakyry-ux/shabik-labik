@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -138,9 +137,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
       let txQuery;
       if (isAdminUser) {
-        txQuery = query(collection(db, "transactions"), orderBy("createdAt", "desc"), limit(50));
+        txQuery = query(collection(db, "transactions"), orderBy("createdAt", "desc"), limit(100));
       } else {
-        txQuery = query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"), limit(20));
+        txQuery = query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"), limit(50));
       }
       
       const txSnap = await getDocs(txQuery);
@@ -180,6 +179,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const phoneClean = userPhone.trim();
     const isAdminUser = phoneClean === ADMIN_PHONE;
 
+    // مستمع فوري للرصيد والبيانات
     const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
     const unsubUser = onSnapshot(userQ, (snap) => {
       if (!snap.empty) {
@@ -188,9 +188,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setProfileImage(data.profileImage || null);
         if (data.name) setUserName(data.name);
       }
-    }, (error) => console.error("User Snapshot Error:", error));
+    });
     unsubscribes.push(unsubUser);
 
+    // مستمع فوري للعمليات مع ترتيب صارم
     let txQuery;
     if (isAdminUser) {
       txQuery = query(collection(db, "transactions"), orderBy("createdAt", "desc"), limit(100));
@@ -229,25 +230,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setTransactions(newTxs);
       prevTransactionsRef.current = newTxs;
       isInitialLoad.current = false;
-    }, (error) => console.error("Tx Snapshot Error:", error));
+    });
     unsubscribes.push(unsubTxs);
 
     if (isAdminUser) {
       const unsubAllUsers = onSnapshot(collection(db, "users"), (snap) => {
         setAllUsers(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      }, (error) => console.error("All Users Snapshot Error:", error));
+      });
       unsubscribes.push(unsubAllUsers);
 
       const unsubPass = onSnapshot(collection(db, "password_requests"), (snap) => {
         setPasswordRequests(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      }, (error) => console.error("Pass Requests Snapshot Error:", error));
+      });
       unsubscribes.push(unsubPass);
     }
 
     return () => {
-      unsubscribes.forEach(unsub => {
-        try { unsub(); } catch (e) {}
-      });
+      unsubscribes.forEach(unsub => unsub());
       isInitialLoad.current = true;
     };
   }, [isLoggedIn, userPhone, triggerNotification]);
@@ -292,6 +291,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     
     setUserBalance(newBal);
     
+    // تنفيذ العملية فوراً دون انتظار أي شيء آخر لضمان السرعة وعدم التعليق
     try {
       await recordTransactionAction({
         external_order_id: externalId || "",
