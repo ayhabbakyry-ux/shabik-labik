@@ -34,7 +34,6 @@ export function AdminPanel() {
   // آلية التحديث الدوري (Auto-Polling) كخطة بديلة قوية كل 15 ثانية
   useEffect(() => {
     const pollInterval = setInterval(() => {
-      console.log("Admin Polling Triggered...");
       refreshCloudData();
     }, 15000);
     return () => clearInterval(pollInterval);
@@ -240,7 +239,7 @@ export function AdminPanel() {
                 </TableHeader>
                 <TableBody>
                   {filteredUsers.map((user) => (
-                    <TableRow key={user.phone}>
+                    <TableRow key={user.id}>
                       <TableCell className="text-right font-bold py-4">
                         <p>{user.name}</p>
                         <p className="text-[10px] text-muted-foreground font-mono">{user.phone}</p>
