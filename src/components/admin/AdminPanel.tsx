@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useUser } from "@/lib/store";
@@ -41,7 +40,7 @@ export function AdminPanel() {
 
   const pendingTxs = transactions?.filter(t => t.status === 'Pending' && (t.type === 'إيداع محفظة' || t.type === 'طلب إيداع')) || [];
 
-  const filteredUsers = allUsers.filter(u => 
+  const filteredUsers = (allUsers || []).filter(u => 
     (u.name || "").toLowerCase().includes(userSearch.toLowerCase()) || 
     (u.phone || "").includes(userSearch)
   );

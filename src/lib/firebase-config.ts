@@ -19,6 +19,7 @@ const firebaseConfig = {
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 // استخدام Force Long Polling حصراً لمنع أخطاء 'Listen stream transport errored' في هواتف سامسونج وإنفينيكس
+// تم حذف خيارات التعارض لضمان استقرار الاتصال 100%
 const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
 });

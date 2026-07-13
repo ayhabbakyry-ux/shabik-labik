@@ -87,7 +87,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [isNotificationSupported, setIsNotificationSupported] = useState(false);
   const [isAudioUnlocked, setIsAudioUnlocked] = useState(false);
   
-  const prevTransactionsRef = useRef<Transaction[]>([]);
   const isInitialLoad = useRef(true);
   const currency = "ل.س.ج";
   const ADMIN_PHONE = "0939549573";
@@ -186,19 +185,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const phoneClean = userPhone.trim();
     const isAdminUser = phoneClean === ADMIN_PHONE;
 
-    // مستمع الرصيد والبيانات الأساسية
     const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
     const unsubUser = onSnapshot(userQ, (snap) => {
       if (!snap.empty) {
         const data = snap.docs[0].data();
         setUserBalance(data.balance || 0);
         setProfileImage(data.profileImage || null);
-        if (data.name) setUserName(data.name);
       }
     }, (err) => console.error("User Snapshot Error:", err));
     unsubscribes.push(unsubUser);
 
-    // مستمع العمليات - تبسيط الاستعلام لتجنب مشكلة اختفاء الطلبات غير المفهرسة
     let txQuery;
     if (isAdminUser) {
       txQuery = query(collection(db, "transactions"), limit(150));
@@ -209,7 +205,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const unsubTxs = onSnapshot(txQuery, (snap) => {
       const newTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
       
-      // الترتيب في المتصفح لضمان ظهور كافة الطلبات حتى لو كان التاريخ ناقصاً في الداتابيز
       newTxs.sort((a, b) => {
         const dateA = a.createdAt || a.date || "";
         const dateB = b.createdAt || b.date || "";
@@ -233,20 +228,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
       
       setTransactions(newTxs);
-      prevTransactionsRef.current = newTxs;
       isInitialLoad.current = false;
-    }, (err) => console.error("TX Snapshot Error:", err));
+    }, (err) => {
+      console.error("TX Snapshot Error (Transport Issue):", err);
+      // في حال حدوث خطأ في الاتصال، نقوم بتحديث البيانات يدوياً كخطة بديلة
+      refreshCloudData();
+    });
     unsubscribes.push(unsubTxs);
 
     if (isAdminUser) {
       const unsubAllUsers = onSnapshot(collection(db, "users"), (snap) => {
         setAllUsers(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      });
+      }, (err) => console.error("AllUsers Snapshot Error:", err));
       unsubscribes.push(unsubAllUsers);
 
       const unsubPass = onSnapshot(collection(db, "password_requests"), (snap) => {
         setPasswordRequests(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      });
+      }, (err) => console.error("PassRequests Snapshot Error:", err));
       unsubscribes.push(unsubPass);
     }
 
@@ -254,7 +252,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       unsubscribes.forEach(unsub => unsub());
       isInitialLoad.current = true;
     };
-  }, [isLoggedIn, userPhone, triggerNotification]);
+  }, [isLoggedIn, userPhone, triggerNotification, refreshCloudData]);
 
   const requestNotificationPermission = async () => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
