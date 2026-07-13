@@ -108,8 +108,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (typeof Audio !== 'undefined') {
         const audio = new Audio(NOTIFICATION_SOUND);
         audio.play().catch(e => {
-          // Fallback for mobile devices that require user interaction
-          console.log("Audio playback deferred or blocked by mobile system");
+          console.log("Audio deferred: User interaction required");
         });
       }
     } catch (e) {}
@@ -139,45 +138,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, [playNotificationSound]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const supported = 'Notification' in window && 'serviceWorker' in navigator;
-      setIsNotificationSupported(supported);
-      if (supported) {
-        setNotificationsEnabled(Notification.permission === 'granted');
-        if (messaging) {
-          onMessage(messaging, (payload) => {
-            if (payload.notification) {
-              const icon = payload.notification.image || payload.notification.icon || getIconForService(payload.notification.title || "", payload.notification.body || "");
-              triggerNotification(payload.notification.title || "تنبيه جديد", payload.notification.body || "", icon);
-            }
-          });
-        }
-      }
-
-      // Mobile fix: Refresh data when tab becomes visible
-      const handleVisibilityChange = () => {
-        if (document.visibilityState === 'visible' && userPhone) {
-          fetchCloudData(userPhone, true);
-        }
-      };
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }
-  }, [triggerNotification, userPhone]);
-
-  const requestNotificationPermission = useCallback(async () => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      const permission = await Notification.requestPermission();
-      setNotificationsEnabled(permission === "granted");
-      if (permission === "granted" && messaging) {
-        try {
-          await getToken(messaging, { vapidKey: VAPID_KEY });
-        } catch (err) {}
-      }
-    }
-  }, []);
 
   const fetchCloudData = useCallback(async (phone: string, force = false) => {
     if (!phone) return;
@@ -249,6 +209,45 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (userPhone) await fetchCloudData(userPhone, true);
   };
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const supported = 'Notification' in window && 'serviceWorker' in navigator;
+      setIsNotificationSupported(supported);
+      if (supported) {
+        setNotificationsEnabled(Notification.permission === 'granted');
+        if (messaging) {
+          onMessage(messaging, (payload) => {
+            if (payload.notification) {
+              const icon = payload.notification.image || payload.notification.icon || getIconForService(payload.notification.title || "", payload.notification.body || "");
+              triggerNotification(payload.notification.title || "تنبيه جديد", payload.notification.body || "", icon);
+            }
+          });
+        }
+      }
+
+      // تحسين للأجهزة التي تعطل المهام في الخلفية (Samsung/Infinix)
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible' && userPhone) {
+          fetchCloudData(userPhone, true);
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }, [triggerNotification, userPhone, fetchCloudData]);
+
+  const requestNotificationPermission = useCallback(async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      const permission = await Notification.requestPermission();
+      setNotificationsEnabled(permission === "granted");
+      if (permission === "granted" && messaging) {
+        try {
+          await getToken(messaging, { vapidKey: VAPID_KEY });
+        } catch (err) {}
+      }
+    }
+  }, []);
+
   const checkPendingOrders = useCallback(async () => {
     if (!isLoggedIn || isCheckingOrders) return;
     const pending = transactions.filter(tx => tx.status === 'Pending' && tx.external_order_id);
@@ -288,7 +287,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isLoggedIn && userPhone) {
-      // Shorter interval for active use, especially on mobile
       pollingIntervalRef.current = setInterval(() => fetchCloudData(userPhone), 5000);
     }
     return () => { if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current); };
@@ -343,7 +341,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       balanceBefore: before,
       balanceAfter: newBal
     });
-    // Immediate refresh after critical action
     await fetchCloudData(userPhone, true);
   };
 
