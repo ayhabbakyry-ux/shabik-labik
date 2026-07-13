@@ -9,7 +9,9 @@ import {
   where, 
   onSnapshot, 
   orderBy,
-  doc 
+  doc,
+  getDocs,
+  limit
 } from 'firebase/firestore';
 import { signInAction, signUpAction, requestPasswordResetAction } from '@/app/actions/auth';
 import { syncBalanceAction, recordTransactionAction } from '@/app/actions/wallet';
@@ -87,6 +89,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [isAudioUnlocked, setIsAudioUnlocked] = useState(false);
   
   const prevTransactionsRef = useRef<Transaction[]>([]);
+  const isInitialLoad = useRef(true);
   const currency = "ل.س.ج";
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
@@ -97,7 +100,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
       audio.volume = 1.0;
-      audio.play().catch(() => console.log("Audio deferred"));
+      audio.play().catch(e => console.log("Audio deferred", e));
     } catch (e) {}
   }, [isAudioUnlocked]);
 
@@ -107,16 +110,48 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       audio.volume = 0;
       audio.play().then(() => {
         setIsAudioUnlocked(true);
-      }).catch(e => console.error(e));
+      }).catch(e => console.error("Audio Unlock Error:", e));
     } catch (e) {}
   };
 
   const triggerNotification = useCallback((title: string, body: string) => {
     playNotificationSound();
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === "granted") {
-      new Notification(title, { body });
+      new Notification(title, { body, icon: '/favicon.ico' });
     }
   }, [playNotificationSound]);
+
+  // مزامنة يدوية قسرية للأجهزة التي تقتل المستمعات الفورية
+  const refreshCloudData = useCallback(async () => {
+    if (!isLoggedIn || !userPhone) return;
+    
+    try {
+      const phoneClean = userPhone.trim();
+      const isAdminUser = phoneClean === ADMIN_PHONE;
+      
+      // جلب يدوي للبيانات كخطة بديلة
+      const userQ = query(collection(db, "users"), where("phone", "==", phoneClean), limit(1));
+      const userSnap = await getDocs(userQ);
+      if (!userSnap.empty) {
+        const data = userSnap.docs[0].data();
+        setUserBalance(data.balance || 0);
+        setProfileImage(data.profileImage || null);
+      }
+
+      let txQuery;
+      if (isAdminUser) {
+        txQuery = query(collection(db, "transactions"), orderBy("createdAt", "desc"), limit(50));
+      } else {
+        txQuery = query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"), limit(20));
+      }
+      
+      const txSnap = await getDocs(txQuery);
+      const manualTxs = txSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
+      setTransactions(manualTxs);
+    } catch (e) {
+      console.error("Manual Refresh Error:", e);
+    }
+  }, [isLoggedIn, userPhone]);
 
   useEffect(() => {
     const saved = localStorage.getItem('shabik_auth');
@@ -131,6 +166,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setNotificationsEnabled(Notification.permission === "granted");
     }
 
+    // أهم جزء لأجهزة سامسونج وإنفينيكس: إعادة المزامنة عند عودة المستخدم للتطبيق
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && isLoggedIn) {
         refreshCloudData();
@@ -138,7 +174,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [isLoggedIn]);
+  }, [isLoggedIn, refreshCloudData]);
 
   useEffect(() => {
     if (!isLoggedIn || !userPhone) return;
@@ -158,33 +194,33 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
     }));
 
-    // 2. مراقب العمليات (Real-time الصارم)
+    // 2. مراقب العمليات (Real-time الفوري الصارم)
     let txQuery;
     if (isAdminUser) {
-      txQuery = query(collection(db, "transactions"), orderBy("createdAt", "desc"));
+      txQuery = query(collection(db, "transactions"), orderBy("createdAt", "desc"), limit(100));
     } else {
-      txQuery = query(collection(db, "transactions"), where("userPhone", "==", phoneClean));
+      txQuery = query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"), limit(50));
     }
 
     unsubscribes.push(onSnapshot(txQuery, (snap) => {
       const newTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
       
-      // الترتيب الصارم: الأحدث فوق
+      // الترتيب الصارم: الأحدث فوق باستخدام مقارنة النصوص ISO
       newTxs.sort((a, b) => {
         const dateA = a.createdAt || a.date || "";
         const dateB = b.createdAt || b.date || "";
         return dateB.localeCompare(dateA);
       });
 
-      // منطق الإشعارات الفوري عند التغيير
-      if (prevTransactionsRef.current.length > 0) {
+      // منطق الإشعارات الفوري - يتجاهل أول جلب للبيانات
+      if (!isInitialLoad.current) {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
             const tx = change.doc.data() as Transaction;
             if (isAdminUser && tx.status === 'Pending') {
               triggerNotification("طلب إيداع جديد 💰", `من: ${tx.userName || tx.userPhone} بقيمة ${tx.amount}`);
             } else if (!isAdminUser && tx.userPhone === phoneClean) {
-              triggerNotification("تم استلام طلبك", `العملية ${tx.type} قيد المراجعة.`);
+              triggerNotification("تأكيد العملية", `تم تسجيل ${tx.type} في النظام.`);
             }
           } else if (change.type === "modified") {
             const tx = change.doc.data() as Transaction;
@@ -198,6 +234,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       
       setTransactions(newTxs);
       prevTransactionsRef.current = newTxs;
+      isInitialLoad.current = false;
     }));
 
     if (isAdminUser) {
@@ -210,7 +247,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }));
     }
 
-    return () => unsubscribes.forEach(unsub => unsub());
+    return () => {
+      unsubscribes.forEach(unsub => unsub());
+      isInitialLoad.current = true;
+    };
   }, [isLoggedIn, userPhone, triggerNotification]);
 
   const requestNotificationPermission = async () => {
@@ -251,40 +291,48 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const now = new Date().toISOString();
     const newBal = Math.max(0, userBalance - amount);
     
-    // تحديث محلي فوري للسرعة
+    // تحديث محلي فوري
     setUserBalance(newBal);
     
-    // تسجيل في الخلفية دون تعطيل الواجهة
-    syncBalanceAction(userPhone, newBal);
-    recordTransactionAction({
-      external_order_id: externalId || "",
-      type: 'طلب شحن',
-      amount,
-      status: initialStatus,
-      date: now,
-      createdAt: now,
-      userName,
-      userPhone,
-      details: productDetails,
-      balanceBefore: before,
-      balanceAfter: newBal
-    });
+    // تسجيل العملية في Firestore بشكل مستقل تماماً
+    try {
+      await recordTransactionAction({
+        external_order_id: externalId || "",
+        type: 'طلب شحن',
+        amount,
+        status: initialStatus,
+        date: now,
+        createdAt: now,
+        userName,
+        userPhone,
+        details: productDetails,
+        balanceBefore: before,
+        balanceAfter: newBal
+      });
+      await syncBalanceAction(userPhone, newBal);
+    } catch (e) {
+      console.error("Deduct Balance Error:", e);
+    }
   };
 
   const requestDeposit = async (amount: number, proofImage: string) => {
     const now = new Date().toISOString();
     // إرسال فوري دون انتظار أي توابع تقنية
-    recordTransactionAction({
-      type: 'إيداع محفظة',
-      amount,
-      status: 'Pending',
-      date: now,
-      createdAt: now,
-      userName,
-      userPhone,
-      details: "طلب إيداع رصيد من المحفظة",
-      proofImage
-    });
+    try {
+      await recordTransactionAction({
+        type: 'إيداع محفظة',
+        amount,
+        status: 'Pending',
+        date: now,
+        createdAt: now,
+        userName,
+        userPhone,
+        details: "طلب إيداع رصيد من المحفظة",
+        proofImage
+      });
+    } catch (e) {
+      console.error("Request Deposit Error:", e);
+    }
   };
 
   const adminAction = async (txId: string, action: 'approve' | 'reject') => {
@@ -322,10 +370,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {}
     }
     setIsCheckingOrders(false);
-  };
-
-  const refreshCloudData = async () => {
-    // onSnapshot يتكفل بالتزامن الفوري، هذه الدالة للتأكيد اليدوي إذا لزم الأمر
   };
 
   return (

@@ -66,6 +66,7 @@ export async function getUserTransactionsAction(phone: string) {
       ...doc.data()
     })) as Transaction[];
     
+    // الترتيب الصارم: الأحدث فوق دائماً
     return txs.sort((a, b) => {
       const dateA = a.createdAt || a.date || "";
       const dateB = b.createdAt || b.date || "";

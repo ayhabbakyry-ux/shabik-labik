@@ -31,7 +31,7 @@ export function AdminPanel() {
   const [userSearch, setUserSearch] = useState("");
   const [balanceAdjustments, setBalanceAdjustments] = useState<Record<string, string>>({});
 
-  // المشكلة 1 و 4: تحديث دوري احتياطي (Polling) كل 15 ثانية للأجهزة الضعيفة
+  // آلية التحديث الدوري (Auto-Polling) كخطة بديلة قوية كل 15 ثانية
   useEffect(() => {
     const pollInterval = setInterval(() => {
       console.log("Admin Polling Triggered...");
@@ -99,7 +99,6 @@ export function AdminPanel() {
 
   return (
     <div className="space-y-6 w-full max-w-7xl mx-auto" dir="rtl">
-      {/* المشكلة 2: زر تفعيل الصوت الصارم لتخطي حظر المتصفحات */}
       <div className="flex flex-wrap justify-between items-center gap-4">
         <div className="flex gap-2">
           <Button 
@@ -133,7 +132,6 @@ export function AdminPanel() {
         </Button>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card className="bg-primary text-white border-none rounded-3xl overflow-hidden shadow-lg">
           <CardContent className="p-6 flex items-center justify-between">
