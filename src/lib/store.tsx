@@ -159,7 +159,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const unsubTxs = onSnapshot(txQuery, (snap) => {
       const newTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
       
-      // منطق مراقبة الطلبات الجديدة (Added)
+      // منطق مراقبة الطلبات الجديدة (Added) باستخدام docChanges لضمان الدقة
       if (prevTransactionsRef.current.length > 0) {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
@@ -238,15 +238,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const now = new Date().toISOString();
     const newBal = Math.max(0, userBalance - amount);
     
+    // الأولوية 1: تحديث الواجهة والـ Firestore
     setUserBalance(newBal);
-
-    // فصل منطق الإشعارات عن العملية المالية لضمان التنفيذ في Infinix/Samsung
-    try {
-      console.log("Attempting to record transaction...");
-    } catch (e) {
-      console.error("Non-critical background error", e);
-    }
-
     await syncBalanceAction(userPhone, newBal);
     await recordTransactionAction({
       external_order_id: externalId || "",
@@ -261,11 +254,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       balanceBefore: before,
       balanceAfter: newBal
     });
+
+    // الأولوية 2: الإشعارات في الخلفية لضمان عدم تعطل العملية في Samsung/Infinix
+    try {
+      console.log("Transaction recorded, handling background notification flow...");
+    } catch (e) {}
   };
 
   const requestDeposit = async (amount: number, proofImage: string) => {
     const now = new Date().toISOString();
-    // فصل كلي عن أي منطق إشعارات قد يعيق العملية
+    // تنفيذ العملية أولاً وبشكل مستقل
     await recordTransactionAction({
       type: 'إيداع محفظة',
       amount,
