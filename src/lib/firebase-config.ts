@@ -1,10 +1,10 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { initializeFirestore, getFirestore, CACHE_SIZE_UNLIMITED } from "firebase/firestore";
+import { initializeFirestore, getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getMessaging } from "firebase/messaging";
 
 /**
- * @fileOverview إعدادات الفايربيز الأساسية - تم تفعيل Force Long Polling حصراً لحل مشكلة انقطاع البث في أجهزة الأندرويد.
+ * @fileOverview إعدادات الفايربيز الأساسية - تم تفعيل Long Polling قسرياً لحل مشكلة انقطاع الاتصال في أجهزة الأندرويد.
  */
 
 const firebaseConfig = {
@@ -18,8 +18,7 @@ const firebaseConfig = {
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// تفعيل إعدادات قوية للتعامل مع الشبكات الضعيفة وأجهزة الأندرويد (Infinix/Samsung)
-// تم استخدام experimentalForceLongPolling حصراً لمنع خطأ 'Listen stream transport errored'
+// استخدام Force Long Polling حصراً لمنع أخطاء 'Listen stream transport errored' في هواتف سامسونج وإنفينيكس
 const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
 });

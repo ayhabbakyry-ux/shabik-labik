@@ -99,7 +99,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
       audio.volume = 1.0;
-      audio.play().catch(e => console.log("Audio deferred", e));
+      audio.play().catch(() => {});
     } catch (e) {}
   }, [isAudioUnlocked]);
 
@@ -116,7 +116,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const triggerNotification = useCallback((title: string, body: string) => {
     playNotificationSound();
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === "granted") {
-      new Notification(title, { body, icon: '/favicon.ico' });
+      new Notification(title, { body });
     }
   }, [playNotificationSound]);
 
@@ -137,13 +137,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
       let txQuery;
       if (isAdminUser) {
-        txQuery = query(collection(db, "transactions"), orderBy("createdAt", "desc"), limit(100));
+        txQuery = query(collection(db, "transactions"), limit(200));
       } else {
-        txQuery = query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"), limit(50));
+        txQuery = query(collection(db, "transactions"), where("userPhone", "==", phoneClean), limit(100));
       }
       
       const txSnap = await getDocs(txQuery);
       const manualTxs = txSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
+      
+      manualTxs.sort((a, b) => {
+        const dateA = a.createdAt || a.date || "";
+        const dateB = b.createdAt || b.date || "";
+        return dateB.localeCompare(dateA);
+      });
+
       setTransactions(manualTxs);
     } catch (e) {
       console.error("Manual Refresh Error:", e);
@@ -179,7 +186,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const phoneClean = userPhone.trim();
     const isAdminUser = phoneClean === ADMIN_PHONE;
 
-    // مستمع فوري للرصيد والبيانات
+    // مستمع الرصيد والبيانات الأساسية
     const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
     const unsubUser = onSnapshot(userQ, (snap) => {
       if (!snap.empty) {
@@ -188,20 +195,21 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setProfileImage(data.profileImage || null);
         if (data.name) setUserName(data.name);
       }
-    });
+    }, (err) => console.error("User Snapshot Error:", err));
     unsubscribes.push(unsubUser);
 
-    // مستمع فوري للعمليات مع ترتيب صارم
+    // مستمع العمليات - تبسيط الاستعلام لتجنب مشكلة اختفاء الطلبات غير المفهرسة
     let txQuery;
     if (isAdminUser) {
-      txQuery = query(collection(db, "transactions"), orderBy("createdAt", "desc"), limit(100));
+      txQuery = query(collection(db, "transactions"), limit(150));
     } else {
-      txQuery = query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"), limit(50));
+      txQuery = query(collection(db, "transactions"), where("userPhone", "==", phoneClean), limit(100));
     }
 
     const unsubTxs = onSnapshot(txQuery, (snap) => {
       const newTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
       
+      // الترتيب في المتصفح لضمان ظهور كافة الطلبات حتى لو كان التاريخ ناقصاً في الداتابيز
       newTxs.sort((a, b) => {
         const dateA = a.createdAt || a.date || "";
         const dateB = b.createdAt || b.date || "";
@@ -215,14 +223,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             if (isAdminUser && tx.status === 'Pending') {
               triggerNotification("طلب إيداع جديد 💰", `من: ${tx.userName || tx.userPhone} بقيمة ${tx.amount}`);
             } else if (!isAdminUser && tx.userPhone === phoneClean) {
-              triggerNotification("تأكيد العملية", `تم تسجيل ${tx.type} في النظام.`);
+              triggerNotification("تحديث في حسابك", `تم تسجيل ${tx.type} بنجاح.`);
             }
           } else if (change.type === "modified") {
             const tx = change.doc.data() as Transaction;
-            const old = prevTransactionsRef.current.find(t => t.id === change.doc.id);
-            if (old && old.status !== tx.status) {
-              triggerNotification("تحديث حالة الطلب", `${tx.type}: ${tx.status === 'Completed' ? "تم القبول ✅" : "تم الرفض ❌"}`);
-            }
+            triggerNotification("تحديث حالة الطلب", `${tx.type}: ${tx.status === 'Completed' ? "تم القبول ✅" : "تم الرفض ❌"}`);
           }
         });
       }
@@ -230,7 +235,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setTransactions(newTxs);
       prevTransactionsRef.current = newTxs;
       isInitialLoad.current = false;
-    });
+    }, (err) => console.error("TX Snapshot Error:", err));
     unsubscribes.push(unsubTxs);
 
     if (isAdminUser) {
@@ -291,7 +296,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     
     setUserBalance(newBal);
     
-    // تنفيذ العملية فوراً دون انتظار أي شيء آخر لضمان السرعة وعدم التعليق
     try {
       await recordTransactionAction({
         external_order_id: externalId || "",
