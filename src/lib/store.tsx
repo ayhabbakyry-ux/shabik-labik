@@ -9,11 +9,8 @@ import {
   where, 
   onSnapshot, 
   getDocs,
-  limit,
   enableNetwork,
-  orderBy,
-  getDocFromCache,
-  getDocsFromCache
+  orderBy
 } from 'firebase/firestore';
 import { signInAction, signUpAction, requestPasswordResetAction } from '@/app/actions/auth';
 import { syncBalanceAction, recordTransactionAction } from '@/app/actions/wallet';
@@ -28,7 +25,7 @@ import { changePasswordAction, updateProfileImageAction } from '@/app/actions/pr
 import { Transaction } from './types';
 
 /**
- * @fileOverview محرك البيانات والاشعارات المطور - نظام ربط لحظي كامل للمدير والزبائن.
+ * @fileOverview محرك البيانات والاشعارات المطور - نظام ربط لحظي كامل للمدير والزبائن مع استعادة السجل الكامل.
  */
 
 type UserContextType = {
@@ -89,20 +86,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const triggerNotification = useCallback((title: string, body: string) => {
     if (typeof window === "undefined") return;
     try {
-      // تشغيل نغمة شبيك لبيك المعتمدة
       const audio = new Audio(NOTIFICATION_SOUND);
-      audio.play().catch(err => console.log("Audio play blocked, needs interaction", err));
+      audio.play().catch(() => {});
 
       if ("Notification" in window && Notification.permission === "granted") {
         new Notification(title, { 
           body, 
-          icon: 'https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg',
-          badge: 'https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg'
+          icon: 'https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg'
         });
       }
-    } catch (e) {
-      console.error("Notification trigger error", e);
-    }
+    } catch (e) {}
   }, []);
 
   const unlockAudio = () => {
@@ -110,10 +103,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
       audio.volume = 0;
-      audio.play().then(() => {
-        setIsAudioUnlocked(true);
-        console.log("Audio unlocked successfully");
-      }).catch(() => {});
+      audio.play().then(() => setIsAudioUnlocked(true)).catch(() => {});
     } catch (e) {}
   };
 
@@ -125,15 +115,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
       await enableNetwork(db).catch(() => {});
 
-      const userQ = query(collection(db, "users"), where("phone", "==", phoneClean), limit(1));
+      const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
       const fetchPromises: Promise<any>[] = [getDocs(userQ)];
       
       if (isAdminUser) {
-        fetchPromises.push(getDocs(query(collection(db, "users"), limit(200))));
-        fetchPromises.push(getDocs(query(collection(db, "transactions"), orderBy("createdAt", "desc"), limit(100))));
-        fetchPromises.push(getDocs(query(collection(db, "password_requests"), limit(50))));
+        fetchPromises.push(getDocs(collection(db, "users")));
+        fetchPromises.push(getDocs(query(collection(db, "transactions"), orderBy("createdAt", "desc"))));
+        fetchPromises.push(getDocs(collection(db, "password_requests")));
       } else {
-        fetchPromises.push(getDocs(query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"), limit(50))));
+        fetchPromises.push(getDocs(query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"))));
       }
 
       const results = await Promise.all(fetchPromises);
@@ -155,9 +145,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setTransactions(txs);
         transactionsRef.current = txs;
       }
-    } catch (e) {
-      console.error("Rapid Sync Error:", e);
-    }
+    } catch (e) {}
   }, [isLoggedIn, userPhone]);
 
   useEffect(() => {
@@ -194,8 +182,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }));
 
     const txQuery = isAdminUser 
-      ? query(collection(db, "transactions"), orderBy("createdAt", "desc"), limit(100))
-      : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"), limit(50));
+      ? query(collection(db, "transactions"), orderBy("createdAt", "desc"))
+      : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"));
 
     unsubscribes.push(onSnapshot(txQuery, (snap) => {
       const newTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
@@ -205,23 +193,21 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           const tx = change.doc.data() as Transaction;
           const txId = change.doc.id;
 
-          // 1. للمدير: إشعار عند وصول إيداع جديد
           if (change.type === "added") {
             if (isAdminUser && tx.status === 'Pending' && (tx.type === 'إيداع محفظة' || tx.type === 'طلب إيداع')) {
               triggerNotification("طلب إيداع جديد 💰", `المبلغ: ${tx.amount.toLocaleString()} - العميل: ${tx.userName || tx.userPhone}`);
             }
           }
 
-          // 2. للزبون: إشعار عند تغيير حالة الطلب (قبول أو رفض)
           if (change.type === "modified") {
-            if (!isAdminUser) {
-              const oldTx = transactionsRef.current.find(t => t.id === txId);
-              if (oldTx && oldTx.status === 'Pending' && tx.status !== 'Pending') {
-                if (tx.status === 'Completed') {
-                  triggerNotification("تم قبول طلبك بنجاح ✅", `تم تنفيذ ${tx.type} بمبلغ ${tx.amount.toLocaleString()}. رصيدك تم تحديثه.`);
-                } else if (tx.status === 'Rejected') {
-                  triggerNotification("عذراً، تم رفض طلبك ❌", `طلب ${tx.type} تم رفضه وعاد الرصيد لمحفظتك.`);
-                }
+            const oldTx = transactionsRef.current.find(t => t.id === txId);
+            if (oldTx && oldTx.status === 'Pending' && tx.status !== 'Pending') {
+              if (!isAdminUser && tx.userPhone === phoneClean) {
+                 if (tx.status === 'Completed') {
+                   triggerNotification("تم قبول طلبك بنجاح ✅", `تم تنفيذ ${tx.type} بمبلغ ${tx.amount.toLocaleString()}.`);
+                 } else if (tx.status === 'Rejected') {
+                   triggerNotification("تم رفض طلبك ❌", `طلب ${tx.type} تم رفضه وعاد الرصيد لمحفظتك.`);
+                 }
               }
             }
           }
@@ -233,7 +219,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }));
 
     if (isAdminUser) {
-      unsubscribes.push(onSnapshot(query(collection(db, "users"), limit(200)), (snap) => {
+      unsubscribes.push(onSnapshot(collection(db, "users"), (snap) => {
         setAllUsers(snap.docs.map(d => ({ ...d.data(), id: d.id })));
       }));
       unsubscribes.push(onSnapshot(collection(db, "password_requests"), (snap) => {
@@ -275,7 +261,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (!res.success) throw new Error(res.message);
     } catch (error) {
       setTransactions(previousTransactions);
-      alert("تعذر تحديث السيرفر، تم التراجع عن التغيير المحلي.");
     }
   };
 
@@ -293,7 +278,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (!res.success) throw new Error("Server error");
     } catch (error) {
       setAllUsers(previousUsers);
-      alert("فشل تحديث الرصيد في السيرفر.");
     }
   };
 
@@ -319,7 +303,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         userName, userPhone, details: "طلب إيداع رصيد", proofImage
       });
       if (!result.success) alert("الخطأ الحقيقي من السيرفر هو: " + result.error);
-    } catch (error: any) { alert("عطل في الفايربيز: " + error.message); }
+    } catch (error: any) { alert("عطل في السيرفر: " + error.message); }
   };
 
   const deleteUser = async (p: string) => { await deleteUserAction(p); };
