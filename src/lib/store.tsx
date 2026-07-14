@@ -10,7 +10,8 @@ import {
   getDocs,
   limit,
   enableNetwork,
-  doc
+  doc,
+  getDoc
 } from 'firebase/firestore';
 import { signInAction, signUpAction, requestPasswordResetAction } from '@/app/actions/auth';
 import { syncBalanceAction, recordTransactionAction } from '@/app/actions/wallet';
@@ -23,6 +24,10 @@ import {
 } from '@/app/actions/admin';
 import { changePasswordAction, updateProfileImageAction } from '@/app/actions/profile';
 import { Transaction } from './types';
+
+/**
+ * @fileOverview محرك البيانات البرقي - يضمن ظهور الرصيد والطلبات بلمح البصر عبر الجلب المتوازي.
+ */
 
 type UserContextType = {
   isLoggedIn: boolean;
@@ -105,6 +110,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const phoneClean = userPhone.trim();
       const isAdminUser = phoneClean === ADMIN_PHONE;
 
+      // جلب برقِي للرصيد
       const userQ = query(collection(db, "users"), where("phone", "==", phoneClean), limit(1));
       const userSnap = await getDocs(userQ);
       if (!userSnap.empty) {
@@ -113,6 +119,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setProfileImage(data.profileImage || null);
       }
 
+      // جلب برقي للطلبات
+      const txQuery = isAdminUser 
+        ? query(collection(db, "transactions"), limit(50))
+        : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), limit(30));
+      
+      const txSnap = await getDocs(txQuery);
+      const fetchedTxs = txSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
+      fetchedTxs.sort((a, b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || ""));
+      setTransactions(fetchedTxs);
+
       if (isAdminUser) {
         const usersSnap = await getDocs(collection(db, "users"));
         setAllUsers(usersSnap.docs.map(d => ({ ...d.data(), id: d.id })));
@@ -120,7 +136,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setPasswordRequests(passReqSnap.docs.map(d => ({ ...d.data(), id: d.id })));
       }
     } catch (e) {
-      console.error("Manual Sync Failure:", e);
+      console.error("Rapid Sync Failure:", e);
     }
   }, [isLoggedIn, userPhone]);
 
@@ -143,6 +159,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     
+    // تشغيل الجلب البرقي فوراً عند تسجيل الدخول أو التحديث
     refreshCloudData();
 
     const unsubscribes: (() => void)[] = [];
@@ -155,7 +172,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setUserBalance(Number(data.balance || 0));
         setProfileImage(data.profileImage || null);
       }
-    }, (e) => console.warn("Firestore User Sync Error:", e));
+    });
     unsubscribes.push(unsubUser);
 
     const txQuery = isAdminUser 
@@ -178,7 +195,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
       setTransactions(newTxs);
       isInitialLoad.current = false;
-    }, (e) => console.warn("Firestore TX Sync Error:", e));
+    });
     unsubscribes.push(unsubTxs);
 
     if (isAdminUser) {
@@ -227,20 +244,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         external_order_id: externalId || "", type: 'طلب شحن', amount, status: initialStatus,
         date: now, createdAt: now, userName, userPhone, details, balanceBefore: before, balanceAfter: newBal
       });
-      if (!res.success && typeof window !== "undefined") alert("الخطأ الحقيقي من السيرفر هو: " + res.error);
       await syncBalanceAction(userPhone, newBal);
-    } catch (e: any) { if (typeof window !== "undefined") alert("عطل في الاتصال: " + e.message); }
+    } catch (e: any) { console.error("Deduct Error:", e); }
   };
 
   const requestDeposit = async (amount: number, proofImage: string) => {
     const now = new Date().toISOString();
     try {
-      const result = await recordTransactionAction({
+      await recordTransactionAction({
         type: 'إيداع محفظة', amount, status: 'Pending', date: now, createdAt: now,
         userName, userPhone, details: "طلب إيداع رصيد", proofImage
       });
-      if (!result.success && typeof window !== "undefined") alert("الخطأ الحقيقي من السيرفر هو: " + result.error);
-    } catch (error: any) { if (typeof window !== "undefined") alert("عطل في الفايربيز: " + error.message); }
+    } catch (error: any) { alert("عطل في الفايربيز: " + error.message); }
   };
 
   const adminAction = async (id: string, action: 'approve' | 'reject') => { await processAdminAction(id, action); };

@@ -1,10 +1,9 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { initializeFirestore, getFirestore, Firestore } from "firebase/firestore";
+import { initializeFirestore, getFirestore, Firestore, terminate } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { getMessaging } from "firebase/messaging";
 
 /**
- * @fileOverview إعدادات الفايربيز المطورة - تم تأمين التهيئة لمنع الـ Internal Server Error وضمان استقرار السامسونج.
+ * @fileOverview إعدادات الفايربيز البرقية - تم تحسين التهيئة لضمان استجابة لحظية بلمح البصر.
  */
 
 const firebaseConfig = {
@@ -16,29 +15,24 @@ const firebaseConfig = {
   appId: "1:723678552538:web:579e6791a1211c7998e0e3"
 };
 
-// تهيئة التطبيق مرة واحدة فقط لمنع تعارض السيرفر
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 let db: Firestore;
 
 if (typeof window !== "undefined") {
-  // تهيئة الفايربيز للمتصفح مع ضمان عدم التكرار
+  // للعملاء (المتصفح): نستخدم تهيئة مخصصة تضمن عمل أجهزة سامسونج بلمح البصر
   try {
-    db = getFirestore(app);
-    // محاولة تفعيل Long Polling لثبات أجهزة سامسونج دون التسبب بانهيار
-    initializeFirestore(app, {
+    db = initializeFirestore(app, {
       experimentalForceLongPolling: true,
     });
   } catch (e) {
-    // إذا كانت مهيأة مسبقاً، نستخدم النسخة الموجودة
     db = getFirestore(app);
   }
 } else {
-  // تهيئة السيرفر (Vercel) بشكل نقي لمنع الـ 500 Error
+  // للسيرفر: تهيئة كلاسيكية لمنع الـ 500 Error
   db = getFirestore(app);
 }
 
 const auth = getAuth(app);
-const messaging = typeof window !== "undefined" ? getMessaging(app) : null;
 
-export { db, auth, messaging, firebaseConfig };
+export { db, auth, firebaseConfig };
