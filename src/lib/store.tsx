@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -27,7 +28,7 @@ import { changePasswordAction, updateProfileImageAction } from '@/app/actions/pr
 import { Transaction } from './types';
 
 /**
- * @fileOverview محرك البيانات البرقي المطور - تم تحسينه ليكون الأسرع في جلب بيانات المدير.
+ * @fileOverview محرك البيانات والاشعارات المطور - نظام ربط لحظي كامل للمدير والزبائن.
  */
 
 type UserContextType = {
@@ -79,6 +80,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [isAudioUnlocked, setIsAudioUnlocked] = useState(false);
   
   const isInitialLoad = useRef(true);
+  const transactionsRef = useRef<Transaction[]>([]);
   const currency = "ل.س.ج";
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
@@ -87,16 +89,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const triggerNotification = useCallback((title: string, body: string) => {
     if (typeof window === "undefined") return;
     try {
+      // تشغيل نغمة شبيك لبيك المعتمدة
       const audio = new Audio(NOTIFICATION_SOUND);
-      audio.play().catch(err => console.log("Audio play ignored:", err));
+      audio.play().catch(err => console.log("Audio play blocked, needs interaction", err));
 
       if ("Notification" in window && Notification.permission === "granted") {
         new Notification(title, { 
           body, 
-          icon: 'https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg' 
+          icon: 'https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg',
+          badge: 'https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg'
         });
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("Notification trigger error", e);
+    }
   }, []);
 
   const unlockAudio = () => {
@@ -104,7 +110,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
       audio.volume = 0;
-      audio.play().then(() => setIsAudioUnlocked(true)).catch(() => {});
+      audio.play().then(() => {
+        setIsAudioUnlocked(true);
+        console.log("Audio unlocked successfully");
+      }).catch(() => {});
     } catch (e) {}
   };
 
@@ -114,16 +123,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const phoneClean = userPhone.trim();
       const isAdminUser = phoneClean === ADMIN_PHONE;
 
-      // 1. تفعيل الشبكة فوراً
       await enableNetwork(db).catch(() => {});
 
-      // 2. الجلب المتوازي بـ Limits صارمة للسرعة
       const userQ = query(collection(db, "users"), where("phone", "==", phoneClean), limit(1));
       const fetchPromises: Promise<any>[] = [getDocs(userQ)];
       
       if (isAdminUser) {
-        // للمدير: جلب آخر 100 مستخدم و 100 عملية و 50 طلب استعادة لضمان السرعة
-        fetchPromises.push(getDocs(query(collection(db, "users"), limit(150))));
+        fetchPromises.push(getDocs(query(collection(db, "users"), limit(200))));
         fetchPromises.push(getDocs(query(collection(db, "transactions"), orderBy("createdAt", "desc"), limit(100))));
         fetchPromises.push(getDocs(query(collection(db, "password_requests"), limit(50))));
       } else {
@@ -132,7 +138,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
       const results = await Promise.all(fetchPromises);
       
-      // تحديث الحالة فوراً
       if (!results[0].empty) {
         const data = results[0].docs[0].data();
         setUserBalance(Number(data.balance || 0));
@@ -141,10 +146,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
       if (isAdminUser) {
         setAllUsers(results[1].docs.map(d => ({ ...d.data(), id: d.id })));
-        setTransactions(results[2].docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[]);
+        const txs = results[2].docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
+        setTransactions(txs);
+        transactionsRef.current = txs;
         setPasswordRequests(results[3].docs.map(d => ({ ...d.data(), id: d.id })));
       } else {
-        setTransactions(results[1].docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[]);
+        const txs = results[1].docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
+        setTransactions(txs);
+        transactionsRef.current = txs;
       }
     } catch (e) {
       console.error("Rapid Sync Error:", e);
@@ -170,14 +179,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     
-    // تشغيل الجلب البرقي فوراً
     refreshCloudData();
 
     const unsubscribes: (() => void)[] = [];
     const phoneClean = userPhone.trim();
     const isAdminUser = phoneClean === ADMIN_PHONE;
 
-    // مستمع رصيد المستخدم
     unsubscribes.push(onSnapshot(query(collection(db, "users"), where("phone", "==", phoneClean)), (snap) => {
       if (!snap.empty) {
         const data = snap.docs[0].data();
@@ -186,35 +193,49 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
     }));
 
-    // مستمع العمليات
     const txQuery = isAdminUser 
       ? query(collection(db, "transactions"), orderBy("createdAt", "desc"), limit(100))
-      : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"), limit(30));
+      : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"), limit(50));
 
     unsubscribes.push(onSnapshot(txQuery, (snap) => {
       const newTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
       
       if (!isInitialLoad.current) {
         snap.docChanges().forEach((change) => {
+          const tx = change.doc.data() as Transaction;
+          const txId = change.doc.id;
+
+          // 1. للمدير: إشعار عند وصول إيداع جديد
           if (change.type === "added") {
-            const tx = change.doc.data() as Transaction;
             if (isAdminUser && tx.status === 'Pending' && (tx.type === 'إيداع محفظة' || tx.type === 'طلب إيداع')) {
-              triggerNotification("طلب إيداع جديد 💰", `المبلغ: ${tx.amount.toLocaleString()} - العميل: ${tx.userName}`);
+              triggerNotification("طلب إيداع جديد 💰", `المبلغ: ${tx.amount.toLocaleString()} - العميل: ${tx.userName || tx.userPhone}`);
+            }
+          }
+
+          // 2. للزبون: إشعار عند تغيير حالة الطلب (قبول أو رفض)
+          if (change.type === "modified") {
+            if (!isAdminUser) {
+              const oldTx = transactionsRef.current.find(t => t.id === txId);
+              if (oldTx && oldTx.status === 'Pending' && tx.status !== 'Pending') {
+                if (tx.status === 'Completed') {
+                  triggerNotification("تم قبول طلبك بنجاح ✅", `تم تنفيذ ${tx.type} بمبلغ ${tx.amount.toLocaleString()}. رصيدك تم تحديثه.`);
+                } else if (tx.status === 'Rejected') {
+                  triggerNotification("عذراً، تم رفض طلبك ❌", `طلب ${tx.type} تم رفضه وعاد الرصيد لمحفظتك.`);
+                }
+              }
             }
           }
         });
       }
       setTransactions(newTxs);
+      transactionsRef.current = newTxs;
       isInitialLoad.current = false;
     }));
 
     if (isAdminUser) {
-      // مستمع المستخدمين للمدير
       unsubscribes.push(onSnapshot(query(collection(db, "users"), limit(200)), (snap) => {
         setAllUsers(snap.docs.map(d => ({ ...d.data(), id: d.id })));
       }));
-
-      // مستمع طلبات الاستعادة للمدير
       unsubscribes.push(onSnapshot(collection(db, "password_requests"), (snap) => {
         setPasswordRequests(snap.docs.map(d => ({ ...d.data(), id: d.id })));
       }));
@@ -246,7 +267,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const adminAction = async (id: string, action: 'approve' | 'reject') => {
     const previousTransactions = [...transactions];
-    // Optimistic Update
     setTransactions(prev => prev.map(t => 
       t.id === id ? { ...t, status: action === 'approve' ? 'Completed' : 'Rejected' } : t
     ));
