@@ -28,6 +28,14 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  experimental: {
+    // حل مشكلة Cross-origin في بيئات Cloud Workstations لضمان استقرار السيرفر
+    allowedDevOrigins: [
+      '*.cloudworkstations.dev',
+      'localhost:9002',
+      '0.0.0.0:9002'
+    ]
+  }
 };
 
 export default nextConfig;
