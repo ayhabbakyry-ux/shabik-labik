@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -26,6 +27,7 @@ import { Transaction } from './types';
 
 /**
  * @fileOverview محرك البيانات البرقي - يضمن ظهور الرصيد والطلبات بلمح البصر عبر الجلب المتوازي.
+ * تم تحديثه بنظام Optimistic UI للمدير ونظام إشعارات مضاد للانهيار.
  */
 
 type UserContextType = {
@@ -82,24 +84,28 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";
 
-  // دالة الإشعار الصوتي الفوري - محمية 100% ضد انهيار السيرفر
+  // دالة الإشعار الصوتي الفوري - محمية 100% ضد انهيار أجهزة السامسونج والإنفينيكس
   const triggerNotification = useCallback((title: string, body: string) => {
     if (typeof window === "undefined") return;
     
-    // تشغيل نغمة شبيك لبيك
+    // محرك الإشعارات الآمن - حماية قصوى ضد أخطاء الـ WebView
     try {
+      // تشغيل الصوت مع معالجة صامتة للحظر (Silent Audio Fallback)
       const audio = new Audio(NOTIFICATION_SOUND);
-      audio.play().catch(e => console.log("الصوت بانتظار تفاعل المستخدم أولاً"));
-    } catch (e) {}
+      audio.play().catch(err => {
+        console.log("Audio play safely blocked by browser policy:", err);
+      });
 
-    // إظهار إشعار النظام
-    if ("Notification" in window && Notification.permission === "granted") {
-      try {
+      // إظهار إشعار النظام مع التحقق من الدعم (Environment Protection)
+      if ("Notification" in window && Notification.permission === "granted") {
         new Notification(title, { 
           body, 
           icon: 'https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg' 
         });
-      } catch (e) {}
+      }
+    } catch (crashGuard) {
+      // منع انهيار التطبيق في حال تعطل واجهات برمجة المتصفح (No UI Blocking)
+      console.error("Notification system error suppressed for stability:", crashGuard);
     }
   }, []);
 
@@ -114,7 +120,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {}
   };
 
-  // هجوم جلب البيانات البرقي - للمدير والزبون
   const refreshCloudData = useCallback(async () => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     try {
@@ -122,7 +127,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const phoneClean = userPhone.trim();
       const isAdminUser = phoneClean === ADMIN_PHONE;
 
-      // جلب متوازي لضمان السرعة القصوى (بلمح البصر)
       const userQ = query(collection(db, "users"), where("phone", "==", phoneClean), limit(1));
       
       const fetchPromises: Promise<any>[] = [getDocs(userQ)];
@@ -137,7 +141,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
       const results = await Promise.all(fetchPromises);
       
-      // تحديث الحالة فوراً
       if (!results[0].empty) {
         const data = results[0].docs[0].data();
         setUserBalance(Number(data.balance || 0));
@@ -173,7 +176,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // المراقبة اللحظية للإشعارات والصوت
   useEffect(() => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     
@@ -183,7 +185,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const phoneClean = userPhone.trim();
     const isAdminUser = phoneClean === ADMIN_PHONE;
 
-    // مراقب الرصيد والبروفايل
     const unsubUser = onSnapshot(query(collection(db, "users"), where("phone", "==", phoneClean)), (snap) => {
       if (!snap.empty) {
         const data = snap.docs[0].data();
@@ -193,7 +194,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     });
     unsubscribes.push(unsubUser);
 
-    // مراقب العمليات اللحظي - قلب نظام الإشعارات
     const txQuery = isAdminUser 
       ? query(collection(db, "transactions"), limit(50))
       : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), limit(20));
@@ -206,14 +206,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
             const tx = change.doc.data() as Transaction;
-            // للمدير: إشعار عند إيداع جديد
             if (isAdminUser && tx.status === 'Pending' && (tx.type === 'إيداع محفظة' || tx.type === 'طلب إيداع')) {
               triggerNotification("طلب إيداع جديد 💰", `المبلغ: ${tx.amount.toLocaleString()} - العميل: ${tx.userName}`);
             }
           }
           if (change.type === "modified") {
             const tx = change.doc.data() as Transaction;
-            // للزبون: إشعار عند قبول أو رفض الطلب
             if (!isAdminUser && tx.status !== 'Pending') {
               triggerNotification(
                 tx.status === 'Completed' ? "تم قبول طلبك ✅" : "تم رفض الطلب ❌",
@@ -288,8 +286,56 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (error: any) { alert("عطل في الفايربيز: " + error.message); }
   };
 
-  const adminAction = async (id: string, action: 'approve' | 'reject') => { await processAdminAction(id, action); };
-  const updateBalanceAdmin = async (p: string, a: number, o: 'add' | 'subtract') => { await updateUserBalanceDirectlyAction(p, a, o); };
+  /**
+   * TASK 1: Instant Manager Data Update (Optimistic UI)
+   * يضمن استجابة فورية للمدير العام بغض النظر عن قوة الإنترنت.
+   */
+  const adminAction = async (id: string, action: 'approve' | 'reject') => {
+    // حفظ الحالة الحالية للرجوع إليها في حال الفشل
+    const previousTransactions = [...transactions];
+    
+    // التحديث المحلي الفوري (Millisecond Update)
+    setTransactions(prev => prev.map(t => 
+      t.id === id ? { ...t, status: action === 'approve' ? 'Completed' : 'Rejected' } : t
+    ));
+
+    try {
+      const res = await processAdminAction(id, action);
+      if (!res.success) throw new Error(res.message);
+    } catch (error: any) {
+      // التراجع التلقائي (Graceful Rollback)
+      setTransactions(previousTransactions);
+      console.error("Optimistic Action Failed:", error);
+      alert("فشل تحديث البيانات في السيرفر بسبب اتصال الشبكة. تم التراجع عن التغيير المحلي.");
+    }
+  };
+
+  /**
+   * Optimistic UI لتعديل الرصيد
+   */
+  const updateBalanceAdmin = async (phone: string, amount: number, operation: 'add' | 'subtract') => {
+    const previousUsers = [...allUsers];
+    
+    // تحديث محلي فوري
+    setAllUsers(prev => prev.map(u => {
+      if (u.phone === phone) {
+        const currentBal = Number(u.balance || 0);
+        const newBal = operation === 'add' ? currentBal + amount : Math.max(0, currentBal - amount);
+        return { ...u, balance: newBal };
+      }
+      return u;
+    }));
+
+    try {
+      const res = await updateUserBalanceDirectlyAction(phone, amount, operation);
+      if (!res.success) throw new Error("Update failed on server");
+    } catch (error) {
+      // استعادة الحالة السابقة
+      setAllUsers(previousUsers);
+      alert("تعذر تحديث رصيد العميل في السيرفر حالياً. يرجى مراجعة الاتصال.");
+    }
+  };
+
   const deleteUser = async (p: string) => { await deleteUserAction(p); };
   const requestReset = async (p: string) => await requestPasswordResetAction(p);
   const adminResetPassword = async (p: string, r: string) => { await completePasswordResetAction(p, r); };
