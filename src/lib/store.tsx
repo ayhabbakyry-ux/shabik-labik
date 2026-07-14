@@ -10,9 +10,7 @@ import {
   getDocs,
   limit,
   enableNetwork,
-  disableNetwork,
-  doc,
-  getDoc
+  doc
 } from 'firebase/firestore';
 import { signInAction, signUpAction, requestPasswordResetAction } from '@/app/actions/auth';
 import { syncBalanceAction, recordTransactionAction } from '@/app/actions/wallet';
@@ -80,12 +78,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";
 
-  const playNotificationSound = useCallback(() => {
+  const triggerNotification = useCallback((title: string, body: string) => {
     if (typeof window === "undefined" || !isAudioUnlocked) return;
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
-      audio.volume = 1.0;
       audio.play().catch(() => {});
+      if ('Notification' in window && Notification.permission === "granted") {
+        new Notification(title, { body });
+      }
     } catch (e) {}
   }, [isAudioUnlocked]);
 
@@ -94,32 +94,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
       audio.volume = 0;
-      audio.play().then(() => {
-        setIsAudioUnlocked(true);
-      }).catch(() => {});
+      audio.play().then(() => setIsAudioUnlocked(true)).catch(() => {});
     } catch (e) {}
   };
-
-  const triggerNotification = useCallback((title: string, body: string) => {
-    if (typeof window === "undefined") return;
-    playNotificationSound();
-    try {
-      if ('Notification' in window && Notification.permission === "granted") {
-        new Notification(title, { body });
-      }
-    } catch (e) {}
-  }, [playNotificationSound]);
 
   const refreshCloudData = useCallback(async () => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     try {
+      await enableNetwork(db).catch(() => {});
       const phoneClean = userPhone.trim();
       const isAdminUser = phoneClean === ADMIN_PHONE;
-      
-      // إجبار الفايربيز على إعادة الاتصال
-      await enableNetwork(db).catch(() => {});
 
-      // جلب بيانات المستخدم الحالي (أو المدير)
       const userQ = query(collection(db, "users"), where("phone", "==", phoneClean), limit(1));
       const userSnap = await getDocs(userQ);
       if (!userSnap.empty) {
@@ -128,26 +113,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setProfileImage(data.profileImage || null);
       }
 
-      // جلب المعاملات
-      const txQuery = isAdminUser 
-        ? query(collection(db, "transactions"), limit(100))
-        : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), limit(50));
-      
-      const txSnap = await getDocs(txQuery);
-      const manualTxs = txSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
-      manualTxs.sort((a, b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || ""));
-      setTransactions(manualTxs);
-
-      // جلب بيانات الإدارة الإضافية إذا كان المستخدم هو المدير
       if (isAdminUser) {
         const usersSnap = await getDocs(collection(db, "users"));
         setAllUsers(usersSnap.docs.map(d => ({ ...d.data(), id: d.id })));
-        
         const passReqSnap = await getDocs(collection(db, "password_requests"));
         setPasswordRequests(passReqSnap.docs.map(d => ({ ...d.data(), id: d.id })));
       }
     } catch (e) {
-      console.error("Refresh Cloud Data Error:", e);
+      console.error("Manual Sync Failure:", e);
     }
   }, [isLoggedIn, userPhone]);
 
@@ -170,7 +143,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     
-    // محاولة الاتصال القسري عند البداية
     refreshCloudData();
 
     const unsubscribes: (() => void)[] = [];
@@ -183,9 +155,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setUserBalance(Number(data.balance || 0));
         setProfileImage(data.profileImage || null);
       }
-    }, (error) => {
-      console.warn("Firestore Sync Error (User):", error);
-    });
+    }, (e) => console.warn("Firestore User Sync Error:", e));
     unsubscribes.push(unsubUser);
 
     const txQuery = isAdminUser 
@@ -201,27 +171,25 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           if (change.type === "added") {
             const tx = change.doc.data() as Transaction;
             if (isAdminUser && tx.status === 'Pending' && (tx.type === 'إيداع محفظة' || tx.type === 'طلب إيداع')) {
-              triggerNotification("طلب إيداع جديد 💰", `من: ${tx.userName || tx.userPhone} بقيمة ${tx.amount.toLocaleString()}`);
+              triggerNotification("طلب إيداع جديد 💰", `المبلغ: ${tx.amount.toLocaleString()}`);
             }
           }
         });
       }
       setTransactions(newTxs);
       isInitialLoad.current = false;
-    }, (error) => {
-      console.warn("Firestore Sync Error (Transactions):", error);
-    });
+    }, (e) => console.warn("Firestore TX Sync Error:", e));
     unsubscribes.push(unsubTxs);
 
     if (isAdminUser) {
       const unsubAllUsers = onSnapshot(collection(db, "users"), (snap) => {
         setAllUsers(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      }, (e) => console.warn(e));
+      });
       unsubscribes.push(unsubAllUsers);
 
       const unsubPassReq = onSnapshot(collection(db, "password_requests"), (snap) => {
         setPasswordRequests(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      }, (e) => console.warn(e));
+      });
       unsubscribes.push(unsubPassReq);
     }
     
@@ -271,10 +239,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         type: 'إيداع محفظة', amount, status: 'Pending', date: now, createdAt: now,
         userName, userPhone, details: "طلب إيداع رصيد", proofImage
       });
-      if (!result.success) {
-        if (typeof window !== "undefined") alert("الخطأ الحقيقي من السيرفر هو: " + result.error);
-        return;
-      }
+      if (!result.success && typeof window !== "undefined") alert("الخطأ الحقيقي من السيرفر هو: " + result.error);
     } catch (error: any) { if (typeof window !== "undefined") alert("عطل في الفايربيز: " + error.message); }
   };
 
@@ -305,8 +270,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (data.success && data.status) {
           const remote = String(data.status).toLowerCase().trim();
           let final: 'Completed' | 'Rejected' | null = null;
-          if (['accept', 'موافق', 'مقبول', 'success', 'completed'].includes(remote)) final = 'Completed';
-          else if (['reject', 'رفض', 'failed'].includes(remote)) final = 'Rejected';
+          if (['accept', 'موافق', 'success', 'completed'].includes(remote)) final = 'Completed';
+          else if (['reject', 'failed'].includes(remote)) final = 'Rejected';
           if (final) await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
         }
       } catch (err) {}

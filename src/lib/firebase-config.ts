@@ -4,7 +4,7 @@ import { getAuth } from "firebase/auth";
 import { getMessaging } from "firebase/messaging";
 
 /**
- * @fileOverview إعدادات الفايربيز الأساسية - تم تحسينها لضمان استقرار الاتصال في الأجهزة الضعيفة ومنع الانهيارات.
+ * @fileOverview إعدادات الفايربيز المطورة - تم تأمين التهيئة لمنع الـ Internal Server Error وضمان استقرار السامسونج.
  */
 
 const firebaseConfig = {
@@ -16,20 +16,25 @@ const firebaseConfig = {
   appId: "1:723678552538:web:579e6791a1211c7998e0e3"
 };
 
+// تهيئة التطبيق مرة واحدة فقط لمنع تعارض السيرفر
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 let db: Firestore;
+
 if (typeof window !== "undefined") {
+  // تهيئة الفايربيز للمتصفح مع ضمان عدم التكرار
   try {
-    // تفعيل Long Polling لضمان استقرار أجهزة سامسونج
-    db = initializeFirestore(app, {
+    db = getFirestore(app);
+    // محاولة تفعيل Long Polling لثبات أجهزة سامسونج دون التسبب بانهيار
+    initializeFirestore(app, {
       experimentalForceLongPolling: true,
-      useFetchStreams: false
     });
   } catch (e) {
+    // إذا كانت مهيأة مسبقاً، نستخدم النسخة الموجودة
     db = getFirestore(app);
   }
 } else {
+  // تهيئة السيرفر (Vercel) بشكل نقي لمنع الـ 500 Error
   db = getFirestore(app);
 }
 
