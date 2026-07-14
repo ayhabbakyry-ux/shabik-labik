@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -11,7 +10,9 @@ import {
   getDocs,
   limit,
   enableNetwork,
-  orderBy
+  orderBy,
+  getDocFromCache,
+  getDocsFromCache
 } from 'firebase/firestore';
 import { signInAction, signUpAction, requestPasswordResetAction } from '@/app/actions/auth';
 import { syncBalanceAction, recordTransactionAction } from '@/app/actions/wallet';
@@ -26,8 +27,7 @@ import { changePasswordAction, updateProfileImageAction } from '@/app/actions/pr
 import { Transaction } from './types';
 
 /**
- * @fileOverview محرك البيانات البرقي - يضمن ظهور الرصيد والطلبات بلمح البصر عبر الجلب المتوازي.
- * تم تحديثه بنظام Optimistic UI للمدير ونظام إشعارات مضاد للانهيار.
+ * @fileOverview محرك البيانات البرقي المطور - تم تحسينه ليكون الأسرع في جلب بيانات المدير.
  */
 
 type UserContextType = {
@@ -84,29 +84,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";
 
-  // دالة الإشعار الصوتي الفوري - محمية 100% ضد انهيار أجهزة السامسونج والإنفينيكس
   const triggerNotification = useCallback((title: string, body: string) => {
     if (typeof window === "undefined") return;
-    
-    // محرك الإشعارات الآمن - حماية قصوى ضد أخطاء الـ WebView
     try {
-      // تشغيل الصوت مع معالجة صامتة للحظر (Silent Audio Fallback)
       const audio = new Audio(NOTIFICATION_SOUND);
-      audio.play().catch(err => {
-        console.log("Audio play safely blocked by browser policy:", err);
-      });
+      audio.play().catch(err => console.log("Audio play ignored:", err));
 
-      // إظهار إشعار النظام مع التحقق من الدعم (Environment Protection)
       if ("Notification" in window && Notification.permission === "granted") {
         new Notification(title, { 
           body, 
           icon: 'https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg' 
         });
       }
-    } catch (crashGuard) {
-      // منع انهيار التطبيق في حال تعطل واجهات برمجة المتصفح (No UI Blocking)
-      console.error("Notification system error suppressed for stability:", crashGuard);
-    }
+    } catch (e) {}
   }, []);
 
   const unlockAudio = () => {
@@ -114,33 +104,35 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
       audio.volume = 0;
-      audio.play().then(() => {
-        setIsAudioUnlocked(true);
-      }).catch(() => {});
+      audio.play().then(() => setIsAudioUnlocked(true)).catch(() => {});
     } catch (e) {}
   };
 
   const refreshCloudData = useCallback(async () => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     try {
-      await enableNetwork(db).catch(() => {});
       const phoneClean = userPhone.trim();
       const isAdminUser = phoneClean === ADMIN_PHONE;
 
+      // 1. تفعيل الشبكة فوراً
+      await enableNetwork(db).catch(() => {});
+
+      // 2. الجلب المتوازي بـ Limits صارمة للسرعة
       const userQ = query(collection(db, "users"), where("phone", "==", phoneClean), limit(1));
-      
       const fetchPromises: Promise<any>[] = [getDocs(userQ)];
       
       if (isAdminUser) {
-        fetchPromises.push(getDocs(collection(db, "users")));
+        // للمدير: جلب آخر 100 مستخدم و 100 عملية و 50 طلب استعادة لضمان السرعة
+        fetchPromises.push(getDocs(query(collection(db, "users"), limit(150))));
         fetchPromises.push(getDocs(query(collection(db, "transactions"), orderBy("createdAt", "desc"), limit(100))));
-        fetchPromises.push(getDocs(collection(db, "password_requests")));
+        fetchPromises.push(getDocs(query(collection(db, "password_requests"), limit(50))));
       } else {
         fetchPromises.push(getDocs(query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"), limit(50))));
       }
 
       const results = await Promise.all(fetchPromises);
       
+      // تحديث الحالة فوراً
       if (!results[0].empty) {
         const data = results[0].docs[0].data();
         setUserBalance(Number(data.balance || 0));
@@ -154,9 +146,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       } else {
         setTransactions(results[1].docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[]);
       }
-
     } catch (e) {
-      console.error("Rapid Sync Failure:", e);
+      console.error("Rapid Sync Error:", e);
     }
   }, [isLoggedIn, userPhone]);
 
@@ -179,29 +170,30 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     
+    // تشغيل الجلب البرقي فوراً
     refreshCloudData();
 
     const unsubscribes: (() => void)[] = [];
     const phoneClean = userPhone.trim();
     const isAdminUser = phoneClean === ADMIN_PHONE;
 
-    const unsubUser = onSnapshot(query(collection(db, "users"), where("phone", "==", phoneClean)), (snap) => {
+    // مستمع رصيد المستخدم
+    unsubscribes.push(onSnapshot(query(collection(db, "users"), where("phone", "==", phoneClean)), (snap) => {
       if (!snap.empty) {
         const data = snap.docs[0].data();
         setUserBalance(Number(data.balance || 0));
         setProfileImage(data.profileImage || null);
       }
-    });
-    unsubscribes.push(unsubUser);
+    }));
 
+    // مستمع العمليات
     const txQuery = isAdminUser 
-      ? query(collection(db, "transactions"), limit(50))
-      : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), limit(20));
+      ? query(collection(db, "transactions"), orderBy("createdAt", "desc"), limit(100))
+      : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"), limit(30));
 
-    const unsubTxs = onSnapshot(txQuery, (snap) => {
+    unsubscribes.push(onSnapshot(txQuery, (snap) => {
       const newTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
-      newTxs.sort((a, b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || ""));
-
+      
       if (!isInitialLoad.current) {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
@@ -210,36 +202,26 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
               triggerNotification("طلب إيداع جديد 💰", `المبلغ: ${tx.amount.toLocaleString()} - العميل: ${tx.userName}`);
             }
           }
-          if (change.type === "modified") {
-            const tx = change.doc.data() as Transaction;
-            if (!isAdminUser && tx.status !== 'Pending') {
-              triggerNotification(
-                tx.status === 'Completed' ? "تم قبول طلبك ✅" : "تم رفض الطلب ❌",
-                `الخدمة: ${tx.type} - رصيدك الآن: ${userBalance} ل.س.ج`
-              );
-            }
-          }
         });
       }
       setTransactions(newTxs);
       isInitialLoad.current = false;
-    });
-    unsubscribes.push(unsubTxs);
+    }));
 
     if (isAdminUser) {
-      const unsubAllUsers = onSnapshot(collection(db, "users"), (snap) => {
+      // مستمع المستخدمين للمدير
+      unsubscribes.push(onSnapshot(query(collection(db, "users"), limit(200)), (snap) => {
         setAllUsers(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      });
-      unsubscribes.push(unsubAllUsers);
+      }));
 
-      const unsubPassReq = onSnapshot(collection(db, "password_requests"), (snap) => {
+      // مستمع طلبات الاستعادة للمدير
+      unsubscribes.push(onSnapshot(collection(db, "password_requests"), (snap) => {
         setPasswordRequests(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      });
-      unsubscribes.push(unsubPassReq);
+      }));
     }
     
     return () => unsubscribes.forEach(unsub => unsub());
-  }, [isLoggedIn, userPhone, triggerNotification, refreshCloudData, userBalance]);
+  }, [isLoggedIn, userPhone, triggerNotification, refreshCloudData]);
 
   const login = async (phone: string, password: string) => {
     const phoneClean = phone.trim();
@@ -262,78 +244,62 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== "undefined") localStorage.removeItem('shabik_auth');
   };
 
+  const adminAction = async (id: string, action: 'approve' | 'reject') => {
+    const previousTransactions = [...transactions];
+    // Optimistic Update
+    setTransactions(prev => prev.map(t => 
+      t.id === id ? { ...t, status: action === 'approve' ? 'Completed' : 'Rejected' } : t
+    ));
+    try {
+      const res = await processAdminAction(id, action);
+      if (!res.success) throw new Error(res.message);
+    } catch (error) {
+      setTransactions(previousTransactions);
+      alert("تعذر تحديث السيرفر، تم التراجع عن التغيير المحلي.");
+    }
+  };
+
+  const updateBalanceAdmin = async (phone: string, amount: number, operation: 'add' | 'subtract') => {
+    const previousUsers = [...allUsers];
+    setAllUsers(prev => prev.map(u => {
+      if (u.phone === phone) {
+        const cur = Number(u.balance || 0);
+        return { ...u, balance: operation === 'add' ? cur + amount : Math.max(0, cur - amount) };
+      }
+      return u;
+    }));
+    try {
+      const res = await updateUserBalanceDirectlyAction(phone, amount, operation);
+      if (!res.success) throw new Error("Server error");
+    } catch (error) {
+      setAllUsers(previousUsers);
+      alert("فشل تحديث الرصيد في السيرفر.");
+    }
+  };
+
   const deductBalance = async (amount: number, details: string, initialStatus: 'Pending' | 'Completed' = 'Completed', externalId?: string) => {
     const before = userBalance;
     const now = new Date().toISOString();
     const newBal = Math.max(0, userBalance - amount);
     setUserBalance(newBal);
     try {
-      const res = await recordTransactionAction({
+      await recordTransactionAction({
         external_order_id: externalId || "", type: 'طلب شحن', amount, status: initialStatus,
         date: now, createdAt: now, userName, userPhone, details, balanceBefore: before, balanceAfter: newBal
       });
       await syncBalanceAction(userPhone, newBal);
-    } catch (e: any) { console.error("Deduct Error:", e); }
+    } catch (e) {}
   };
 
   const requestDeposit = async (amount: number, proofImage: string) => {
     const now = new Date().toISOString();
     try {
-      await recordTransactionAction({
+      const result = await recordTransactionAction({
         type: 'إيداع محفظة', amount, status: 'Pending', date: now, createdAt: now,
         userName, userPhone, details: "طلب إيداع رصيد", proofImage
       });
+      if (!result.success) alert("الخطأ الحقيقي من السيرفر هو: " + result.error);
     } catch (error: any) { alert("عطل في الفايربيز: " + error.message); }
-  };
-
-  /**
-   * TASK 1: Instant Manager Data Update (Optimistic UI)
-   * يضمن استجابة فورية للمدير العام بغض النظر عن قوة الإنترنت.
-   */
-  const adminAction = async (id: string, action: 'approve' | 'reject') => {
-    // حفظ الحالة الحالية للرجوع إليها في حال الفشل
-    const previousTransactions = [...transactions];
-    
-    // التحديث المحلي الفوري (Millisecond Update)
-    setTransactions(prev => prev.map(t => 
-      t.id === id ? { ...t, status: action === 'approve' ? 'Completed' : 'Rejected' } : t
-    ));
-
-    try {
-      const res = await processAdminAction(id, action);
-      if (!res.success) throw new Error(res.message);
-    } catch (error: any) {
-      // التراجع التلقائي (Graceful Rollback)
-      setTransactions(previousTransactions);
-      console.error("Optimistic Action Failed:", error);
-      alert("فشل تحديث البيانات في السيرفر بسبب اتصال الشبكة. تم التراجع عن التغيير المحلي.");
-    }
-  };
-
-  /**
-   * Optimistic UI لتعديل الرصيد
-   */
-  const updateBalanceAdmin = async (phone: string, amount: number, operation: 'add' | 'subtract') => {
-    const previousUsers = [...allUsers];
-    
-    // تحديث محلي فوري
-    setAllUsers(prev => prev.map(u => {
-      if (u.phone === phone) {
-        const currentBal = Number(u.balance || 0);
-        const newBal = operation === 'add' ? currentBal + amount : Math.max(0, currentBal - amount);
-        return { ...u, balance: newBal };
-      }
-      return u;
-    }));
-
-    try {
-      const res = await updateUserBalanceDirectlyAction(phone, amount, operation);
-      if (!res.success) throw new Error("Update failed on server");
-    } catch (error) {
-      // استعادة الحالة السابقة
-      setAllUsers(previousUsers);
-      alert("تعذر تحديث رصيد العميل في السيرفر حالياً. يرجى مراجعة الاتصال.");
-    }
   };
 
   const deleteUser = async (p: string) => { await deleteUserAction(p); };
@@ -346,9 +312,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       const permission = await Notification.requestPermission();
       setNotificationsEnabled(permission === "granted");
-      if (permission === "granted") {
-        unlockAudio();
-      }
+      if (permission === "granted") unlockAudio();
     }
   };
 
