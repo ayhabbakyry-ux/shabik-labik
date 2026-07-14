@@ -10,7 +10,9 @@ import {
   getDocs,
   limit,
   enableNetwork,
-  disableNetwork
+  disableNetwork,
+  doc,
+  getDoc
 } from 'firebase/firestore';
 import { signInAction, signUpAction, requestPasswordResetAction } from '@/app/actions/auth';
 import { syncBalanceAction, recordTransactionAction } from '@/app/actions/wallet';
@@ -109,30 +111,43 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [playNotificationSound]);
 
   const refreshCloudData = useCallback(async () => {
-    if (!isLoggedIn || !userPhone) return;
+    if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     try {
       const phoneClean = userPhone.trim();
+      const isAdminUser = phoneClean === ADMIN_PHONE;
       
-      // إجبار الفايربيز على محاولة الاتصال مجدداً إذا كان في وضع الـ Offline
+      // إجبار الفايربيز على إعادة الاتصال
       await enableNetwork(db).catch(() => {});
 
+      // جلب بيانات المستخدم الحالي (أو المدير)
       const userQ = query(collection(db, "users"), where("phone", "==", phoneClean), limit(1));
       const userSnap = await getDocs(userQ);
       if (!userSnap.empty) {
         const data = userSnap.docs[0].data();
-        setUserBalance(data.balance || 0);
+        setUserBalance(Number(data.balance || 0));
         setProfileImage(data.profileImage || null);
       }
-      const txQuery = (phoneClean === ADMIN_PHONE) 
-        ? query(collection(db, "transactions"), limit(150))
-        : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), limit(100));
+
+      // جلب المعاملات
+      const txQuery = isAdminUser 
+        ? query(collection(db, "transactions"), limit(100))
+        : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), limit(50));
       
       const txSnap = await getDocs(txQuery);
       const manualTxs = txSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
       manualTxs.sort((a, b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || ""));
       setTransactions(manualTxs);
+
+      // جلب بيانات الإدارة الإضافية إذا كان المستخدم هو المدير
+      if (isAdminUser) {
+        const usersSnap = await getDocs(collection(db, "users"));
+        setAllUsers(usersSnap.docs.map(d => ({ ...d.data(), id: d.id })));
+        
+        const passReqSnap = await getDocs(collection(db, "password_requests"));
+        setPasswordRequests(passReqSnap.docs.map(d => ({ ...d.data(), id: d.id })));
+      }
     } catch (e) {
-      console.error("Refresh Error:", e);
+      console.error("Refresh Cloud Data Error:", e);
     }
   }, [isLoggedIn, userPhone]);
 
@@ -154,6 +169,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
+    
+    // محاولة الاتصال القسري عند البداية
+    refreshCloudData();
+
     const unsubscribes: (() => void)[] = [];
     const phoneClean = userPhone.trim();
     const isAdminUser = phoneClean === ADMIN_PHONE;
@@ -161,17 +180,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const unsubUser = onSnapshot(query(collection(db, "users"), where("phone", "==", phoneClean)), (snap) => {
       if (!snap.empty) {
         const data = snap.docs[0].data();
-        setUserBalance(data.balance || 0);
+        setUserBalance(Number(data.balance || 0));
         setProfileImage(data.profileImage || null);
       }
     }, (error) => {
-      console.warn("Firestore Listen Error (User):", error);
+      console.warn("Firestore Sync Error (User):", error);
     });
     unsubscribes.push(unsubUser);
 
     const txQuery = isAdminUser 
-      ? query(collection(db, "transactions"), limit(150))
-      : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), limit(100));
+      ? query(collection(db, "transactions"), limit(100))
+      : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), limit(50));
 
     const unsubTxs = onSnapshot(txQuery, (snap) => {
       const newTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
@@ -190,20 +209,24 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setTransactions(newTxs);
       isInitialLoad.current = false;
     }, (error) => {
-      console.warn("Firestore Listen Error (Transactions):", error);
+      console.warn("Firestore Sync Error (Transactions):", error);
     });
     unsubscribes.push(unsubTxs);
 
     if (isAdminUser) {
-      unsubscribes.push(onSnapshot(collection(db, "users"), (snap) => {
+      const unsubAllUsers = onSnapshot(collection(db, "users"), (snap) => {
         setAllUsers(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      }, (e) => console.warn(e)));
-      unsubscribes.push(onSnapshot(collection(db, "password_requests"), (snap) => {
+      }, (e) => console.warn(e));
+      unsubscribes.push(unsubAllUsers);
+
+      const unsubPassReq = onSnapshot(collection(db, "password_requests"), (snap) => {
         setPasswordRequests(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      }, (e) => console.warn(e)));
+      }, (e) => console.warn(e));
+      unsubscribes.push(unsubPassReq);
     }
+    
     return () => unsubscribes.forEach(unsub => unsub());
-  }, [isLoggedIn, userPhone, triggerNotification]);
+  }, [isLoggedIn, userPhone, triggerNotification, refreshCloudData]);
 
   const login = async (phone: string, password: string) => {
     const phoneClean = phone.trim();
@@ -262,6 +285,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const adminResetPassword = async (p: string, r: string) => { await completePasswordResetAction(p, r); };
   const changePassword = async (c: string, n: string) => await changePasswordAction(userPhone, c, n);
   const updateProfileImage = async (i: string) => await updateProfileImageAction(userPhone, i, userName);
+  
   const requestNotificationPermission = async () => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       const permission = await Notification.requestPermission();
@@ -292,7 +316,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <UserContext.Provider value={{ 
-      isLoggedIn, isAdmin: userPhone === ADMIN_PHONE, userPhone, userName, userBalance, profileImage, transactions, allUsers, passwordRequests,
+      isLoggedIn, isAdmin: userPhone.trim() === ADMIN_PHONE, userPhone, userName, userBalance, profileImage, transactions, allUsers, passwordRequests,
       login, register: signUpAction, logout, deductBalance, requestDeposit, adminAction, updateBalanceAdmin, deleteUser, requestReset, adminResetPassword,
       changePassword, updateProfileImage, currency, checkPendingOrders, notificationsEnabled, isNotificationSupported, requestNotificationPermission, refreshCloudData,
       isAudioUnlocked, unlockAudio

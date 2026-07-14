@@ -4,7 +4,7 @@ import { getAuth } from "firebase/auth";
 import { getMessaging } from "firebase/messaging";
 
 /**
- * @fileOverview إعدادات الفايربيز الأساسية - تم تحسينها لضمان استقرار الاتصال في الأجهزة الضعيفة.
+ * @fileOverview إعدادات الفايربيز الأساسية - تم تحسينها لضمان استقرار الاتصال في الأجهزة الضعيفة ومنع الانهيارات.
  */
 
 const firebaseConfig = {
@@ -21,16 +21,15 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 let db: Firestore;
 if (typeof window !== "undefined") {
   try {
-    // تفعيل Long Polling بشكل صارم لضمان استقرار أجهزة سامسونج ومنع خطأ "Could not reach backend"
+    // تفعيل Long Polling لضمان استقرار أجهزة سامسونج
     db = initializeFirestore(app, {
       experimentalForceLongPolling: true,
-      useFetchStreams: false // تعطيل Fetch Streams لزيادة التوافق مع المتصفحات القديمة
+      useFetchStreams: false
     });
   } catch (e) {
     db = getFirestore(app);
   }
 } else {
-  // السيرفر يستخدم التهيئة العادية لمنع Internal Server Error
   db = getFirestore(app);
 }
 
