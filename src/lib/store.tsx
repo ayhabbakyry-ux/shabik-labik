@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -9,7 +8,9 @@ import {
   where, 
   onSnapshot, 
   getDocs,
-  limit
+  limit,
+  enableNetwork,
+  disableNetwork
 } from 'firebase/firestore';
 import { signInAction, signUpAction, requestPasswordResetAction } from '@/app/actions/auth';
 import { syncBalanceAction, recordTransactionAction } from '@/app/actions/wallet';
@@ -111,6 +112,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (!isLoggedIn || !userPhone) return;
     try {
       const phoneClean = userPhone.trim();
+      
+      // إجبار الفايربيز على محاولة الاتصال مجدداً إذا كان في وضع الـ Offline
+      await enableNetwork(db).catch(() => {});
+
       const userQ = query(collection(db, "users"), where("phone", "==", phoneClean), limit(1));
       const userSnap = await getDocs(userQ);
       if (!userSnap.empty) {
@@ -126,7 +131,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const manualTxs = txSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
       manualTxs.sort((a, b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || ""));
       setTransactions(manualTxs);
-    } catch (e) {}
+    } catch (e) {
+      console.error("Refresh Error:", e);
+    }
   }, [isLoggedIn, userPhone]);
 
   useEffect(() => {
@@ -157,6 +164,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setUserBalance(data.balance || 0);
         setProfileImage(data.profileImage || null);
       }
+    }, (error) => {
+      console.warn("Firestore Listen Error (User):", error);
     });
     unsubscribes.push(unsubUser);
 
@@ -180,12 +189,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
       setTransactions(newTxs);
       isInitialLoad.current = false;
+    }, (error) => {
+      console.warn("Firestore Listen Error (Transactions):", error);
     });
     unsubscribes.push(unsubTxs);
 
     if (isAdminUser) {
-      unsubscribes.push(onSnapshot(collection(db, "users"), (snap) => setAllUsers(snap.docs.map(d => ({ ...d.data(), id: d.id })))));
-      unsubscribes.push(onSnapshot(collection(db, "password_requests"), (snap) => setPasswordRequests(snap.docs.map(d => ({ ...d.data(), id: d.id })))));
+      unsubscribes.push(onSnapshot(collection(db, "users"), (snap) => {
+        setAllUsers(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+      }, (e) => console.warn(e)));
+      unsubscribes.push(onSnapshot(collection(db, "password_requests"), (snap) => {
+        setPasswordRequests(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+      }, (e) => console.warn(e)));
     }
     return () => unsubscribes.forEach(unsub => unsub());
   }, [isLoggedIn, userPhone, triggerNotification]);
