@@ -1,4 +1,3 @@
-
 "use client";
 
 import { WalletCard } from "@/components/dashboard/WalletCard";
@@ -8,16 +7,18 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { useUser } from "@/lib/store";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Search, Menu, ShieldAlert, Sparkles, BellRing } from "lucide-react";
+import { Bell, Search, Menu, ShieldAlert, BellRing } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
-  const { isLoggedIn, userPhone, isAdmin, notificationsEnabled, isNotificationSupported, requestNotificationPermission, userName } = useUser();
+  const { 
+    isLoggedIn, userPhone, isAdmin, notificationsEnabled, 
+    isNotificationSupported, requestNotificationPermission, userName 
+  } = useUser();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const router = useRouter();
 
-  // Strict Auth Guard
   useEffect(() => {
     if (!isLoggedIn || !userPhone) {
       router.replace("/");
@@ -50,7 +51,7 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* Notification Banner - Only shown if supported by device */}
+        {/* بنر تفعيل الإشعارات - ضروري جداً لتفعيل الصوت */}
         {isNotificationSupported && !notificationsEnabled && (
           <div className="bg-primary/10 border border-primary/20 p-4 rounded-2xl flex items-center justify-between animate-in slide-in-from-top-4 duration-500">
             <div className="flex items-center gap-3">
@@ -58,8 +59,8 @@ export default function DashboardPage() {
                 <BellRing className="h-4 w-4 text-white" />
               </div>
               <div className="text-right">
-                <p className="font-bold text-xs text-primary">تفعيل التنبيهات</p>
-                <p className="text-[9px] text-muted-foreground">لتصلك تحديثات حالة طلباتك ورصيدك فوراً مع تنبيه صوتي.</p>
+                <p className="font-bold text-xs text-primary">تفعيل التنبيهات ونغمة شبيك لبيك</p>
+                <p className="text-[9px] text-muted-foreground">لتصلك تحديثات الطلبات والرصيد فوراً مع تنبيه صوتي.</p>
               </div>
             </div>
             <Button 
@@ -95,7 +96,6 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* بنر الصورة المطلوب - تم وضعه تحت الإدارة وفوق الرصيد */}
         <div className="w-full my-4 animate-in fade-in zoom-in duration-700">
           <img 
             src="https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg" 

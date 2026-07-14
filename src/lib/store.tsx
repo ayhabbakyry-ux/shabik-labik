@@ -10,8 +10,7 @@ import {
   getDocs,
   limit,
   enableNetwork,
-  doc,
-  getDoc
+  orderBy
 } from 'firebase/firestore';
 import { signInAction, signUpAction, requestPasswordResetAction } from '@/app/actions/auth';
 import { syncBalanceAction, recordTransactionAction } from '@/app/actions/wallet';
@@ -83,26 +82,39 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";
 
+  // دالة الإشعار الصوتي الفوري - محمية 100% ضد انهيار السيرفر
   const triggerNotification = useCallback((title: string, body: string) => {
-    if (typeof window === "undefined" || !isAudioUnlocked) return;
+    if (typeof window === "undefined") return;
+    
+    // تشغيل نغمة شبيك لبيك
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
-      audio.play().catch(() => {});
-      if ('Notification' in window && Notification.permission === "granted") {
-        new Notification(title, { body });
-      }
+      audio.play().catch(e => console.log("الصوت بانتظار تفاعل المستخدم أولاً"));
     } catch (e) {}
-  }, [isAudioUnlocked]);
+
+    // إظهار إشعار النظام
+    if ("Notification" in window && Notification.permission === "granted") {
+      try {
+        new Notification(title, { 
+          body, 
+          icon: 'https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg' 
+        });
+      } catch (e) {}
+    }
+  }, []);
 
   const unlockAudio = () => {
     if (typeof window === "undefined") return;
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
       audio.volume = 0;
-      audio.play().then(() => setIsAudioUnlocked(true)).catch(() => {});
+      audio.play().then(() => {
+        setIsAudioUnlocked(true);
+      }).catch(() => {});
     } catch (e) {}
   };
 
+  // هجوم جلب البيانات البرقي - للمدير والزبون
   const refreshCloudData = useCallback(async () => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     try {
@@ -110,31 +122,36 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const phoneClean = userPhone.trim();
       const isAdminUser = phoneClean === ADMIN_PHONE;
 
-      // جلب برقِي للرصيد
+      // جلب متوازي لضمان السرعة القصوى (بلمح البصر)
       const userQ = query(collection(db, "users"), where("phone", "==", phoneClean), limit(1));
-      const userSnap = await getDocs(userQ);
-      if (!userSnap.empty) {
-        const data = userSnap.docs[0].data();
+      
+      const fetchPromises: Promise<any>[] = [getDocs(userQ)];
+      
+      if (isAdminUser) {
+        fetchPromises.push(getDocs(collection(db, "users")));
+        fetchPromises.push(getDocs(query(collection(db, "transactions"), orderBy("createdAt", "desc"), limit(100))));
+        fetchPromises.push(getDocs(collection(db, "password_requests")));
+      } else {
+        fetchPromises.push(getDocs(query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"), limit(50))));
+      }
+
+      const results = await Promise.all(fetchPromises);
+      
+      // تحديث الحالة فوراً
+      if (!results[0].empty) {
+        const data = results[0].docs[0].data();
         setUserBalance(Number(data.balance || 0));
         setProfileImage(data.profileImage || null);
       }
 
-      // جلب برقي للطلبات
-      const txQuery = isAdminUser 
-        ? query(collection(db, "transactions"), limit(50))
-        : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), limit(30));
-      
-      const txSnap = await getDocs(txQuery);
-      const fetchedTxs = txSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
-      fetchedTxs.sort((a, b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || ""));
-      setTransactions(fetchedTxs);
-
       if (isAdminUser) {
-        const usersSnap = await getDocs(collection(db, "users"));
-        setAllUsers(usersSnap.docs.map(d => ({ ...d.data(), id: d.id })));
-        const passReqSnap = await getDocs(collection(db, "password_requests"));
-        setPasswordRequests(passReqSnap.docs.map(d => ({ ...d.data(), id: d.id })));
+        setAllUsers(results[1].docs.map(d => ({ ...d.data(), id: d.id })));
+        setTransactions(results[2].docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[]);
+        setPasswordRequests(results[3].docs.map(d => ({ ...d.data(), id: d.id })));
+      } else {
+        setTransactions(results[1].docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[]);
       }
+
     } catch (e) {
       console.error("Rapid Sync Failure:", e);
     }
@@ -156,16 +173,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // المراقبة اللحظية للإشعارات والصوت
   useEffect(() => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     
-    // تشغيل الجلب البرقي فوراً عند تسجيل الدخول أو التحديث
     refreshCloudData();
 
     const unsubscribes: (() => void)[] = [];
     const phoneClean = userPhone.trim();
     const isAdminUser = phoneClean === ADMIN_PHONE;
 
+    // مراقب الرصيد والبروفايل
     const unsubUser = onSnapshot(query(collection(db, "users"), where("phone", "==", phoneClean)), (snap) => {
       if (!snap.empty) {
         const data = snap.docs[0].data();
@@ -175,9 +193,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     });
     unsubscribes.push(unsubUser);
 
+    // مراقب العمليات اللحظي - قلب نظام الإشعارات
     const txQuery = isAdminUser 
-      ? query(collection(db, "transactions"), limit(100))
-      : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), limit(50));
+      ? query(collection(db, "transactions"), limit(50))
+      : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), limit(20));
 
     const unsubTxs = onSnapshot(txQuery, (snap) => {
       const newTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
@@ -187,8 +206,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
             const tx = change.doc.data() as Transaction;
+            // للمدير: إشعار عند إيداع جديد
             if (isAdminUser && tx.status === 'Pending' && (tx.type === 'إيداع محفظة' || tx.type === 'طلب إيداع')) {
-              triggerNotification("طلب إيداع جديد 💰", `المبلغ: ${tx.amount.toLocaleString()}`);
+              triggerNotification("طلب إيداع جديد 💰", `المبلغ: ${tx.amount.toLocaleString()} - العميل: ${tx.userName}`);
+            }
+          }
+          if (change.type === "modified") {
+            const tx = change.doc.data() as Transaction;
+            // للزبون: إشعار عند قبول أو رفض الطلب
+            if (!isAdminUser && tx.status !== 'Pending') {
+              triggerNotification(
+                tx.status === 'Completed' ? "تم قبول طلبك ✅" : "تم رفض الطلب ❌",
+                `الخدمة: ${tx.type} - رصيدك الآن: ${userBalance} ل.س.ج`
+              );
             }
           }
         });
@@ -211,7 +241,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
     
     return () => unsubscribes.forEach(unsub => unsub());
-  }, [isLoggedIn, userPhone, triggerNotification, refreshCloudData]);
+  }, [isLoggedIn, userPhone, triggerNotification, refreshCloudData, userBalance]);
 
   const login = async (phone: string, password: string) => {
     const phoneClean = phone.trim();
@@ -270,6 +300,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       const permission = await Notification.requestPermission();
       setNotificationsEnabled(permission === "granted");
+      if (permission === "granted") {
+        unlockAudio();
+      }
     }
   };
 
