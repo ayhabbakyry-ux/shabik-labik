@@ -92,16 +92,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
 
-  // حماية الصوت من العمل على السيرفر
+  // دالة محمية ومعزولة لتشغيل الصوت - لا تسبب انهيار السيرفر نهائياً
   const playNotificationSound = useCallback(() => {
     if (typeof window === "undefined" || !isAudioUnlocked) return;
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
       audio.volume = 1.0;
-      audio.play().catch(() => {});
+      audio.play().catch((e) => {
+        console.warn("Autoplay blocked or audio error:", e);
+      });
     } catch (e) {}
   }, [isAudioUnlocked]);
 
+  // دالة فك حظر الصوت من خلال تفاعل المستخدم
   const unlockAudio = () => {
     if (typeof window === "undefined") return;
     try {
@@ -113,13 +116,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {}
   };
 
-  // حماية الإشعارات من العمل على السيرفر
+  // دالة محمية ومعزولة لإرسال الإشعارات
   const triggerNotification = useCallback((title: string, body: string) => {
     if (typeof window === "undefined") return;
+    
+    // تشغيل الصوت في الخلفية وبشكل مستقل
+    playNotificationSound();
+
     try {
-      playNotificationSound();
       if ('Notification' in window && Notification.permission === "granted") {
-        new Notification(title, { body });
+        new Notification(title, { body, icon: '/favicon.ico' });
       }
     } catch (e) {}
   }, [playNotificationSound]);
@@ -221,18 +227,21 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         return dateB.localeCompare(dateA);
       });
 
+      // الكشف عن الإضافات الجديدة للإشعارات
       if (!isInitialLoad.current) {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
             const tx = change.doc.data() as Transaction;
-            if (isAdminUser && tx.status === 'Pending') {
-              triggerNotification("طلب إيداع جديد 💰", `من: ${tx.userName || tx.userPhone} بقيمة ${tx.amount}`);
+            if (isAdminUser && tx.status === 'Pending' && (tx.type === 'إيداع محفظة' || tx.type === 'طلب إيداع')) {
+              triggerNotification("طلب إيداع جديد 💰", `من: ${tx.userName || tx.userPhone} بقيمة ${tx.amount.toLocaleString()} ليرة.`);
             } else if (!isAdminUser && tx.userPhone === phoneClean) {
               triggerNotification("تحديث في حسابك", `تم تسجيل ${tx.type} بنجاح.`);
             }
           } else if (change.type === "modified") {
             const tx = change.doc.data() as Transaction;
-            triggerNotification("تحديث حالة الطلب", `${tx.type}: ${tx.status === 'Completed' ? "تم القبول ✅" : "تم الرفض ❌"}`);
+            if (tx.userPhone === phoneClean) {
+              triggerNotification("تحديث حالة الطلب", `${tx.type}: ${tx.status === 'Completed' ? "تم القبول بنجاح ✅" : "تم الرفض ❌"}`);
+            }
           }
         });
       }
@@ -323,9 +332,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         balanceBefore: before,
         balanceAfter: newBal
       });
+
       if (!res.success && typeof window !== "undefined") {
         alert("الخطأ الحقيقي من السيرفر هو: " + (res.error || "فشل غير معروف"));
       }
+      
       await syncBalanceAction(userPhone, newBal);
     } catch (e: any) {
       if (typeof window !== "undefined") {
@@ -338,7 +349,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const now = new Date().toISOString();
     
     try {
-      // كتابة البيانات هي الخطوة الأولى والصارمة
+      // كتابة البيانات هي الأولوية القصوى والصارمة
       const result = await recordTransactionAction({
         type: 'إيداع محفظة',
         amount,
@@ -353,25 +364,22 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
       if (!result.success) {
         if (typeof window !== "undefined") {
-          alert("الخطأ الحقيقي من السيرفر هو: " + result.error);
+          alert("الخطأ الحقيقي من السيرفر هو: " + (result.error || "فشل الحفظ"));
         }
         return;
       }
       
-      // عزل كود الإشعارات والتوكن لمنع الانهيار على أجهزة سامسونج
+      // تشغيل إشعار محلي مع صوت بشكل معزول وغير متزامن
       if (typeof window !== "undefined") {
-        try {
-          // أي منطق إضافي للتوكن يوضع هنا
-        } catch (tokenError: any) {
-          alert("عطل في التوكن: " + tokenError.message);
-        }
+        setTimeout(() => {
+          triggerNotification("تم إرسال طلبك", `جاري مراجعة إيداع ${amount.toLocaleString()} ليرة من قبل الإدارة.`);
+        }, 100);
       }
       
     } catch (error: any) {
       if (typeof window !== "undefined") {
         alert("عطل في الفايربيز: " + error.message);
       }
-      console.error(error);
     }
   };
 
