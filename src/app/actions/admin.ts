@@ -10,9 +10,9 @@ import {
   doc, 
   updateDoc, 
   deleteDoc, 
-  getDoc,
-  orderBy
+  getDoc
 } from 'firebase/firestore';
+import { Transaction } from '@/lib/types';
 
 /**
  * @fileOverview أفعال الإدارة السحابية - مع جلب شامل للبيانات لضمان عدم ضياع أي إيداع زبون.
@@ -30,7 +30,6 @@ export async function getAllUsersAction() {
 
 export async function getAllTransactionsAction() {
   try {
-    // جلب كافة العمليات من Firestore لضمان ظهور كل شيء للمدير
     const txSnap = await getDocs(collection(db, "transactions"));
     return txSnap.docs.map(d => ({ ...d.data(), id: d.id }));
   } catch (error) {

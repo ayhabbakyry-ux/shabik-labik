@@ -8,7 +8,6 @@ import {
   query, 
   where, 
   onSnapshot, 
-  doc,
   getDocs,
   limit
 } from 'firebase/firestore';
@@ -22,22 +21,7 @@ import {
   updateUserBalanceDirectlyAction
 } from '@/app/actions/admin';
 import { changePasswordAction, updateProfileImageAction } from '@/app/actions/profile';
-
-export type Transaction = {
-  id: string;
-  external_order_id?: string;
-  type: string;
-  amount: number;
-  status: 'Pending' | 'Completed' | 'Rejected';
-  date: string;
-  createdAt?: string;
-  userName?: string;
-  userPhone?: string;
-  details?: string;
-  proofImage?: string;
-  balanceBefore?: number;
-  balanceAfter?: number;
-};
+import { Transaction } from './types';
 
 type UserContextType = {
   isLoggedIn: boolean;
@@ -91,7 +75,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const currency = "ل.س.ج";
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
-  // المسار الصارم للنغمة المطلوبة
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";
 
   const playNotificationSound = useCallback(() => {
@@ -99,43 +82,35 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
       audio.volume = 1.0;
-      audio.play().catch((e) => {
-        console.warn("Autoplay blocked or audio error:", e);
-      });
+      audio.play().catch(() => {});
     } catch (e) {}
   }, [isAudioUnlocked]);
 
   const unlockAudio = () => {
     if (typeof window === "undefined") return;
     try {
-      // محاولة تشغيل صامتة لفك حظر سياسة المتصفح
       const audio = new Audio(NOTIFICATION_SOUND);
       audio.volume = 0;
       audio.play().then(() => {
         setIsAudioUnlocked(true);
-      }).catch(e => console.error("Audio Unlock Error:", e));
+      }).catch(() => {});
     } catch (e) {}
   };
 
   const triggerNotification = useCallback((title: string, body: string) => {
     if (typeof window === "undefined") return;
-    
     playNotificationSound();
-
     try {
       if ('Notification' in window && Notification.permission === "granted") {
-        new Notification(title, { body, icon: '/favicon.ico' });
+        new Notification(title, { body });
       }
     } catch (e) {}
   }, [playNotificationSound]);
 
   const refreshCloudData = useCallback(async () => {
     if (!isLoggedIn || !userPhone) return;
-    
     try {
       const phoneClean = userPhone.trim();
-      const isAdminUser = phoneClean === ADMIN_PHONE;
-      
       const userQ = query(collection(db, "users"), where("phone", "==", phoneClean), limit(1));
       const userSnap = await getDocs(userQ);
       if (!userSnap.empty) {
@@ -143,27 +118,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setUserBalance(data.balance || 0);
         setProfileImage(data.profileImage || null);
       }
-
-      let txQuery;
-      if (isAdminUser) {
-        txQuery = query(collection(db, "transactions"), limit(200));
-      } else {
-        txQuery = query(collection(db, "transactions"), where("userPhone", "==", phoneClean), limit(100));
-      }
+      const txQuery = (phoneClean === ADMIN_PHONE) 
+        ? query(collection(db, "transactions"), limit(150))
+        : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), limit(100));
       
       const txSnap = await getDocs(txQuery);
       const manualTxs = txSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
-      
-      manualTxs.sort((a, b) => {
-        const dateA = a.createdAt || a.date || "";
-        const dateB = b.createdAt || b.date || "";
-        return dateB.localeCompare(dateA);
-      });
-
+      manualTxs.sort((a, b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || ""));
       setTransactions(manualTxs);
-    } catch (e) {
-      console.error("Manual Refresh Error:", e);
-    }
+    } catch (e) {}
   }, [isLoggedIn, userPhone]);
 
   useEffect(() => {
@@ -179,26 +142,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setIsNotificationSupported(true);
         setNotificationsEnabled(Notification.permission === "granted");
       }
-
-      const handleVisibilityChange = () => {
-        if (document.visibilityState === 'visible' && isLoggedIn) {
-          refreshCloudData();
-        }
-      };
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }
-  }, [isLoggedIn, refreshCloudData]);
+  }, []);
 
   useEffect(() => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
-
     const unsubscribes: (() => void)[] = [];
     const phoneClean = userPhone.trim();
     const isAdminUser = phoneClean === ADMIN_PHONE;
 
-    const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
-    const unsubUser = onSnapshot(userQ, (snap) => {
+    const unsubUser = onSnapshot(query(collection(db, "users"), where("phone", "==", phoneClean)), (snap) => {
       if (!snap.empty) {
         const data = snap.docs[0].data();
         setUserBalance(data.balance || 0);
@@ -207,67 +160,93 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     });
     unsubscribes.push(unsubUser);
 
-    let txQuery;
-    if (isAdminUser) {
-      txQuery = query(collection(db, "transactions"), limit(150));
-    } else {
-      txQuery = query(collection(db, "transactions"), where("userPhone", "==", phoneClean), limit(100));
-    }
+    const txQuery = isAdminUser 
+      ? query(collection(db, "transactions"), limit(150))
+      : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), limit(100));
 
     const unsubTxs = onSnapshot(txQuery, (snap) => {
       const newTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
-      
-      newTxs.sort((a, b) => {
-        const dateA = a.createdAt || a.date || "";
-        const dateB = b.createdAt || b.date || "";
-        return dateB.localeCompare(dateA);
-      });
+      newTxs.sort((a, b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || ""));
 
       if (!isInitialLoad.current) {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
             const tx = change.doc.data() as Transaction;
-            // الربط اللحظي للمدير: إذا كان الإيداع معلقاً، شغل الصوت والإشعار
             if (isAdminUser && tx.status === 'Pending' && (tx.type === 'إيداع محفظة' || tx.type === 'طلب إيداع')) {
-              triggerNotification("طلب إيداع جديد 💰", `من: ${tx.userName || tx.userPhone} بقيمة ${tx.amount.toLocaleString()} ليرة.`);
-            } else if (!isAdminUser && tx.userPhone === phoneClean) {
-              triggerNotification("تحديث في حسابك", `تم تسجيل ${tx.type} بنجاح.`);
-            }
-          } else if (change.type === "modified") {
-            const tx = change.doc.data() as Transaction;
-            if (tx.userPhone === phoneClean) {
-              triggerNotification("تحديث حالة الطلب", `${tx.type}: ${tx.status === 'Completed' ? "تم القبول بنجاح ✅" : "تم الرفض ❌"}`);
+              triggerNotification("طلب إيداع جديد 💰", `من: ${tx.userName || tx.userPhone} بقيمة ${tx.amount.toLocaleString()}`);
             }
           }
         });
       }
-      
       setTransactions(newTxs);
       isInitialLoad.current = false;
-    }, (err) => {
-      console.error("TX Snapshot Error:", err);
-      refreshCloudData();
     });
     unsubscribes.push(unsubTxs);
 
     if (isAdminUser) {
-      const unsubAllUsers = onSnapshot(collection(db, "users"), (snap) => {
-        setAllUsers(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      });
-      unsubscribes.push(unsubAllUsers);
-
-      const unsubPass = onSnapshot(collection(db, "password_requests"), (snap) => {
-        setPasswordRequests(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      });
-      unsubscribes.push(unsubPass);
+      unsubscribes.push(onSnapshot(collection(db, "users"), (snap) => setAllUsers(snap.docs.map(d => ({ ...d.data(), id: d.id })))));
+      unsubscribes.push(onSnapshot(collection(db, "password_requests"), (snap) => setPasswordRequests(snap.docs.map(d => ({ ...d.data(), id: d.id })))));
     }
+    return () => unsubscribes.forEach(unsub => unsub());
+  }, [isLoggedIn, userPhone, triggerNotification]);
 
-    return () => {
-      unsubscribes.forEach(unsub => unsub());
-      isInitialLoad.current = true;
-    };
-  }, [isLoggedIn, userPhone, triggerNotification, refreshCloudData]);
+  const login = async (phone: string, password: string) => {
+    const phoneClean = phone.trim();
+    if (phoneClean === ADMIN_PHONE && password === ADMIN_PASS) {
+      const data = { phone: phoneClean, name: "المدير العام" };
+      setIsLoggedIn(true); setUserPhone(phoneClean); setUserName(data.name);
+      if (typeof window !== "undefined") localStorage.setItem('shabik_auth', JSON.stringify(data));
+      return { success: true, message: "مرحباً بك يا مدير." };
+    }
+    const result = await signInAction(phoneClean, password);
+    if (result.success && result.user) {
+      setIsLoggedIn(true); setUserPhone(result.user.phone); setUserName(result.user.name);
+      if (typeof window !== "undefined") localStorage.setItem('shabik_auth', JSON.stringify(result.user));
+    }
+    return result;
+  };
 
+  const logout = () => {
+    setIsLoggedIn(false); setUserPhone("");
+    if (typeof window !== "undefined") localStorage.removeItem('shabik_auth');
+  };
+
+  const deductBalance = async (amount: number, details: string, initialStatus: 'Pending' | 'Completed' = 'Completed', externalId?: string) => {
+    const before = userBalance;
+    const now = new Date().toISOString();
+    const newBal = Math.max(0, userBalance - amount);
+    setUserBalance(newBal);
+    try {
+      const res = await recordTransactionAction({
+        external_order_id: externalId || "", type: 'طلب شحن', amount, status: initialStatus,
+        date: now, createdAt: now, userName, userPhone, details, balanceBefore: before, balanceAfter: newBal
+      });
+      if (!res.success && typeof window !== "undefined") alert("الخطأ الحقيقي من السيرفر هو: " + res.error);
+      await syncBalanceAction(userPhone, newBal);
+    } catch (e: any) { if (typeof window !== "undefined") alert("عطل في الاتصال: " + e.message); }
+  };
+
+  const requestDeposit = async (amount: number, proofImage: string) => {
+    const now = new Date().toISOString();
+    try {
+      const result = await recordTransactionAction({
+        type: 'إيداع محفظة', amount, status: 'Pending', date: now, createdAt: now,
+        userName, userPhone, details: "طلب إيداع رصيد", proofImage
+      });
+      if (!result.success) {
+        if (typeof window !== "undefined") alert("الخطأ الحقيقي من السيرفر هو: " + result.error);
+        return;
+      }
+    } catch (error: any) { if (typeof window !== "undefined") alert("عطل في الفايربيز: " + error.message); }
+  };
+
+  const adminAction = async (id: string, action: 'approve' | 'reject') => { await processAdminAction(id, action); };
+  const updateBalanceAdmin = async (p: string, a: number, o: 'add' | 'subtract') => { await updateUserBalanceDirectlyAction(p, a, o); };
+  const deleteUser = async (p: string) => { await deleteUserAction(p); };
+  const requestReset = async (p: string) => await requestPasswordResetAction(p);
+  const adminResetPassword = async (p: string, r: string) => { await completePasswordResetAction(p, r); };
+  const changePassword = async (c: string, n: string) => await changePasswordAction(userPhone, c, n);
+  const updateProfileImage = async (i: string) => await updateProfileImageAction(userPhone, i, userName);
   const requestNotificationPermission = async () => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       const permission = await Notification.requestPermission();
@@ -275,125 +254,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const login = async (phone: string, password: string) => {
-    const phoneClean = phone.trim();
-    if (phoneClean === ADMIN_PHONE && password === ADMIN_PASS) {
-      const adminData = { phone: phoneClean, name: "المدير العام" };
-      setIsLoggedIn(true);
-      setUserPhone(phoneClean);
-      setUserName(adminData.name);
-      if (typeof window !== "undefined") {
-        localStorage.setItem('shabik_auth', JSON.stringify(adminData));
-      }
-      return { success: true, message: "مرحباً بك يا مدير." };
-    }
-    const result = await signInAction(phoneClean, password);
-    if (result.success && result.user) {
-      setIsLoggedIn(true);
-      setUserPhone(result.user.phone);
-      setUserName(result.user.name);
-      if (typeof window !== "undefined") {
-        localStorage.setItem('shabik_auth', JSON.stringify(result.user));
-      }
-    }
-    return result;
-  };
-
-  const logout = () => {
-    setIsLoggedIn(false);
-    setUserPhone("");
-    if (typeof window !== "undefined") {
-      localStorage.removeItem('shabik_auth');
-    }
-  };
-
-  const deductBalance = async (amount: number, productDetails: string, initialStatus: 'Pending' | 'Completed' = 'Completed', externalId?: string) => {
-    const before = userBalance;
-    const now = new Date().toISOString();
-    const newBal = Math.max(0, userBalance - amount);
-    
-    setUserBalance(newBal);
-    
-    try {
-      const res = await recordTransactionAction({
-        external_order_id: externalId || "",
-        type: 'طلب شحن',
-        amount,
-        status: initialStatus,
-        date: now,
-        createdAt: now,
-        userName,
-        userPhone,
-        details: productDetails,
-        balanceBefore: before,
-        balanceAfter: newBal
-      });
-
-      if (!res.success && typeof window !== "undefined") {
-        alert("الخطأ الحقيقي من السيرفر هو: " + (res.error || "فشل غير معروف"));
-      }
-      
-      await syncBalanceAction(userPhone, newBal);
-    } catch (e: any) {
-      if (typeof window !== "undefined") {
-        alert("عطل في الاتصال: " + e.message);
-      }
-    }
-  };
-
-  const requestDeposit = async (amount: number, proofImage: string) => {
-    const now = new Date().toISOString();
-    
-    try {
-      const result = await recordTransactionAction({
-        type: 'إيداع محفظة',
-        amount,
-        status: 'Pending',
-        date: now,
-        createdAt: now,
-        userName,
-        userPhone,
-        details: "طلب إيداع رصيد من المحفظة",
-        proofImage
-      });
-
-      if (!result.success) {
-        if (typeof window !== "undefined") {
-          alert("الخطأ الحقيقي من السيرفر هو: " + (result.error || "فشل الحفظ"));
-        }
-        return;
-      }
-      
-      if (typeof window !== "undefined") {
-        setTimeout(() => {
-          triggerNotification("تم إرسال طلبك", `جاري مراجعة إيداع ${amount.toLocaleString()} ليرة من قبل الإدارة.`);
-        }, 100);
-      }
-      
-    } catch (error: any) {
-      if (typeof window !== "undefined") {
-        alert("عطل في الفايربيز: " + error.message);
-      }
-    }
-  };
-
-  const adminAction = async (txId: string, action: 'approve' | 'reject') => {
-    await processAdminAction(txId, action);
-  };
-
-  const updateBalanceAdmin = async (phone: string, amount: number, operation: 'add' | 'subtract') => {
-    await updateUserBalanceDirectlyAction(phone, amount, operation);
-  };
-
-  const deleteUser = async (phone: string) => {
-    await deleteUserAction(phone);
-  };
-
   const checkPendingOrders = async () => {
     if (!isLoggedIn || isCheckingOrders) return;
     const pending = transactions.filter(tx => tx.status === 'Pending' && tx.external_order_id);
     if (pending.length === 0) return;
-
     setIsCheckingOrders(true);
     for (const order of pending) {
       try {
@@ -404,10 +268,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           let final: 'Completed' | 'Rejected' | null = null;
           if (['accept', 'موافق', 'مقبول', 'success', 'completed'].includes(remote)) final = 'Completed';
           else if (['reject', 'رفض', 'failed'].includes(remote)) final = 'Rejected';
-          
-          if (final) {
-            await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
-          }
+          if (final) await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
         }
       } catch (err) {}
     }
@@ -417,8 +278,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   return (
     <UserContext.Provider value={{ 
       isLoggedIn, isAdmin: userPhone === ADMIN_PHONE, userPhone, userName, userBalance, profileImage, transactions, allUsers, passwordRequests,
-      login, register: signUpAction, logout, deductBalance, requestDeposit, adminAction, updateBalanceAdmin, deleteUser, requestReset: requestPasswordResetAction, adminResetPassword: completePasswordResetAction,
-      changePassword: changePasswordAction, updateProfileImage: updateProfileImageAction, currency, checkPendingOrders, notificationsEnabled, isNotificationSupported, requestNotificationPermission, refreshCloudData,
+      login, register: signUpAction, logout, deductBalance, requestDeposit, adminAction, updateBalanceAdmin, deleteUser, requestReset, adminResetPassword,
+      changePassword, updateProfileImage, currency, checkPendingOrders, notificationsEnabled, isNotificationSupported, requestNotificationPermission, refreshCloudData,
       isAudioUnlocked, unlockAudio
     }}>
       {children}

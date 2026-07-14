@@ -1,3 +1,4 @@
+
 'use server';
 
 import { db } from '@/lib/firebase-config';
@@ -10,7 +11,7 @@ import {
   updateDoc, 
   doc
 } from 'firebase/firestore';
-import { Transaction } from '@/lib/store';
+import { Transaction } from '@/lib/types';
 
 /**
  * @fileOverview محرك العمليات المالية السحابي - يضمن كشف الأخطاء الحقيقية بدلاً من انهيار السيرفر.
