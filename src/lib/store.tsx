@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -90,9 +91,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const currency = "ل.س.ج";
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
-  const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
+  // المسار الصارم للنغمة المطلوبة
+  const NOTIFICATION_SOUND = "/shabik-labik.mp3";
 
-  // دالة محمية ومعزولة لتشغيل الصوت - لا تسبب انهيار السيرفر نهائياً
   const playNotificationSound = useCallback(() => {
     if (typeof window === "undefined" || !isAudioUnlocked) return;
     try {
@@ -104,10 +105,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {}
   }, [isAudioUnlocked]);
 
-  // دالة فك حظر الصوت من خلال تفاعل المستخدم
   const unlockAudio = () => {
     if (typeof window === "undefined") return;
     try {
+      // محاولة تشغيل صامتة لفك حظر سياسة المتصفح
       const audio = new Audio(NOTIFICATION_SOUND);
       audio.volume = 0;
       audio.play().then(() => {
@@ -116,11 +117,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {}
   };
 
-  // دالة محمية ومعزولة لإرسال الإشعارات
   const triggerNotification = useCallback((title: string, body: string) => {
     if (typeof window === "undefined") return;
     
-    // تشغيل الصوت في الخلفية وبشكل مستقل
     playNotificationSound();
 
     try {
@@ -205,9 +204,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setUserBalance(data.balance || 0);
         setProfileImage(data.profileImage || null);
       }
-    }, (err) => {
-      console.error("User Snapshot Error:", err);
-      refreshCloudData();
     });
     unsubscribes.push(unsubUser);
 
@@ -227,11 +223,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         return dateB.localeCompare(dateA);
       });
 
-      // الكشف عن الإضافات الجديدة للإشعارات
       if (!isInitialLoad.current) {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
             const tx = change.doc.data() as Transaction;
+            // الربط اللحظي للمدير: إذا كان الإيداع معلقاً، شغل الصوت والإشعار
             if (isAdminUser && tx.status === 'Pending' && (tx.type === 'إيداع محفظة' || tx.type === 'طلب إيداع')) {
               triggerNotification("طلب إيداع جديد 💰", `من: ${tx.userName || tx.userPhone} بقيمة ${tx.amount.toLocaleString()} ليرة.`);
             } else if (!isAdminUser && tx.userPhone === phoneClean) {
@@ -257,12 +253,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (isAdminUser) {
       const unsubAllUsers = onSnapshot(collection(db, "users"), (snap) => {
         setAllUsers(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      }, (err) => console.error("AllUsers Snapshot Error:", err));
+      });
       unsubscribes.push(unsubAllUsers);
 
       const unsubPass = onSnapshot(collection(db, "password_requests"), (snap) => {
         setPasswordRequests(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      }, (err) => console.error("PassRequests Snapshot Error:", err));
+      });
       unsubscribes.push(unsubPass);
     }
 
@@ -349,7 +345,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const now = new Date().toISOString();
     
     try {
-      // كتابة البيانات هي الأولوية القصوى والصارمة
       const result = await recordTransactionAction({
         type: 'إيداع محفظة',
         amount,
@@ -369,7 +364,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       
-      // تشغيل إشعار محلي مع صوت بشكل معزول وغير متزامن
       if (typeof window !== "undefined") {
         setTimeout(() => {
           triggerNotification("تم إرسال طلبك", `جاري مراجعة إيداع ${amount.toLocaleString()} ليرة من قبل الإدارة.`);
