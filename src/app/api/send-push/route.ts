@@ -1,15 +1,16 @@
+
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار إرسال إشعارات FCM - يستخدم بروتوكول Legacy لضمان التوافق الفوري.
- * يرجى إضافة FCM_SERVER_KEY في إعدادات البيئة (Vercel Env).
+ * @fileOverview مسار إرسال إشعارات FCM - نسخة مستقرة للمحفزات الثلاثة.
  */
 
 export async function POST(request: Request) {
     try {
-        const { token, title, body } = await request.json();
+        const { token, title, body, data } = await request.json();
         
-        // مفتاح السيرفر (يمكنك الحصول عليه من Firebase Console -> Project Settings -> Cloud Messaging)
+        if (!token) return NextResponse.json({ success: false, error: 'No Token' });
+
         const SERVER_KEY = process.env.ALRAGHEB_TOKEN || "64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0"; 
 
         const response = await fetch('https://fcm.googleapis.com/fcm/send', {
@@ -24,16 +25,18 @@ export async function POST(request: Request) {
                     title: title,
                     body: body,
                     sound: "default",
+                    click_action: "https://shabik-labik.vercel.app/history",
                     icon: "https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg"
                 },
+                data: data || {},
                 priority: "high"
             })
         });
 
-        const data = await response.json();
-        return NextResponse.json({ success: true, data });
+        const resData = await response.json();
+        return NextResponse.json({ success: true, resData });
     } catch (error: any) {
-        console.error("Push Send API Error:", error);
+        console.error("Push API Critical Error:", error);
         return NextResponse.json({ success: false, error: error.message });
     }
 }

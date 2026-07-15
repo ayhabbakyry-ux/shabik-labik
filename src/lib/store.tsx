@@ -109,6 +109,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {}
   }, [playNotificationSound]);
 
+  // دالة إرسال إشعار FCM بشكل صامت (Fire-and-Forget)
   const triggerPushSilently = useCallback((targetPhone: string, title: string, body: string) => {
     (async () => {
       try {
@@ -122,7 +123,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, title, body })
-        }).catch(e => console.log("Push failed silently"));
+        }).catch(() => {});
       } catch (e) {}
     })();
   }, []);
@@ -251,14 +252,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       try {
         const rawTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
         const sortedTxs = sortTransactionsClientSide(rawTxs);
+        
         if (!isInitialLoad.current) {
           snap.docChanges().forEach((change) => {
             const tx = change.doc.data() as Transaction;
             if (change.type === "added" && isAdminUser && tx.status === 'Pending') {
-              triggerNotification("طلب إيداع جديد 💰", `المبلغ: ${tx.amount.toLocaleString()} - العميل: ${tx.userName || tx.userPhone}`);
-            }
-            if (change.type === "modified" && !isAdminUser && tx.userPhone === phoneClean) {
-              triggerNotification(tx.status === 'Completed' ? "تم قبول طلبك ✅" : "تم رفض الطلب ❌", `طلب ${tx.type} بمبلغ ${tx.amount.toLocaleString()}.`);
+              triggerNotification("طلب إيداع جديد 💰", "هناك طلب إيداع وصل الآن");
             }
           });
         }
@@ -306,12 +305,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await processAdminAction(id, action);
       if (!res.success) throw new Error();
-      if (tx && tx.userPhone) {
-         triggerPushSilently(tx.userPhone, action === 'approve' ? "تم قبول طلبك ✅" : "تم رفض الطلب ❌", `طلب ${tx.type} بمبلغ ${tx.amount.toLocaleString()}.`);
+      
+      // TRIGGER 2: Admin -> User (Deposit Approved)
+      if (action === 'approve' && tx && tx.userPhone) {
+         triggerPushSilently(tx.userPhone, "تم تحديث الرصيد", `تمت إضافة مبلغ ${tx.amount.toLocaleString()} ل.س إلى رصيدك`);
       }
     } catch (e) {
       setTransactions(prev);
-      alert("❌ فشل الاتصال بالسيرفر، سيتم التراجع.");
     }
   };
 
@@ -323,7 +323,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (!res.success) throw new Error();
     } catch (e) {
       setAllUsers(prev);
-      alert("❌ فشل تحديث الرصيد.");
     }
   };
 
@@ -381,9 +380,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       
       alert("✅ تم إرسال طلبك بنجاح للمدير.");
 
-      playNotificationSound();
-      refreshCloudData().catch(() => {});
-      triggerPushSilently(ADMIN_PHONE, "طلب إيداع جديد 💰", `المبلغ: ${amount.toLocaleString()} - العميل: ${userName || userPhone}`);
+      // TRIGGER 1: User -> Admin (New Deposit Request)
+      triggerPushSilently(ADMIN_PHONE, "طلب إيداع جديد", "هناك طلب إيداع وصل الآن");
 
     } catch (error: any) { 
         alert("🚨 فشل في إرسال الطلب: " + (error.message || error));
@@ -412,7 +410,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           else if (['reject', 'failed', 'رفض'].includes(remote)) final = 'Rejected';
           if (final) {
             await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
-            triggerPushSilently(order.userPhone || userPhone, final === 'Completed' ? "اكتمل طلب الشحن ✅" : "فشل طلب الشحن ❌", `تم تحديث حالة طلبك لـ ${order.type}.`);
+            
+            // TRIGGER 3: Admin -> User (Product Order Completed)
+            if (final === 'Completed') {
+               const targetId = order.details?.split('ID: ')[1] || "حسابك";
+               triggerPushSilently(order.userPhone || userPhone, "تم اكتمال الشحن", `تمت عملية شحن ${targetId} بنجاح`);
+            }
           }
         }
       } catch (err) {}
