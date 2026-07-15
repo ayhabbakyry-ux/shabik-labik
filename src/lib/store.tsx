@@ -10,7 +10,6 @@ import {
   onSnapshot, 
   getDocs,
   enableNetwork,
-  orderBy,
   doc,
   updateDoc
 } from 'firebase/firestore';
@@ -27,7 +26,7 @@ import { changePasswordAction, updateProfileImageAction } from '@/app/actions/pr
 import { Transaction } from './types';
 
 /**
- * @fileOverview محرك البيانات المطور - تنفيذ "الأمر الصارم" لكشف الأخطاء الحقيقية وحل مشاكل السامسونج.
+ * @fileOverview محرك البيانات المطور - حل مشكلة Index Error عبر الفرز البرمجي في المتصفح.
  */
 
 type UserContextType = {
@@ -85,6 +84,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";
 
+  // دالة الفرز البرمجي لضمان الأحدث فوق دائماً بدون الحاجة لـ Index في فايربيز
+  const sortTransactionsClientSide = (txs: Transaction[]) => {
+    return [...txs].sort((a, b) => {
+      const dateA = a.createdAt || a.date || "";
+      const dateB = b.createdAt || b.date || "";
+      return dateB.localeCompare(dateA); 
+    });
+  };
+
   const playNotificationSound = useCallback(() => {
     if (typeof window === "undefined") return;
     try {
@@ -130,10 +138,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       
       if (isAdminUser) {
         fetchPromises.push(getDocs(collection(db, "users")));
-        fetchPromises.push(getDocs(query(collection(db, "transactions"), orderBy("createdAt", "desc"))));
+        // حذف orderBy لتجنب Index Error والاعتماد على الفرز البرمجي
+        fetchPromises.push(getDocs(collection(db, "transactions")));
         fetchPromises.push(getDocs(collection(db, "password_requests")));
       } else {
-        fetchPromises.push(getDocs(query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"))));
+        // حذف orderBy لتجنب Index Error والاعتماد على الفرز البرمجي
+        fetchPromises.push(getDocs(query(collection(db, "transactions"), where("userPhone", "==", phoneClean))));
       }
 
       const results = await Promise.all(fetchPromises);
@@ -146,18 +156,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
       if (isAdminUser) {
         setAllUsers(results[1].docs.map(d => ({ ...d.data(), id: d.id })));
-        const txs = results[2].docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
-        setTransactions(txs);
-        transactionsRef.current = txs;
+        const rawTxs = results[2].docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
+        const sortedTxs = sortTransactionsClientSide(rawTxs);
+        setTransactions(sortedTxs);
+        transactionsRef.current = sortedTxs;
         setPasswordRequests(results[3].docs.map(d => ({ ...d.data(), id: d.id })));
       } else {
-        const txs = results[1].docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
-        setTransactions(txs);
-        transactionsRef.current = txs;
+        const rawTxs = results[1].docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
+        const sortedTxs = sortTransactionsClientSide(rawTxs);
+        setTransactions(sortedTxs);
+        transactionsRef.current = sortedTxs;
       }
     } catch (e: any) {
       console.error("Manual refresh failed", e);
-      if (typeof window !== 'undefined') alert("خطأ في جلب بيانات السجل: " + (e.message || String(e)));
+      alert("خطأ في جلب بيانات السجل: " + (e.message || String(e)));
     }
   }, [isLoggedIn, userPhone]);
 
@@ -194,44 +206,51 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
     }));
 
+    // استعلام نظيف بدون orderBy لتجنب أخطاء الفهارس نهائياً
     const txQuery = isAdminUser 
-      ? query(collection(db, "transactions"), orderBy("createdAt", "desc"))
-      : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"));
+      ? query(collection(db, "transactions"))
+      : query(collection(db, "transactions"), where("userPhone", "==", phoneClean));
 
     unsubscribes.push(onSnapshot(txQuery, (snap) => {
-      const newTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
-      
-      if (!isInitialLoad.current) {
-        snap.docChanges().forEach((change) => {
-          const tx = change.doc.data() as Transaction;
-          const txId = change.doc.id;
+      try {
+        const rawTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
+        const sortedTxs = sortTransactionsClientSide(rawTxs);
+        
+        if (!isInitialLoad.current) {
+          snap.docChanges().forEach((change) => {
+            const tx = change.doc.data() as Transaction;
+            const txId = change.doc.id;
 
-          if (change.type === "added") {
-            if (isAdminUser && tx.status === 'Pending' && (tx.type === 'إيداع محفظة' || tx.type === 'طلب إيداع')) {
-              triggerNotification("طلب إيداع جديد 💰", `المبلغ: ${tx.amount.toLocaleString()} - العميل: ${tx.userName || tx.userPhone}`);
-            }
-          }
-
-          if (change.type === "modified") {
-            const oldTx = transactionsRef.current.find(t => t.id === txId);
-            if (oldTx && oldTx.status === 'Pending' && tx.status !== 'Pending') {
-              if (!isAdminUser && tx.userPhone === phoneClean) {
-                 if (tx.status === 'Completed') {
-                   triggerNotification("تم قبول طلبك بنجاح ✅", `تم تنفيذ ${tx.type} بمبلغ ${tx.amount.toLocaleString()}.`);
-                 } else if (tx.status === 'Rejected') {
-                   triggerNotification("تم رفض طلبك ❌", `طلب ${tx.type} بمبلغ ${tx.amount.toLocaleString()} تم رفضه.`);
-                 }
+            if (change.type === "added") {
+              if (isAdminUser && tx.status === 'Pending' && (tx.type === 'إيداع محفظة' || tx.type === 'طلب إيداع')) {
+                triggerNotification("طلب إيداع جديد 💰", `المبلغ: ${tx.amount.toLocaleString()} - العميل: ${tx.userName || tx.userPhone}`);
               }
             }
-          }
-        });
+
+            if (change.type === "modified") {
+              const oldTx = transactionsRef.current.find(t => t.id === txId);
+              if (oldTx && oldTx.status === 'Pending' && tx.status !== 'Pending') {
+                if (!isAdminUser && tx.userPhone === phoneClean) {
+                   if (tx.status === 'Completed') {
+                     triggerNotification("تم قبول طلبك بنجاح ✅", `تم تنفيذ ${tx.type} بمبلغ ${tx.amount.toLocaleString()}.`);
+                   } else if (tx.status === 'Rejected') {
+                     triggerNotification("تم رفض طلبك ❌", `طلب ${tx.type} بمبلغ ${tx.amount.toLocaleString()} تم رفضه.`);
+                   }
+                }
+              }
+            }
+          });
+        }
+        
+        setTransactions(sortedTxs);
+        transactionsRef.current = sortedTxs;
+        isInitialLoad.current = false;
+      } catch (e: any) {
+        console.error("Snapshot processing error:", e);
       }
-      setTransactions(newTxs.sort((a, b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || "")));
-      transactionsRef.current = newTxs;
-      isInitialLoad.current = false;
     }, (error) => {
       console.error("Snapshot error:", error);
-      if (typeof window !== 'undefined') alert("خطأ في مراقبة البيانات اللحظية: " + error.message);
+      alert("خطأ في مراقبة البيانات اللحظية: " + error.message);
     }));
 
     if (isAdminUser) {
@@ -278,7 +297,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (!res.success) throw new Error(res.message);
     } catch (error: any) {
       setTransactions(previousTransactions);
-      if (typeof window !== 'undefined') alert("فشل معالجة الطلب: " + (error.message || String(error)));
+      alert("فشل معالجة الطلب: " + (error.message || String(error)));
     }
   };
 
@@ -297,7 +316,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (!res.success) throw new Error("Server error");
     } catch (error: any) {
       setAllUsers(previousUsers);
-      if (typeof window !== 'undefined') alert("خطأ في تحديث الرصيد: " + (error.message || String(error)));
+      alert("خطأ في تحديث الرصيد: " + (error.message || String(error)));
     }
   };
 
@@ -315,7 +334,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       await syncBalanceAction(userPhone, newBal);
     } catch (e: any) {
       console.error("Deduct Balance Error", e);
-      if (typeof window !== 'undefined') alert("فشل تنفيذ طلب الشحن: " + (e.message || String(e)));
+      alert("فشل تنفيذ طلب الشحن: " + (e.message || String(e)));
     }
   };
 
@@ -323,18 +342,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const now = new Date().toISOString();
     
     try {
-      // 1. الأولوية المطلقة للحفظ في Firestore (بدون انتظار أي شيء آخر)
+      // الأولوية للحفظ في فايربيز مع عزل كامل عن أي فشل جانبي
       const result = await recordTransactionAction({
         type: 'إيداع محفظة', amount, status: 'Pending', date: now, createdAt: now,
         userName, userPhone, details: "طلب إيداع رصيد", proofImage
       });
       
       if (result.success) {
-        // 2. منطق الإشعارات والصوت في بلوك منفصل تماماً ولا يعطل النتيجة
+        // عزل كود الصوت تماماً لضمان عدم تعليق العملية في السامسونج
         (async () => {
           try {
             if (typeof window !== 'undefined') playNotificationSound();
-          } catch (e) { console.log("Sound logic failure ignored"); }
+          } catch (e) { console.log("Sound alert failed safely"); }
         })();
 
         await refreshCloudData();
@@ -343,8 +362,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error: any) { 
         console.error("Critical Deposit Failure:", error);
-        // عرض الخطأ التقني الحقيقي على شاشة السامسونج
-        if (typeof window !== 'undefined') alert("حدث خطأ تقني أثناء إرسال الطلب: " + (error.message || String(error)));
+        alert("حدث خطأ تقني أثناء إرسال الطلب: " + (error.message || String(error)));
     }
   };
 
