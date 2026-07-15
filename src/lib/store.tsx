@@ -27,7 +27,8 @@ import { changePasswordAction, updateProfileImageAction } from '@/app/actions/pr
 import { Transaction } from './types';
 
 /**
- * @fileOverview محرك البيانات المطور - نسخة الاستقرار (V17): حل مشكلة السامسونج من الجذور وتأمين المزامنة.
+ * @fileOverview محرك البيانات المطور - نسخة الاستقرار القصوى (V18): 
+ * فصل جراحي كامل للإشعارات لضمان عدم تعليق عمليات الإيداع في السامسونج.
  */
 
 type UserContextType = {
@@ -84,7 +85,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";
 
-  // دالة الفرز في الذاكرة لمنع خطأ Index Error
+  // --- دالة الفرز في الذاكرة (لحل مشكلة Index Error) ---
   const sortTransactionsClientSide = useCallback((txs: Transaction[]) => {
     return [...txs].sort((a, b) => {
       const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.date ? new Date(a.date).getTime() : 0);
@@ -93,14 +94,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // --- نظام الصوت المعزول (Fire-and-Forget) ---
   const playNotificationSound = useCallback(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !isAudioUnlocked) return;
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
       audio.play().catch(() => {});
     } catch (e) {}
-  }, []);
+  }, [isAudioUnlocked]);
 
+  // --- نظام التنبيهات المدمج المعزول ---
   const triggerNotification = useCallback((title: string, body: string) => {
     if (typeof window === "undefined") return;
     try {
@@ -114,6 +117,26 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {}
   }, [playNotificationSound]);
 
+  // --- نظام الدفع (Push) المعزول تماماً ---
+  const triggerPushSilently = useCallback((targetPhone: string, title: string, body: string) => {
+    // تشغيل فوري بدون await لمنع تعطيل واجهة المستخدم
+    (async () => {
+      try {
+        const q = query(collection(db, "users"), where("phone", "==", targetPhone.trim()));
+        const snap = await getDocs(q);
+        if (snap.empty) return;
+        const token = snap.docs[0].data().fcmToken;
+        if (!token) return;
+
+        fetch('/api/send-push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, title, body })
+        }).catch(() => {});
+      } catch (e) {}
+    })();
+  }, []);
+
   const unlockAudio = () => {
     if (typeof window === "undefined") return;
     try {
@@ -123,29 +146,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {}
   };
 
-  // --- FCM INFRASTRUCTURE (ISOLATED) ---
-  const triggerPush = useCallback(async (targetPhone: string, title: string, body: string) => {
-    try {
-      const q = query(collection(db, "users"), where("phone", "==", targetPhone.trim()));
-      const snap = await getDocs(q);
-      if (snap.empty) return;
-      const token = snap.docs[0].data().fcmToken;
-      if (!token) return;
-
-      fetch('/api/send-push', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, title, body })
-      }).catch(() => {});
-    } catch (e) {}
-  }, []);
-
   const setupFCM = useCallback(async (phone: string) => {
     if (typeof window === "undefined") return;
     try {
       const messaging = await getMessagingSafe();
       if (!messaging) return;
-
       setTimeout(async () => {
         try {
           const permission = await Notification.requestPermission();
@@ -155,7 +160,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
               serviceWorkerRegistration: registration,
               vapidKey: "BHPJ_A1A1A1A1A1A1A1A1_DUMMY_VAPID_REPLACE" 
             });
-            
             if (token) {
               const q = query(collection(db, "users"), where("phone", "==", phone.trim()));
               const snap = await getDocs(q);
@@ -165,17 +169,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             }
           }
         } catch (innerError) {}
-      }, 3000);
+      }, 5000);
     } catch (e) {}
   }, []);
-  // -------------------------------------
 
   const refreshCloudData = useCallback(async () => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     try {
       const phoneClean = userPhone.trim();
       const isAdminUser = phoneClean === ADMIN_PHONE;
-
       await enableNetwork(db).catch(() => {});
 
       const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
@@ -190,13 +192,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
 
       const results = await Promise.all(fetchPromises);
-      
       if (!results[0].empty) {
         const data = results[0].docs[0].data();
         setUserBalance(Number(data.balance || 0));
         setProfileImage(data.profileImage || null);
       }
-
       if (isAdminUser) {
         setAllUsers(results[1].docs.map(d => ({ ...d.data(), id: d.id })));
         const rawTxs = results[2].docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
@@ -207,7 +207,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setTransactions(sortTransactionsClientSide(rawTxs));
       }
     } catch (e: any) {
-      console.error("Critical Refresh Error:", e.message);
       if (e.message.includes("unexpected response")) {
          await disableNetwork(db).catch(() => {});
          await enableNetwork(db).catch(() => {});
@@ -233,7 +232,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
-    
     refreshCloudData();
     setupFCM(userPhone);
 
@@ -257,7 +255,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       try {
         const rawTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
         const sortedTxs = sortTransactionsClientSide(rawTxs);
-        
         if (!isInitialLoad.current) {
           snap.docChanges().forEach((change) => {
             const tx = change.doc.data() as Transaction;
@@ -269,14 +266,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             }
           });
         }
-        
         setTransactions(sortedTxs);
         isInitialLoad.current = false;
       } catch (e) {}
-    }, (err) => {
-       if (err.message.includes("unexpected response")) {
-         enableNetwork(db);
-       }
     }));
 
     if (isAdminUser) {
@@ -287,7 +279,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setPasswordRequests(snap.docs.map(d => ({ ...d.data(), id: d.id })));
       }));
     }
-    
     return () => unsubscribes.forEach(unsub => unsub());
   }, [isLoggedIn, userPhone, triggerNotification, refreshCloudData, sortTransactionsClientSide, setupFCM]);
 
@@ -314,15 +305,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const adminAction = async (id: string, action: 'approve' | 'reject') => {
     const prev = [...transactions];
+    const tx = transactions.find(t => t.id === id);
     setTransactions(prev.map(t => t.id === id ? { ...t, status: action === 'approve' ? 'Completed' : 'Rejected' } : t));
     try {
       const res = await processAdminAction(id, action);
       if (!res.success) throw new Error();
-
-      // PUSH TRIGGER TO USER
-      const tx = transactions.find(t => t.id === id);
       if (tx && tx.userPhone) {
-         triggerPush(tx.userPhone, action === 'approve' ? "تم قبول طلبك ✅" : "تم رفض الطلب ❌", `طلب ${tx.type} بمبلغ ${tx.amount.toLocaleString()}.`);
+         triggerPushSilently(tx.userPhone, action === 'approve' ? "تم قبول طلبك ✅" : "تم رفض الطلب ❌", `طلب ${tx.type} بمبلغ ${tx.amount.toLocaleString()}.`);
       }
     } catch (e) {
       setTransactions(prev);
@@ -355,32 +344,31 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       await syncBalanceAction(userPhone, newBal);
     } catch (e: any) {
       setUserBalance(before);
-      alert("🚨 خطأ تقني في جلب سجل الطلبات: " + (e.message || e));
+      alert("🚨 خطأ تقني: " + (e.message || e));
     }
   };
 
   const requestDeposit = async (amount: number, proofImage: string) => {
     try {
+      // 1. الأولوية القصوى للحفظ في السيرفر
       const result = await recordTransactionAction({
         type: 'إيداع محفظة', amount, status: 'Pending', date: new Date().toISOString(), createdAt: new Date().toISOString(),
         userName, userPhone, details: "طلب إيداع رصيد", proofImage
       });
       
       if (result.success) {
+        // 2. تشغيل التنبيهات في الخلفية بدون انتظار (Fire-and-Forget)
         playNotificationSound();
-        await refreshCloudData();
+        refreshCloudData().catch(() => {});
+        triggerPushSilently(ADMIN_PHONE, "طلب إيداع جديد 💰", `المبلغ: ${amount.toLocaleString()} - العميل: ${userName || userPhone}`);
         
-        // PUSH TRIGGER TO ADMIN
-        triggerPush(ADMIN_PHONE, "طلب إيداع جديد 💰", `المبلغ: ${amount.toLocaleString()} - العميل: ${userName || userPhone}`);
+        // 3. رسالة نجاح فورية للمستخدم
+        alert("✅ تم إرسال طلبك بنجاح للمدير.");
       } else {
         throw new Error(result.error);
       }
     } catch (error: any) { 
-        if (String(error).includes("unexpected response")) {
-           alert("⚠️ تنبيه: تم تسجيل طلبك ولكن تعذر تحديث الصفحة حالياً بسبب ضعف الشبكة. سيتم تفعيل رصيدك قريباً.");
-        } else {
-           alert("🚨 حدث خطأ أثناء إرسال الطلب: " + (error.message || error));
-        }
+        alert("🚨 فشل في إرسال الطلب: " + (error.message || error));
     }
   };
 
@@ -414,11 +402,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           let final: 'Completed' | 'Rejected' | null = null;
           if (['accept', 'موافق', 'success', 'completed'].includes(remote)) final = 'Completed';
           else if (['reject', 'failed', 'رفض'].includes(remote)) final = 'Rejected';
-          
           if (final) {
             await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
-            // PUSH TRIGGER TO USER
-            triggerPush(order.userPhone || userPhone, final === 'Completed' ? "اكتمل طلب الشحن ✅" : "فشل طلب الشحن ❌", `تم تحديث حالة طلبك لـ ${order.type}.`);
+            triggerPushSilently(order.userPhone || userPhone, final === 'Completed' ? "اكتمل طلب الشحن ✅" : "فشل طلب الشحن ❌", `تم تحديث حالة طلبك لـ ${order.type}.`);
           }
         }
       } catch (err) {}
