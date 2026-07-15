@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -10,13 +11,11 @@ import {
   onSnapshot, 
   getDocs,
   enableNetwork,
-  disableNetwork,
   doc,
   updateDoc,
   addDoc
 } from 'firebase/firestore';
 import { signInAction, signUpAction, requestPasswordResetAction } from '@/app/actions/auth';
-import { syncBalanceAction, recordTransactionAction } from '@/app/actions/wallet';
 import { 
   deleteUserAction, 
   processAdminAction, 
@@ -26,11 +25,6 @@ import {
 } from '@/app/actions/admin';
 import { changePasswordAction, updateProfileImageAction } from '@/app/actions/profile';
 import { Transaction } from './types';
-
-/**
- * @fileOverview محرك البيانات المطور - نسخة الاستقرار القصوى (V19): 
- * الفصل الجراحي المطلق للحفظ في Firestore عن نظام الإشعارات لحل مشكلة السامسونج نهائياً.
- */
 
 type UserContextType = {
   isLoggedIn: boolean;
@@ -147,27 +141,38 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const messaging = await getMessagingSafe();
       if (!messaging) return;
-      setTimeout(async () => {
-        try {
-          const permission = await Notification.requestPermission();
-          if (permission === 'granted') {
-            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
-            const token = await getToken(messaging, { 
-              serviceWorkerRegistration: registration,
-              vapidKey: "BHPJ_A1A1A1A1A1A1A1A1_DUMMY_VAPID_REPLACE" 
-            });
-            if (token) {
-              const q = query(collection(db, "users"), where("phone", "==", phone.trim()));
-              const snap = await getDocs(q);
-              if (!snap.empty) {
-                await updateDoc(doc(db, "users", snap.docs[0].id), { fcmToken: token });
-              }
-            }
+      
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
+        const token = await getToken(messaging, { 
+          serviceWorkerRegistration: registration,
+          vapidKey: "BHPJ_A1A1A1A1A1A1A1A1_DUMMY_VAPID_REPLACE" 
+        });
+        
+        if (token) {
+          const q = query(collection(db, "users"), where("phone", "==", phone.trim()));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            await updateDoc(doc(db, "users", snap.docs[0].id), { fcmToken: token });
           }
-        } catch (innerError) {}
-      }, 5000);
+        }
+      }
     } catch (e) {}
   }, []);
+
+  const requestNotificationPermission = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      try {
+        const permission = await Notification.requestPermission();
+        setNotificationsEnabled(permission === "granted");
+        if (permission === "granted") {
+          unlockAudio();
+          if (userPhone) setupFCM(userPhone);
+        }
+      } catch (e) {}
+    }
+  };
 
   const refreshCloudData = useCallback(async () => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
@@ -202,9 +207,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const rawTxs = results[1].docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
         setTransactions(sortTransactionsClientSide(rawTxs));
       }
-    } catch (e: any) {
-      console.log("Cloud Fetch Error:", e.message);
-    }
+    } catch (e: any) {}
   }, [isLoggedIn, userPhone, sortTransactionsClientSide]);
 
   useEffect(() => {
@@ -345,10 +348,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         balanceAfter: newBal
       };
 
-      // 1. الحفظ المباشر في قاعدة البيانات (الأولوية القصوى)
       await addDoc(collection(db, "transactions"), txData);
 
-      // 2. تحديث الرصيد في قاعدة البيانات
       const userQ = query(collection(db, "users"), where("phone", "==", userPhone.trim()));
       const snap = await getDocs(userQ);
       if (!snap.empty) {
@@ -376,19 +377,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         proofImage
       };
 
-      // 1. الحفظ المباشر في Firestore (مستقر جداً للسامسونج)
       await addDoc(collection(db, "transactions"), txData);
       
-      // 2. إظهار النجاح فوراً للمستخدم
       alert("✅ تم إرسال طلبك بنجاح للمدير.");
 
-      // 3. المهام الخلفية (Fire-and-Forget) بدون انتظار
       playNotificationSound();
       refreshCloudData().catch(() => {});
       triggerPushSilently(ADMIN_PHONE, "طلب إيداع جديد 💰", `المبلغ: ${amount.toLocaleString()} - العميل: ${userName || userPhone}`);
 
     } catch (error: any) { 
-        alert("🚨 فشل في إرسال الطلب (عطل شبكة): " + (error.message || error));
+        alert("🚨 فشل في إرسال الطلب: " + (error.message || error));
     }
   };
 
@@ -398,16 +396,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const changePassword = async (c: string, n: string) => await changePasswordAction(userPhone, c, n);
   const updateProfileImage = async (i: string) => await updateProfileImageAction(userPhone, i, userName);
   
-  const requestNotificationPermission = async () => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      try {
-        const permission = await Notification.requestPermission();
-        setNotificationsEnabled(permission === "granted");
-        if (permission === "granted") unlockAudio();
-      } catch (e) {}
-    }
-  };
-
   const checkPendingOrders = async () => {
     if (!isLoggedIn || isCheckingOrders) return;
     const pending = transactions.filter(tx => tx.status === 'Pending' && tx.external_order_id);
