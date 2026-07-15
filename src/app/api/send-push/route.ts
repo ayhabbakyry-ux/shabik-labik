@@ -2,23 +2,23 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار إرسال إشعارات FCM المطور - يستخدم متغيرات البيئة للأمان المطلق.
+ * @fileOverview محرك إرسال إشعارات FCM المطور
+ * يستخدم بروتوكول جوجل القياسي لضمان وصول التنبيه لستارة الموبايل.
  */
 
 export async function POST(request: Request) {
     try {
-        const { token, title, body, data } = await request.json();
+        const { token, title, body } = await request.json();
         
         if (!token) {
             return NextResponse.json({ success: false, error: 'Recipient Token is missing' });
         }
 
-        // جلب مفتاح السيرفر من متغيرات البيئة (Vercel Environment Variables)
         const SERVER_KEY = process.env.FCM_SERVER_KEY; 
 
         if (!SERVER_KEY || SERVER_KEY === "YOUR_SERVER_KEY") {
             console.error("FCM API: Missing FCM_SERVER_KEY in environment.");
-            return NextResponse.json({ success: false, error: 'Server configuration missing' });
+            return NextResponse.json({ success: false, error: 'Server key not configured' });
         }
 
         const response = await fetch('https://fcm.googleapis.com/fcm/send', {
@@ -33,13 +33,13 @@ export async function POST(request: Request) {
                     title: title,
                     body: body,
                     sound: "default",
-                    badge: "1",
-                    click_action: "https://shabik-labik.vercel.app/history",
-                    icon: "https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg"
+                    priority: "high",
+                    icon: "https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg",
+                    click_action: "https://shabik-labik.vercel.app/history"
                 },
                 data: {
-                    ...data,
-                    url: "https://shabik-labik.vercel.app/history"
+                    url: "https://shabik-labik.vercel.app/history",
+                    click_action: "FLUTTER_NOTIFICATION_CLICK"
                 },
                 priority: "high"
             })
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
         const resData = await response.json();
         return NextResponse.json({ success: true, info: resData });
     } catch (error: any) {
-        console.error("Push API Critical Error:", error);
-        return NextResponse.json({ success: false, error: error.message || String(error) });
+        console.error("Push API Error:", error);
+        return NextResponse.json({ success: false, error: error.message });
     }
 }

@@ -2,7 +2,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { db, getMessagingSafe, firebaseConfig } from './firebase-config';
+import { db, getMessagingSafe } from './firebase-config';
 import { getToken } from 'firebase/messaging';
 import { 
   collection, 
@@ -80,13 +80,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";
 
-  // فك القناع عن الأخطاء التقنية كما طلبت
   const logTechnicalError = (ctx: string, err: any) => {
     console.error(`Technical Error [${ctx}]:`, err);
-    // تنبيه فقط إذا لم يكن خطأ صامت في الخلفية
-    if (ctx.includes("Critical")) {
-      alert(`خطأ فني في [${ctx}]: ` + (err.message || String(err)));
-    }
   };
 
   const sortTransactionsClientSide = useCallback((txs: Transaction[]) => {
@@ -117,7 +112,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const userData = snap.docs[0].data();
         const token = userData.fcmToken;
         if (!token) {
-          console.log(`Push Error: No fcmToken found for ${phoneClean}`);
+          console.log(`Push Warning: No fcmToken found for ${phoneClean}`);
           return;
         }
 
@@ -149,10 +144,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       
       const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
       
-      // استخدام مفتاح VAPID من متغيرات البيئة أو إظهار خطأ صريح
+      // انتظار تفعيل الـ Service Worker لضمان استلام التوكن
+      await navigator.serviceWorker.ready;
+
       const vapidKey = process.env.NEXT_PUBLIC_VAPID_KEY;
-      if (!vapidKey || vapidKey === "YOUR_VAPID_KEY") {
-        console.warn("FCM: Missing NEXT_PUBLIC_VAPID_KEY in environment variables.");
+      if (!vapidKey) {
+        console.warn("FCM: Missing NEXT_PUBLIC_VAPID_KEY environment variable.");
         return;
       }
 
@@ -162,15 +159,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       });
       
       if (token) {
-        const q = query(collection(db, "users"), where("phone", "==", phone.trim()));
+        const phoneClean = phone.trim();
+        const q = query(collection(db, "users"), where("phone", "==", phoneClean));
         const snap = await getDocs(q);
         if (!snap.empty) {
           await updateDoc(doc(db, "users", snap.docs[0].id), { fcmToken: token });
-          console.log("FCM: Token updated successfully.");
+          console.log("FCM: Token updated successfully in Firestore.");
         }
       }
     } catch (e: any) {
-      console.error("FCM Registration Error:", e);
+      logTechnicalError("FCM Registration", e);
     }
   }, []);
 
@@ -254,7 +252,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setUserBalance(Number(data.balance || 0));
         setProfileImage(data.profileImage || null);
       }
-    }, (e) => logTechnicalError("User Snapshot", e)));
+    }));
 
     const txQuery = isAdminUser 
       ? query(collection(db, "transactions"))
@@ -276,9 +274,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setTransactions(sortedTxs);
         isInitialLoad.current = false;
       } catch (e) {
-        logTechnicalError("Transaction Snapshot", e);
+        logTechnicalError("Transaction Stream", e);
       }
-    }, (e) => logTechnicalError("Transaction Stream", e)));
+    }));
 
     if (isAdminUser) {
       unsubscribes.push(onSnapshot(collection(db, "users"), (snap) => {
@@ -315,17 +313,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const adminAction = async (id: string, action: 'approve' | 'reject') => {
-    const prev = [...transactions];
     const tx = transactions.find(t => t.id === id);
     if (!tx) return;
 
-    setTransactions(prev.map(t => t.id === id ? { ...t, status: action === 'approve' ? 'Completed' : 'Rejected' } : t));
-    
     try {
       const res = await processAdminAction(id, action);
       if (!res.success) throw new Error("Database Write Failed");
       
-      // محفز إشعار القبول/الرفض - يعمل في الخلفية وبدون تأخير
+      // محفز إشعار القبول/الرفض في الخلفية
       if (tx.userPhone) {
         const title = action === 'approve' ? "تم تحديث الرصيد" : "طلب مرفوض";
         const body = action === 'approve' 
@@ -334,20 +329,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         triggerPushSilently(tx.userPhone, title, body);
       }
     } catch (e) {
-      setTransactions(prev);
-      logTechnicalError("Admin Action Critical", e);
+      logTechnicalError("Admin Action", e);
     }
   };
 
   const updateBalanceAdmin = async (phone: string, amount: number, operation: 'add' | 'subtract') => {
-    const prev = [...allUsers];
-    setAllUsers(prev.map(u => u.phone === phone ? { ...u, balance: operation === 'add' ? (u.balance || 0) + amount : Math.max(0, (u.balance || 0) - amount) } : u));
     try {
       const res = await updateUserBalanceDirectlyAction(phone, amount, operation);
       if (!res.success) throw new Error();
     } catch (e) {
-      setAllUsers(prev);
-      logTechnicalError("Balance Update Critical", e);
+      logTechnicalError("Balance Update", e);
     }
   };
 
@@ -373,13 +364,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       };
 
       await addDoc(collection(db, "transactions"), txData);
-      
-      // لا نستخدم alert المزعجة إلا في الخطأ الصريح
-      console.log("Transaction recorded successfully.");
-
     } catch (e: any) {
       setUserBalance(before);
-      logTechnicalError("Deduct Balance Critical", e);
+      logTechnicalError("Deduct Balance", e);
     }
   };
 
@@ -398,15 +385,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         proofImage
       };
 
-      // الحفظ هو الأولوية الأولى والمنعزلة
       await addDoc(collection(db, "transactions"), txData);
-      alert("تم إرسال طلبك بنجاح للمدير.");
-
-      // محفز إشعار المدير - يعمل في الخلفية صمتاً
+      
+      // إشعار المدير الفوري
       triggerPushSilently(ADMIN_PHONE, "طلب إيداع جديد", "هناك طلب إيداع وصل الآن");
-
+      
+      alert("تم إرسال طلبك بنجاح للمدير.");
     } catch (error: any) { 
-        logTechnicalError("Deposit Submission Critical", error);
+        logTechnicalError("Deposit Submission", error);
+        alert("فشل في إرسال الطلب: " + (error.message || "خطأ غير معروف"));
     }
   };
 
@@ -433,8 +420,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           
           if (final) {
             await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
-            
-            // محفز إشعار اكتمال الشحن
             if (final === 'Completed') {
                const targetId = order.details?.split('ID: ')[1] || "حسابك";
                triggerPushSilently(order.userPhone || userPhone, "تم اكتمال الشحن", `تمت عملية شحن ${targetId} بنجاح`);
