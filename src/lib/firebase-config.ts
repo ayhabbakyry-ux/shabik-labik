@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { initializeFirestore, getFirestore, Firestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getMessaging, isSupported } from "firebase/messaging";
 
 /**
  * @fileOverview إعدادات الفايربيز المطورة - نسخة الاستقرار القصوى (V17).
@@ -27,17 +28,22 @@ if (typeof window !== "undefined") {
     try {
         db = initializeFirestore(app, {
             experimentalForceLongPolling: true,
-            // تجنب استخدام الكاش المحلي (IndexedDB) في أجهزة أندرويد الضعيفة لمنع تعليق المتصفح
         });
     } catch (e) {
-        // في حال كان الفايربيز مشغلاً مسبقاً (Hot Reload)
         db = getFirestore(app);
     }
 } else {
-    // بيئة السيرفر (Vercel): استخدام الإعدادات الافتراضية لأقصى سرعة
     db = getFirestore(app);
 }
 
 const auth = getAuth(app);
+
+// دالة جلب Messaging بأمان لمنع الانهيار
+export const getMessagingSafe = async () => {
+    if (typeof window !== "undefined" && await isSupported()) {
+        return getMessaging(app);
+    }
+    return null;
+};
 
 export { db, auth, firebaseConfig };

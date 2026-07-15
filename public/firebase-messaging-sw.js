@@ -1,8 +1,9 @@
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
+// إعدادات FCM للخدمة الخلفية
 firebase.initializeApp({
-  apiKey: "AIzaSyBCpBxbVjDl9C8XvVFN18DV",
+  apiKey: "AIzaSyBCpbXvIDJl9C8XvVFNl8DViQEC8msCgBU",
   authDomain: "studio-4603707742-d33ce.firebaseapp.com",
   projectId: "studio-4603707742-d33ce",
   storageBucket: "studio-4603707742-d33ce.appspot.com",
@@ -12,14 +13,14 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// معالجة الإشعارات في الخلفية
 messaging.onBackgroundMessage((payload) => {
-  console.log('Received background message ', payload);
-  const notificationTitle = payload.notification.title || "تنبيه من شبيك لبيك";
+  console.log('[firebase-messaging-sw.js] Received background message ', payload);
+  const notificationTitle = payload.notification.title || "تنبيه جديد - شبيك لبيك";
   const notificationOptions = {
     body: payload.notification.body,
-    icon: 'https://picsum.photos/seed/genie/200/200',
-    badge: 'https://picsum.photos/seed/genie/100/100',
-    vibrate: [200, 100, 200]
+    icon: 'https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg',
+    badge: 'https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg'
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
