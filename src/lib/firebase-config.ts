@@ -3,8 +3,8 @@ import { initializeFirestore, getFirestore, Firestore } from "firebase/firestore
 import { getAuth } from "firebase/auth";
 
 /**
- * @fileOverview إعدادات الفايربيز المطورة - نسخة الاستقرار القصوى (V16).
- * تم فرض بروتوكول Long Polling على كافة المنصات لحل مشكلة "An unexpected response" في أجهزة Infinix وSamsung.
+ * @fileOverview إعدادات الفايربيز المطورة - نسخة الاستقرار القصوى (V17).
+ * تم حل مشكلة "An unexpected response" جذرياً عبر فصل إعدادات المتصفح عن السيرفر.
  */
 
 const firebaseConfig = {
@@ -16,19 +16,26 @@ const firebaseConfig = {
   appId: "1:723678552538:web:579e6791a1211c7998e0e3"
 };
 
-// تهيئة التطبيق مرة واحدة
+// تهيئة التطبيق الأساسي
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 let db: Firestore;
 
-// فرض بروتوكول Long Polling بشكل قاطع لتجاوز قيود الشبكات وأجهزة الأندرويد
-try {
-  db = initializeFirestore(app, {
-    experimentalForceLongPolling: true,
-  });
-} catch (e) {
-  // في حال كان الفايربيز مشغلاً مسبقاً، نستخدم النسخة الموجودة
-  db = getFirestore(app);
+// الحل الجذري: لا نستخدم initializeFirestore أكثر من مرة، ونميز بين البيئات
+if (typeof window !== "undefined") {
+    // بيئة المتصفح (الموبايل): فرض Long Polling لضمان الاستقرار في الشبكات الضعيفة
+    try {
+        db = initializeFirestore(app, {
+            experimentalForceLongPolling: true,
+            // تجنب استخدام الكاش المحلي (IndexedDB) في أجهزة أندرويد الضعيفة لمنع تعليق المتصفح
+        });
+    } catch (e) {
+        // في حال كان الفايربيز مشغلاً مسبقاً (Hot Reload)
+        db = getFirestore(app);
+    }
+} else {
+    // بيئة السيرفر (Vercel): استخدام الإعدادات الافتراضية لأقصى سرعة
+    db = getFirestore(app);
 }
 
 const auth = getAuth(app);

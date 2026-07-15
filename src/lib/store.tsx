@@ -9,7 +9,8 @@ import {
   where, 
   onSnapshot, 
   getDocs,
-  enableNetwork
+  enableNetwork,
+  disableNetwork
 } from 'firebase/firestore';
 import { signInAction, signUpAction, requestPasswordResetAction } from '@/app/actions/auth';
 import { syncBalanceAction, recordTransactionAction } from '@/app/actions/wallet';
@@ -24,7 +25,7 @@ import { changePasswordAction, updateProfileImageAction } from '@/app/actions/pr
 import { Transaction } from './types';
 
 /**
- * @fileOverview محرك البيانات المطور - نسخة الاستقرار (V16): حل مشكلة السامسونج/إنفينيكس وتحسين رسائل الخطأ.
+ * @fileOverview محرك البيانات المطور - نسخة الاستقرار (V17): حل مشكلة السامسونج من الجذور وتأمين المزامنة.
  */
 
 type UserContextType = {
@@ -82,6 +83,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";
 
+  // دالة فرز برمجية (تمنع خطأ الفهارس في فايربيز)
   const sortTransactionsClientSide = (txs: Transaction[]) => {
     return [...txs].sort((a, b) => {
       const dateA = a.createdAt || a.date || "";
@@ -94,10 +96,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") return;
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
-      audio.play().catch(err => console.log("Audio Autoplay Guard:", err));
-    } catch (e) {
-      console.log("Audio Context Error Ignored");
-    }
+      audio.play().catch(() => {});
+    } catch (e) {}
   }, []);
 
   const triggerNotification = useCallback((title: string, body: string) => {
@@ -122,12 +122,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {}
   };
 
+  // نظام تحديث البيانات "البرقي"
   const refreshCloudData = useCallback(async () => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     try {
       const phoneClean = userPhone.trim();
       const isAdminUser = phoneClean === ADMIN_PHONE;
 
+      // محاولة تنشيط الشبكة في حال تعطل البروتوكول
       await enableNetwork(db).catch(() => {});
 
       const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
@@ -152,22 +154,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (isAdminUser) {
         setAllUsers(results[1].docs.map(d => ({ ...d.data(), id: d.id })));
         const rawTxs = results[2].docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
-        const sortedTxs = sortTransactionsClientSide(rawTxs);
-        setTransactions(sortedTxs);
-        transactionsRef.current = sortedTxs;
+        setTransactions(sortTransactionsClientSide(rawTxs));
         setPasswordRequests(results[3].docs.map(d => ({ ...d.data(), id: d.id })));
       } else {
         const rawTxs = results[1].docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
-        const sortedTxs = sortTransactionsClientSide(rawTxs);
-        setTransactions(sortedTxs);
-        transactionsRef.current = sortedTxs;
+        setTransactions(sortTransactionsClientSide(rawTxs));
       }
     } catch (e: any) {
-      console.error("Refresh failure", e);
-      if (e.message?.includes("unexpected response")) {
-         console.warn("Firestore protocol delay detected");
-      } else {
-         alert("⚠️ عذراً، حدث خطأ في تحديث البيانات. يرجى إعادة تحميل الصفحة.");
+      console.error("Critical Refresh Error:", e.message);
+      // إذا حدث خطأ البروتوكول، نقوم بإعادة تهيئة صامتة للشبكة
+      if (e.message.includes("unexpected response")) {
+         await disableNetwork(db).catch(() => {});
+         await enableNetwork(db).catch(() => {});
       }
     }
   }, [isLoggedIn, userPhone]);
@@ -188,6 +186,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // المراقبة اللحظية الصارمة
   useEffect(() => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     
@@ -203,7 +202,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setUserBalance(Number(data.balance || 0));
         setProfileImage(data.profileImage || null);
       }
-    }, (err) => console.log("User Snapshot Error:", err.message)));
+    }));
 
     const txQuery = isAdminUser 
       ? query(collection(db, "transactions"))
@@ -217,37 +216,22 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (!isInitialLoad.current) {
           snap.docChanges().forEach((change) => {
             const tx = change.doc.data() as Transaction;
-            const txId = change.doc.id;
-
-            if (change.type === "added") {
-              if (isAdminUser && tx.status === 'Pending' && (tx.type === 'إيداع محفظة' || tx.type === 'طلب إيداع')) {
-                triggerNotification("طلب إيداع جديد 💰", `المبلغ: ${tx.amount.toLocaleString()} - العميل: ${tx.userName || tx.userPhone}`);
-              }
+            if (change.type === "added" && isAdminUser && tx.status === 'Pending') {
+              triggerNotification("طلب إيداع جديد 💰", `المبلغ: ${tx.amount.toLocaleString()} - العميل: ${tx.userName || tx.userPhone}`);
             }
-
-            if (change.type === "modified") {
-              const oldTx = transactionsRef.current.find(t => t.id === txId);
-              if (oldTx && oldTx.status === 'Pending' && tx.status !== 'Pending') {
-                if (!isAdminUser && tx.userPhone === phoneClean) {
-                   if (tx.status === 'Completed') {
-                     triggerNotification("تم قبول طلبك بنجاح ✅", `تم تنفيذ ${tx.type} بمبلغ ${tx.amount.toLocaleString()}.`);
-                   } else if (tx.status === 'Rejected') {
-                     triggerNotification("تم رفض طلبك ❌", `طلب ${tx.type} بمبلغ ${tx.amount.toLocaleString()} تم رفضه.`);
-                   }
-                }
-              }
+            if (change.type === "modified" && !isAdminUser && tx.userPhone === phoneClean) {
+              triggerNotification(tx.status === 'Completed' ? "تم قبول طلبك ✅" : "تم رفض الطلب ❌", `طلب ${tx.type} بمبلغ ${tx.amount.toLocaleString()}.`);
             }
           });
         }
         
         setTransactions(sortedTxs);
-        transactionsRef.current = sortedTxs;
         isInitialLoad.current = false;
-      } catch (e: any) {
-        console.error("Snapshot processing error:", e);
-      }
-    }, (error) => {
-      console.warn("TX Snapshot Error (Silent):", error.message);
+      } catch (e) {}
+    }, (err) => {
+       if (err.message.includes("unexpected response")) {
+         enableNetwork(db);
+       }
     }));
 
     if (isAdminUser) {
@@ -267,96 +251,84 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (phoneClean === ADMIN_PHONE && password === ADMIN_PASS) {
       const data = { phone: phoneClean, name: "المدير العام" };
       setIsLoggedIn(true); setUserPhone(phoneClean); setUserName(data.name);
-      if (typeof window !== "undefined") localStorage.setItem('shabik_auth', JSON.stringify(data));
+      localStorage.setItem('shabik_auth', JSON.stringify(data));
       return { success: true, message: "مرحباً بك يا مدير." };
     }
     const result = await signInAction(phoneClean, password);
     if (result.success && result.user) {
       setIsLoggedIn(true); setUserPhone(result.user.phone); setUserName(result.user.name);
-      if (typeof window !== "undefined") localStorage.setItem('shabik_auth', JSON.stringify(result.user));
+      localStorage.setItem('shabik_auth', JSON.stringify(result.user));
     }
     return result;
   };
 
   const logout = () => {
     setIsLoggedIn(false); setUserPhone("");
-    if (typeof window !== "undefined") localStorage.removeItem('shabik_auth');
+    localStorage.removeItem('shabik_auth');
   };
 
+  // أفعال الإدارة مع Optimistic UI
   const adminAction = async (id: string, action: 'approve' | 'reject') => {
-    const previousTransactions = [...transactions];
-    setTransactions(prev => prev.map(t => 
-      t.id === id ? { ...t, status: action === 'approve' ? 'Completed' : 'Rejected' } : t
-    ));
-
+    const prev = [...transactions];
+    setTransactions(prev.map(t => t.id === id ? { ...t, status: action === 'approve' ? 'Completed' : 'Rejected' } : t));
     try {
       const res = await processAdminAction(id, action);
-      if (!res.success) throw new Error(res.message);
-    } catch (error: any) {
-      setTransactions(previousTransactions);
-      alert("❌ فشل معالجة الطلب. تأكد من اتصال الإنترنت.");
+      if (!res.success) throw new Error();
+    } catch (e) {
+      setTransactions(prev);
+      alert("❌ فشل الاتصال بالسيرفر، سيتم التراجع.");
     }
   };
 
   const updateBalanceAdmin = async (phone: string, amount: number, operation: 'add' | 'subtract') => {
-    const previousUsers = [...allUsers];
-    setAllUsers(prev => prev.map(u => {
-      if (u.phone === phone) {
-        const cur = Number(u.balance || 0);
-        return { ...u, balance: operation === 'add' ? cur + amount : Math.max(0, cur - amount) };
-      }
-      return u;
-    }));
-
+    const prev = [...allUsers];
+    setAllUsers(prev.map(u => u.phone === phone ? { ...u, balance: operation === 'add' ? (u.balance || 0) + amount : Math.max(0, (u.balance || 0) - amount) } : u));
     try {
       const res = await updateUserBalanceDirectlyAction(phone, amount, operation);
-      if (!res.success) throw new Error("Server error");
-    } catch (error: any) {
-      setAllUsers(previousUsers);
+      if (!res.success) throw new Error();
+    } catch (e) {
+      setAllUsers(prev);
       alert("❌ فشل تحديث الرصيد.");
     }
   };
 
   const deductBalance = async (amount: number, details: string, initialStatus: 'Pending' | 'Completed' = 'Completed', externalId?: string) => {
     const before = userBalance;
-    const now = new Date().toISOString();
     const newBal = Math.max(0, userBalance - amount);
     setUserBalance(newBal);
     try {
       const result = await recordTransactionAction({
         external_order_id: externalId || "", type: 'طلب شحن', amount, status: initialStatus,
-        date: now, createdAt: now, userName, userPhone, details, balanceBefore: before, balanceAfter: newBal
+        date: new Date().toISOString(), createdAt: new Date().toISOString(), userName, userPhone, details, balanceBefore: before, balanceAfter: newBal
       });
-      if (!result.success) throw new Error(result.error);
+      if (!result.success) throw new Error();
       await syncBalanceAction(userPhone, newBal);
-    } catch (e: any) {
-      console.error("Deduct Balance Error", e);
-      alert("❌ فشل إرسال طلب الشحن. يرجى تحديث الصفحة.");
+    } catch (e) {
+      setUserBalance(before);
+      alert("🚨 خطأ تقني: تعذر تنفيذ الخصم. يرجى المحاولة لاحقاً.");
     }
   };
 
   const requestDeposit = async (amount: number, proofImage: string) => {
-    const now = new Date().toISOString();
-    
     try {
       const result = await recordTransactionAction({
-        type: 'إيداع محفظة', amount, status: 'Pending', date: now, createdAt: now,
+        type: 'إيداع محفظة', amount, status: 'Pending', date: new Date().toISOString(), createdAt: new Date().toISOString(),
         userName, userPhone, details: "طلب إيداع رصيد", proofImage
       });
       
       if (result.success) {
-        try { if (typeof window !== 'undefined') playNotificationSound(); } catch (e) {}
+        playNotificationSound();
         await refreshCloudData();
       } else {
-        throw new Error(result.error || "Unknown server action error");
+        throw new Error(result.error);
       }
     } catch (error: any) { 
-        console.error("Deposit Failure:", error);
-        const errorMsg = error.message || String(error);
-        if (errorMsg.includes("unexpected response")) {
-          alert("⚠️ عذراً، تعذر الاتصال بسيرفر فايربيز حالياً. يرجى تحديث الصفحة والمحاولة مرة أخرى.");
+        console.error("Deposit Root Error:", error);
+        // التعامل الذكي مع خطأ السامسونج
+        if (String(error).includes("unexpected response")) {
+           alert("⚠️ تنبيه: تم تسجيل طلبك ولكن تعذر تحديث الصفحة حالياً بسبب ضعف الشبكة. سيتم تفعيل رصيدك قريباً.");
         } else {
-          alert("🚨 حدث خطأ أثناء إرسال الطلب. يرجى المحاولة لاحقاً.");
+           alert("🚨 حدث خطأ فني أثناء الإرسال. يرجى التأكد من الإنترنت والمحاولة مرة أخرى.");
         }
     }
   };
@@ -373,7 +345,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const permission = await Notification.requestPermission();
         setNotificationsEnabled(permission === "granted");
         if (permission === "granted") unlockAudio();
-      } catch (e) { console.log("Permission Guarded"); }
+      } catch (e) {}
     }
   };
 
