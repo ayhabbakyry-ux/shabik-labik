@@ -26,7 +26,7 @@ import { changePasswordAction, updateProfileImageAction } from '@/app/actions/pr
 import { Transaction } from './types';
 
 /**
- * @fileOverview محرك البيانات المطور - حل مشكلة Index Error عبر الفرز البرمجي في المتصفح.
+ * @fileOverview محرك البيانات المطور - نسخة الطوارئ (V15): كشف الأخطاء التقنية الصريحة وفصل الحفظ عن الإشعارات.
  */
 
 type UserContextType = {
@@ -84,7 +84,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";
 
-  // دالة الفرز البرمجي لضمان الأحدث فوق دائماً بدون الحاجة لـ Index في فايربيز
   const sortTransactionsClientSide = (txs: Transaction[]) => {
     return [...txs].sort((a, b) => {
       const dateA = a.createdAt || a.date || "";
@@ -106,13 +105,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const triggerNotification = useCallback((title: string, body: string) => {
     if (typeof window === "undefined") return;
     try {
-      playNotificationSound();
       if ("Notification" in window && Notification.permission === "granted") {
         new Notification(title, { 
           body, 
           icon: 'https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg'
         });
       }
+      playNotificationSound();
     } catch (e) {}
   }, [playNotificationSound]);
 
@@ -138,11 +137,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       
       if (isAdminUser) {
         fetchPromises.push(getDocs(collection(db, "users")));
-        // حذف orderBy لتجنب Index Error والاعتماد على الفرز البرمجي
         fetchPromises.push(getDocs(collection(db, "transactions")));
         fetchPromises.push(getDocs(collection(db, "password_requests")));
       } else {
-        // حذف orderBy لتجنب Index Error والاعتماد على الفرز البرمجي
         fetchPromises.push(getDocs(query(collection(db, "transactions"), where("userPhone", "==", phoneClean))));
       }
 
@@ -169,7 +166,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (e: any) {
       console.error("Manual refresh failed", e);
-      alert("خطأ في جلب بيانات السجل: " + (e.message || String(e)));
+      // DEBUG: كشف سبب فشل الجلب بدقة
+      alert("⚠️ خطأ تقني في جلب السجل: " + (e.message || String(e)));
     }
   }, [isLoggedIn, userPhone]);
 
@@ -206,7 +204,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
     }));
 
-    // استعلام نظيف بدون orderBy لتجنب أخطاء الفهارس نهائياً
     const txQuery = isAdminUser 
       ? query(collection(db, "transactions"))
       : query(collection(db, "transactions"), where("userPhone", "==", phoneClean));
@@ -250,7 +247,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
     }, (error) => {
       console.error("Snapshot error:", error);
-      alert("خطأ في مراقبة البيانات اللحظية: " + error.message);
+      // DEBUG: كشف تعطل المزامنة اللحظية
+      alert("⚠️ خطأ في مراقبة البيانات اللحظية: " + error.message);
     }));
 
     if (isAdminUser) {
@@ -297,7 +295,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (!res.success) throw new Error(res.message);
     } catch (error: any) {
       setTransactions(previousTransactions);
-      alert("فشل معالجة الطلب: " + (error.message || String(error)));
+      alert("❌ فشل معالجة الطلب تقنياً: " + (error.message || String(error)));
     }
   };
 
@@ -316,7 +314,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (!res.success) throw new Error("Server error");
     } catch (error: any) {
       setAllUsers(previousUsers);
-      alert("خطأ في تحديث الرصيد: " + (error.message || String(error)));
+      alert("❌ خطأ في تحديث الرصيد: " + (error.message || String(error)));
     }
   };
 
@@ -334,7 +332,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       await syncBalanceAction(userPhone, newBal);
     } catch (e: any) {
       console.error("Deduct Balance Error", e);
-      alert("فشل تنفيذ طلب الشحن: " + (e.message || String(e)));
+      // DEBUG: كشف سبب فشل الشحن
+      alert("❌ فشل تنفيذ طلب الشحن تقنياً: " + (e.message || String(e)));
     }
   };
 
@@ -342,27 +341,29 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const now = new Date().toISOString();
     
     try {
-      // الأولوية للحفظ في فايربيز مع عزل كامل عن أي فشل جانبي
+      // 1. الأولوية القصوى: الحفظ في Firestore أولاً وبشكل مستقل
       const result = await recordTransactionAction({
         type: 'إيداع محفظة', amount, status: 'Pending', date: now, createdAt: now,
         userName, userPhone, details: "طلب إيداع رصيد", proofImage
       });
       
       if (result.success) {
-        // عزل كود الصوت تماماً لضمان عدم تعليق العملية في السامسونج
-        (async () => {
-          try {
-            if (typeof window !== 'undefined') playNotificationSound();
-          } catch (e) { console.log("Sound alert failed safely"); }
-        })();
+        // 2. عزل كود الصوت والإشعارات في بلوك صامت تماماً لضمان عدم تعليق العملية
+        try {
+          if (typeof window !== 'undefined') playNotificationSound();
+        } catch (e) { 
+          console.log("Secondary sound notification ignored safely"); 
+        }
 
+        // 3. تحديث البيانات بعد النجاح المضمون
         await refreshCloudData();
       } else {
-        throw new Error(result.error);
+        throw new Error(result.error || "Unknown server action error");
       }
     } catch (error: any) { 
         console.error("Critical Deposit Failure:", error);
-        alert("حدث خطأ تقني أثناء إرسال الطلب: " + (error.message || String(error)));
+        // 4. فك القناع عن الخطأ الحقيقي للمستخدم والمدير
+        alert("🚨 خطأ تقني صريح (سامسونج/فايربيز): " + (error.message || String(error)));
     }
   };
 
