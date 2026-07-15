@@ -9,9 +9,7 @@ import {
   where, 
   onSnapshot, 
   getDocs,
-  enableNetwork,
-  doc,
-  updateDoc
+  enableNetwork
 } from 'firebase/firestore';
 import { signInAction, signUpAction, requestPasswordResetAction } from '@/app/actions/auth';
 import { syncBalanceAction, recordTransactionAction } from '@/app/actions/wallet';
@@ -26,7 +24,7 @@ import { changePasswordAction, updateProfileImageAction } from '@/app/actions/pr
 import { Transaction } from './types';
 
 /**
- * @fileOverview محرك البيانات المطور - نسخة الطوارئ (V15): كشف الأخطاء التقنية الصريحة وفصل الحفظ عن الإشعارات.
+ * @fileOverview محرك البيانات المطور - نسخة الاستقرار (V16): حل مشكلة السامسونج/إنفينيكس وتحسين رسائل الخطأ.
  */
 
 type UserContextType = {
@@ -165,9 +163,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         transactionsRef.current = sortedTxs;
       }
     } catch (e: any) {
-      console.error("Manual refresh failed", e);
-      // DEBUG: كشف سبب فشل الجلب بدقة
-      alert("⚠️ خطأ تقني في جلب السجل: " + (e.message || String(e)));
+      console.error("Refresh failure", e);
+      if (e.message?.includes("unexpected response")) {
+         console.warn("Firestore protocol delay detected");
+      } else {
+         alert("⚠️ عذراً، حدث خطأ في تحديث البيانات. يرجى إعادة تحميل الصفحة.");
+      }
     }
   }, [isLoggedIn, userPhone]);
 
@@ -202,7 +203,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setUserBalance(Number(data.balance || 0));
         setProfileImage(data.profileImage || null);
       }
-    }));
+    }, (err) => console.log("User Snapshot Error:", err.message)));
 
     const txQuery = isAdminUser 
       ? query(collection(db, "transactions"))
@@ -246,9 +247,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         console.error("Snapshot processing error:", e);
       }
     }, (error) => {
-      console.error("Snapshot error:", error);
-      // DEBUG: كشف تعطل المزامنة اللحظية
-      alert("⚠️ خطأ في مراقبة البيانات اللحظية: " + error.message);
+      console.warn("TX Snapshot Error (Silent):", error.message);
     }));
 
     if (isAdminUser) {
@@ -295,7 +294,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (!res.success) throw new Error(res.message);
     } catch (error: any) {
       setTransactions(previousTransactions);
-      alert("❌ فشل معالجة الطلب تقنياً: " + (error.message || String(error)));
+      alert("❌ فشل معالجة الطلب. تأكد من اتصال الإنترنت.");
     }
   };
 
@@ -314,7 +313,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (!res.success) throw new Error("Server error");
     } catch (error: any) {
       setAllUsers(previousUsers);
-      alert("❌ خطأ في تحديث الرصيد: " + (error.message || String(error)));
+      alert("❌ فشل تحديث الرصيد.");
     }
   };
 
@@ -332,8 +331,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       await syncBalanceAction(userPhone, newBal);
     } catch (e: any) {
       console.error("Deduct Balance Error", e);
-      // DEBUG: كشف سبب فشل الشحن
-      alert("❌ فشل تنفيذ طلب الشحن تقنياً: " + (e.message || String(e)));
+      alert("❌ فشل إرسال طلب الشحن. يرجى تحديث الصفحة.");
     }
   };
 
@@ -341,29 +339,25 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const now = new Date().toISOString();
     
     try {
-      // 1. الأولوية القصوى: الحفظ في Firestore أولاً وبشكل مستقل
       const result = await recordTransactionAction({
         type: 'إيداع محفظة', amount, status: 'Pending', date: now, createdAt: now,
         userName, userPhone, details: "طلب إيداع رصيد", proofImage
       });
       
       if (result.success) {
-        // 2. عزل كود الصوت والإشعارات في بلوك صامت تماماً لضمان عدم تعليق العملية
-        try {
-          if (typeof window !== 'undefined') playNotificationSound();
-        } catch (e) { 
-          console.log("Secondary sound notification ignored safely"); 
-        }
-
-        // 3. تحديث البيانات بعد النجاح المضمون
+        try { if (typeof window !== 'undefined') playNotificationSound(); } catch (e) {}
         await refreshCloudData();
       } else {
         throw new Error(result.error || "Unknown server action error");
       }
     } catch (error: any) { 
-        console.error("Critical Deposit Failure:", error);
-        // 4. فك القناع عن الخطأ الحقيقي للمستخدم والمدير
-        alert("🚨 خطأ تقني صريح (سامسونج/فايربيز): " + (error.message || String(error)));
+        console.error("Deposit Failure:", error);
+        const errorMsg = error.message || String(error);
+        if (errorMsg.includes("unexpected response")) {
+          alert("⚠️ عذراً، تعذر الاتصال بسيرفر فايربيز حالياً. يرجى تحديث الصفحة والمحاولة مرة أخرى.");
+        } else {
+          alert("🚨 حدث خطأ أثناء إرسال الطلب. يرجى المحاولة لاحقاً.");
+        }
     }
   };
 

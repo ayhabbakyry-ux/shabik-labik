@@ -1,9 +1,10 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { initializeFirestore, getFirestore, Firestore, terminate } from "firebase/firestore";
+import { initializeFirestore, getFirestore, Firestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 /**
- * @fileOverview إعدادات الفايربيز المطورة - تم تحسين التهيئة لمنع خطأ Unexpected response في أجهزة سامسونج.
+ * @fileOverview إعدادات الفايربيز المطورة - نسخة الاستقرار القصوى (V16).
+ * تم فرض بروتوكول Long Polling على كافة المنصات لحل مشكلة "An unexpected response" في أجهزة Infinix وSamsung.
  */
 
 const firebaseConfig = {
@@ -15,24 +16,18 @@ const firebaseConfig = {
   appId: "1:723678552538:web:579e6791a1211c7998e0e3"
 };
 
-// تهيئة التطبيق مرة واحدة فقط لضمان الاستقرار
+// تهيئة التطبيق مرة واحدة
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 let db: Firestore;
 
-if (typeof window !== "undefined") {
-  // للعملاء (المتصفح): نستخدم تهيئة معزولة تضمن تجاوز قيود أجهزة سامسونج
-  try {
-    // محاولة الحصول على النسخة الموجودة مسبقاً لتجنب تعارض الإعدادات
-    db = getFirestore(app);
-    // ملاحظة: لا يمكن تغيير الإعدادات بعد التهيئة الأولى، لذا نعتمد على الضبط التلقائي أو التهيئة المتخصصة
-  } catch (e) {
-    db = initializeFirestore(app, {
-      experimentalForceLongPolling: true,
-    });
-  }
-} else {
-  // للسيرفر (Node.js): تهيئة كلاسيكية لمنع الـ Internal Server Error
+// فرض بروتوكول Long Polling بشكل قاطع لتجاوز قيود الشبكات وأجهزة الأندرويد
+try {
+  db = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+  });
+} catch (e) {
+  // في حال كان الفايربيز مشغلاً مسبقاً، نستخدم النسخة الموجودة
   db = getFirestore(app);
 }
 
