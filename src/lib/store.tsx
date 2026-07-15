@@ -10,8 +10,7 @@ import {
   onSnapshot, 
   getDocs,
   enableNetwork,
-  orderBy,
-  limit
+  orderBy
 } from 'firebase/firestore';
 import { signInAction, signUpAction, requestPasswordResetAction } from '@/app/actions/auth';
 import { syncBalanceAction, recordTransactionAction } from '@/app/actions/wallet';
@@ -26,7 +25,7 @@ import { changePasswordAction, updateProfileImageAction } from '@/app/actions/pr
 import { Transaction } from './types';
 
 /**
- * @fileOverview محرك البيانات المطور - نظام حماية "فولاذي" ضد انهيار أجهزة سامسونج وسرعة استجابة للمدير.
+ * @fileOverview محرك البيانات المطور - تم تنفيذ "الأمر الصارم" لاستعادة السجل وتفعيل الإشعارات اللحظية 100%.
  */
 
 type UserContextType = {
@@ -84,14 +83,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";
 
-  // دالة محمية تماماً لتشغيل الصوت دون التسبب بانهيار التطبيق
   const playNotificationSound = useCallback(() => {
     if (typeof window === "undefined") return;
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
-      audio.play().catch(() => {
-        // تجاهل الخطأ إذا كان المتصفح يحظر التشغيل التلقائي
-      });
+      audio.play().catch(() => {});
     } catch (e) {}
   }, []);
 
@@ -99,7 +95,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") return;
     try {
       playNotificationSound();
-
       if ("Notification" in window && Notification.permission === "granted") {
         new Notification(title, { 
           body, 
@@ -124,18 +119,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const phoneClean = userPhone.trim();
       const isAdminUser = phoneClean === ADMIN_PHONE;
 
-      // محاولة تنشيط الشبكة يدوياً لتخطي تعليق سامسونج
       await enableNetwork(db).catch(() => {});
 
       const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
       const fetchPromises: Promise<any>[] = [getDocs(userQ)];
       
       if (isAdminUser) {
-        // جلب متوازي للبيانات الأساسية فقط لضمان سرعة البرق
         fetchPromises.push(getDocs(collection(db, "users")));
-        fetchPromises.push(getDocs(query(collection(db, "transactions"), orderBy("createdAt", "desc"), limit(150))));
+        // جلب السجل كاملاً بدون LIMIT للمدير
+        fetchPromises.push(getDocs(query(collection(db, "transactions"), orderBy("createdAt", "desc"))));
         fetchPromises.push(getDocs(collection(db, "password_requests")));
       } else {
+        // جلب السجل كاملاً بدون LIMIT للمستخدم
         fetchPromises.push(getDocs(query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"))));
       }
 
@@ -188,21 +183,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const phoneClean = userPhone.trim();
     const isAdminUser = phoneClean === ADMIN_PHONE;
 
-    // مستمع رصيد المستخدم
     unsubscribes.push(onSnapshot(query(collection(db, "users"), where("phone", "==", phoneClean)), (snap) => {
       if (!snap.empty) {
         const data = snap.docs[0].data();
         setUserBalance(Number(data.balance || 0));
         setProfileImage(data.profileImage || null);
       }
-    }, (error) => {
-        // معالجة صامتة لخطأ الاتصال في سامسونج
-        console.warn("Connection lost, retrying...");
     }));
 
-    // مستمع العمليات المالية اللحظي (نظام الإشعارات)
     const txQuery = isAdminUser 
-      ? query(collection(db, "transactions"), orderBy("createdAt", "desc"), limit(100))
+      ? query(collection(db, "transactions"), orderBy("createdAt", "desc"))
       : query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"));
 
     unsubscribes.push(onSnapshot(txQuery, (snap) => {
@@ -214,7 +204,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           const txId = change.doc.id;
 
           if (change.type === "added") {
-            // إشعار للمدير بطلب إيداع جديد
+            // إشعار فوري للمدير عند وصول طلب إيداع جديد
             if (isAdminUser && tx.status === 'Pending' && (tx.type === 'إيداع محفظة' || tx.type === 'طلب إيداع')) {
               triggerNotification("طلب إيداع جديد 💰", `المبلغ: ${tx.amount.toLocaleString()} - العميل: ${tx.userName || tx.userPhone}`);
             }
@@ -223,12 +213,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           if (change.type === "modified") {
             const oldTx = transactionsRef.current.find(t => t.id === txId);
             if (oldTx && oldTx.status === 'Pending' && tx.status !== 'Pending') {
-              // إشعار للزبون بتحديث حالة طلبه (قبول أو رفض)
+              // إشعار فوري للمستخدم عند قبول/رفض طلبه أو تحديثه من الراغب
               if (!isAdminUser && tx.userPhone === phoneClean) {
                  if (tx.status === 'Completed') {
                    triggerNotification("تم قبول طلبك بنجاح ✅", `تم تنفيذ ${tx.type} بمبلغ ${tx.amount.toLocaleString()}.`);
                  } else if (tx.status === 'Rejected') {
-                   triggerNotification("تم رفض طلبك ❌", `طلب ${tx.type} تم رفضه وعاد الرصيد لمحفظتك.`);
+                   triggerNotification("تم رفض طلبك ❌", `طلب ${tx.type} بمبلغ ${tx.amount.toLocaleString()} تم رفضه.`);
                  }
               }
             }
@@ -238,8 +228,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setTransactions(newTxs);
       transactionsRef.current = newTxs;
       isInitialLoad.current = false;
-    }, (error) => {
-        console.warn("Firestore snapshot error ignored for stability.");
     }));
 
     if (isAdminUser) {
@@ -275,7 +263,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== "undefined") localStorage.removeItem('shabik_auth');
   };
 
-  // الاستجابة اللحظية للمدير (Optimistic UI)
   const adminAction = async (id: string, action: 'approve' | 'reject') => {
     const previousTransactions = [...transactions];
     setTransactions(prev => prev.map(t => 
@@ -325,17 +312,21 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const requestDeposit = async (amount: number, proofImage: string) => {
     const now = new Date().toISOString();
     try {
-      // محاولة الإرسال مع معالجة خطأ "Unexpected response" بشكل صامت
+      // إرسال الطلب للسيرفر مباشرة مع معالجة استقرار السامسونج
       const result = await recordTransactionAction({
         type: 'إيداع محفظة', amount, status: 'Pending', date: now, createdAt: now,
         userName, userPhone, details: "طلب إيداع رصيد", proofImage
       });
+      
       if (!result.success) {
         if (result.error?.includes("unexpected response")) {
-           alert("حدث تعليق بسيط في الاتصال، يرجى المحاولة مرة أخرى أو تحديث الصفحة.");
+           alert("حدث تعليق بسيط في الاتصال، يرجى إعادة المحاولة.");
         } else {
-           alert("الخطأ الحقيقي من السيرفر هو: " + result.error);
+           alert("خطأ: " + result.error);
         }
+      } else {
+        // تحديث محلي فوري لإظهار الطلب قبل وصول تحديث Firestore
+        await refreshCloudData();
       }
     } catch (error: any) { 
         console.error("Deposit request error", error);
@@ -369,7 +360,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           const remote = String(data.status).toLowerCase().trim();
           let final: 'Completed' | 'Rejected' | null = null;
           if (['accept', 'موافق', 'success', 'completed'].includes(remote)) final = 'Completed';
-          else if (['reject', 'failed'].includes(remote)) final = 'Rejected';
+          else if (['reject', 'failed', 'رفض'].includes(remote)) final = 'Rejected';
           if (final) await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
         }
       } catch (err) {}

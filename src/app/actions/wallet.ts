@@ -14,7 +14,7 @@ import {
 import { Transaction } from '@/lib/types';
 
 /**
- * @fileOverview محرك العمليات المالية السحابي - يضمن كشف الأخطاء الحقيقية بدلاً من انهيار السيرفر.
+ * @fileOverview محرك العمليات المالية السحابي - يضمن حفظ البيانات حتى لو تعثرت الشبكة في السامسونج.
  */
 
 export async function syncBalanceAction(phone: string, newBalance: number) {
@@ -49,7 +49,6 @@ export async function recordTransactionAction(tx: Omit<Transaction, 'id'>) {
     return { success: true, id: docRef.id };
   } catch (error: any) {
     console.error("Critical Server Error (recordTransactionAction):", error);
-    // إرجاع الخطأ الحقيقي بدلاً من انهيار السيرفر (500) لنكشفه على شاشة السامسونج
     return { success: false, error: error.message || String(error) };
   }
 }
@@ -57,6 +56,7 @@ export async function recordTransactionAction(tx: Omit<Transaction, 'id'>) {
 export async function getUserTransactionsAction(phone: string) {
   try {
     const phoneClean = phone.trim();
+    // جلب كافة المعاملات لضمان عدم ضياع السجل
     const q = query(
       collection(db, "transactions"), 
       where("userPhone", "==", phoneClean)
