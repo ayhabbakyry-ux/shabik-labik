@@ -1,8 +1,7 @@
-
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار إرسال إشعارات FCM - نسخة مستقرة للمحفزات الثلاثة.
+ * @fileOverview مسار إرسال إشعارات FCM - نسخة مستقرة للمحفزات الثلاثة مع أولوية قصوى.
  */
 
 export async function POST(request: Request) {
@@ -11,7 +10,8 @@ export async function POST(request: Request) {
         
         if (!token) return NextResponse.json({ success: false, error: 'No Token' });
 
-        const SERVER_KEY = process.env.ALRAGHEB_TOKEN || "64659dc283eb8ee87192b012aaec33b07d56a00ddf18bdc0"; 
+        // ملاحظة: هذا المفتاح يجب أن يكون مفتاح سيرفر FCM الفعلي من لوحة تحكم فايربيز
+        const SERVER_KEY = process.env.FCM_SERVER_KEY || "AAAA...REPLACE_WITH_ACTUAL_KEY"; 
 
         const response = await fetch('https://fcm.googleapis.com/fcm/send', {
             method: 'POST',
@@ -25,10 +25,14 @@ export async function POST(request: Request) {
                     title: title,
                     body: body,
                     sound: "default",
+                    badge: "1",
                     click_action: "https://shabik-labik.vercel.app/history",
                     icon: "https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg"
                 },
-                data: data || {},
+                data: {
+                    ...data,
+                    url: "https://shabik-labik.vercel.app/history"
+                },
                 priority: "high"
             })
         });

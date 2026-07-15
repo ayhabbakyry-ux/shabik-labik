@@ -1,8 +1,7 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { db, getMessagingSafe } from './firebase-config';
+import { db, getMessagingSafe, firebaseConfig } from './firebase-config';
 import { getToken } from 'firebase/messaging';
 import { 
   collection, 
@@ -96,21 +95,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {}
   }, [isAudioUnlocked]);
 
-  const triggerNotification = useCallback((title: string, body: string) => {
-    if (typeof window === "undefined") return;
-    try {
-      if ("Notification" in window && Notification.permission === "granted") {
-        new Notification(title, { 
-          body, 
-          icon: 'https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg'
-        });
-      }
-      playNotificationSound();
-    } catch (e) {}
-  }, [playNotificationSound]);
-
-  // دالة إرسال إشعار FCM بشكل صامت (Fire-and-Forget)
   const triggerPushSilently = useCallback((targetPhone: string, title: string, body: string) => {
+    if (typeof window === "undefined") return;
     (async () => {
       try {
         const q = query(collection(db, "users"), where("phone", "==", targetPhone.trim()));
@@ -123,7 +109,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, title, body })
-        }).catch(() => {});
+        }).catch(err => console.error("Push Fetch Error:", err));
       } catch (e) {}
     })();
   }, []);
@@ -143,20 +129,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const messaging = await getMessagingSafe();
       if (!messaging) return;
       
-      const permission = await Notification.requestPermission();
-      if (permission === 'granted') {
-        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
-        const token = await getToken(messaging, { 
-          serviceWorkerRegistration: registration,
-          vapidKey: "BHPJ_A1A1A1A1A1A1A1A1_DUMMY_VAPID_REPLACE" 
-        });
-        
-        if (token) {
-          const q = query(collection(db, "users"), where("phone", "==", phone.trim()));
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-            await updateDoc(doc(db, "users", snap.docs[0].id), { fcmToken: token });
-          }
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
+      
+      // مفتاح VAPID العام لفايربيز
+      const token = await getToken(messaging, { 
+        serviceWorkerRegistration: registration,
+        vapidKey: "BHPJ_A1A1A1A1A1A1A1A1_DUMMY_VAPID_REPLACE" 
+      });
+      
+      if (token) {
+        const q = query(collection(db, "users"), where("phone", "==", phone.trim()));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          await updateDoc(doc(db, "users", snap.docs[0].id), { fcmToken: token });
         }
       }
     } catch (e) {}
@@ -183,32 +168,30 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       await enableNetwork(db).catch(() => {});
 
       const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
-      const fetchPromises: Promise<any>[] = [getDocs(userQ)];
-      
-      if (isAdminUser) {
-        fetchPromises.push(getDocs(collection(db, "users")));
-        fetchPromises.push(getDocs(collection(db, "transactions")));
-        fetchPromises.push(getDocs(collection(db, "password_requests")));
-      } else {
-        fetchPromises.push(getDocs(query(collection(db, "transactions"), where("userPhone", "==", phoneClean))));
-      }
-
-      const results = await Promise.all(fetchPromises);
-      if (!results[0].empty) {
-        const data = results[0].docs[0].data();
+      const results = await getDocs(userQ);
+      if (!results.empty) {
+        const data = results.docs[0].data();
         setUserBalance(Number(data.balance || 0));
         setProfileImage(data.profileImage || null);
       }
+
+      const txQ = isAdminUser 
+        ? query(collection(db, "transactions"))
+        : query(collection(db, "transactions"), where("userPhone", "==", phoneClean));
+      
+      const txSnap = await getDocs(txQ);
+      const rawTxs = txSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
+      setTransactions(sortTransactionsClientSide(rawTxs));
+
       if (isAdminUser) {
-        setAllUsers(results[1].docs.map(d => ({ ...d.data(), id: d.id })));
-        const rawTxs = results[2].docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
-        setTransactions(sortTransactionsClientSide(rawTxs));
-        setPasswordRequests(results[3].docs.map(d => ({ ...d.data(), id: d.id })));
-      } else {
-        const rawTxs = results[1].docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
-        setTransactions(sortTransactionsClientSide(rawTxs));
+        const allUsersSnap = await getDocs(collection(db, "users"));
+        setAllUsers(allUsersSnap.docs.map(d => ({ ...d.data(), id: d.id })));
+        const passSnap = await getDocs(collection(db, "password_requests"));
+        setPasswordRequests(passSnap.docs.map(d => ({ ...d.data(), id: d.id })));
       }
-    } catch (e: any) {}
+    } catch (e: any) {
+       console.error("Refresh Error:", e);
+    }
   }, [isLoggedIn, userPhone, sortTransactionsClientSide]);
 
   useEffect(() => {
@@ -257,7 +240,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           snap.docChanges().forEach((change) => {
             const tx = change.doc.data() as Transaction;
             if (change.type === "added" && isAdminUser && tx.status === 'Pending') {
-              triggerNotification("طلب إيداع جديد 💰", "هناك طلب إيداع وصل الآن");
+              playNotificationSound();
             }
           });
         }
@@ -275,7 +258,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }));
     }
     return () => unsubscribes.forEach(unsub => unsub());
-  }, [isLoggedIn, userPhone, triggerNotification, refreshCloudData, sortTransactionsClientSide, setupFCM]);
+  }, [isLoggedIn, userPhone, playNotificationSound, refreshCloudData, sortTransactionsClientSide, setupFCM]);
 
   const login = async (phone: string, password: string) => {
     const phoneClean = phone.trim();
@@ -283,12 +266,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const data = { phone: phoneClean, name: "المدير العام" };
       setIsLoggedIn(true); setUserPhone(phoneClean); setUserName(data.name);
       localStorage.setItem('shabik_auth', JSON.stringify(data));
+      setupFCM(phoneClean);
       return { success: true, message: "مرحباً بك يا مدير." };
     }
     const result = await signInAction(phoneClean, password);
     if (result.success && result.user) {
       setIsLoggedIn(true); setUserPhone(result.user.phone); setUserName(result.user.name);
       localStorage.setItem('shabik_auth', JSON.stringify(result.user));
+      setupFCM(phoneClean);
     }
     return result;
   };
@@ -306,9 +291,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const res = await processAdminAction(id, action);
       if (!res.success) throw new Error();
       
-      // TRIGGER 2: Admin -> User (Deposit Approved)
       if (action === 'approve' && tx && tx.userPhone) {
-         triggerPushSilently(tx.userPhone, "تم تحديث الرصيد", `تمت إضافة مبلغ ${tx.amount.toLocaleString()} ل.س إلى رصيدك`);
+         triggerPushSilently(tx.userPhone, "تم تحديث الرصيد ✅", `تمت إضافة مبلغ ${tx.amount.toLocaleString()} ل.س إلى رصيدك`);
       }
     } catch (e) {
       setTransactions(prev);
@@ -357,7 +341,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     } catch (e: any) {
       setUserBalance(before);
-      alert("🚨 فشل تنفيذ العملية (خطأ شبكة): " + (e.message || e));
+      alert("🚨 فشل تنفيذ العملية: " + (e.message || e));
     }
   };
 
@@ -377,11 +361,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       };
 
       await addDoc(collection(db, "transactions"), txData);
-      
       alert("✅ تم إرسال طلبك بنجاح للمدير.");
 
-      // TRIGGER 1: User -> Admin (New Deposit Request)
-      triggerPushSilently(ADMIN_PHONE, "طلب إيداع جديد", "هناك طلب إيداع وصل الآن");
+      // إشعار للمدير في الخلفية
+      triggerPushSilently(ADMIN_PHONE, "طلب إيداع جديد 💰", "هناك طلب إيداع وصل الآن من " + userName);
 
     } catch (error: any) { 
         alert("🚨 فشل في إرسال الطلب: " + (error.message || error));
@@ -411,10 +394,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           if (final) {
             await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
             
-            // TRIGGER 3: Admin -> User (Product Order Completed)
             if (final === 'Completed') {
                const targetId = order.details?.split('ID: ')[1] || "حسابك";
-               triggerPushSilently(order.userPhone || userPhone, "تم اكتمال الشحن", `تمت عملية شحن ${targetId} بنجاح`);
+               triggerPushSilently(order.userPhone || userPhone, "تم اكتمال الشحن ✨", `تمت عملية شحن ${targetId} بنجاح`);
             }
           }
         }
