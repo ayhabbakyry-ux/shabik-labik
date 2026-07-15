@@ -27,7 +27,7 @@ import { changePasswordAction, updateProfileImageAction } from '@/app/actions/pr
 import { Transaction } from './types';
 
 /**
- * @fileOverview محرك البيانات المطور - تنفيذ "الأمر الصارم" للأداء اللحظي وحل مشاكل السامسونج.
+ * @fileOverview محرك البيانات المطور - تنفيذ "الأمر الصارم" لكشف الأخطاء الحقيقية وحل مشاكل السامسونج.
  */
 
 type UserContextType = {
@@ -85,7 +85,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";
 
-  // Task 3: Crash-Proof Sound Alert
   const playNotificationSound = useCallback(() => {
     if (typeof window === "undefined") return;
     try {
@@ -96,7 +95,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Task 3: Safe Notification Trigger
   const triggerNotification = useCallback((title: string, body: string) => {
     if (typeof window === "undefined") return;
     try {
@@ -157,8 +155,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setTransactions(txs);
         transactionsRef.current = txs;
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Manual refresh failed", e);
+      if (typeof window !== 'undefined') alert("خطأ في جلب بيانات السجل: " + (e.message || String(e)));
     }
   }, [isLoggedIn, userPhone]);
 
@@ -227,10 +226,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           }
         });
       }
-      // Task 4: Strict Chronological Sorting (Newest First)
       setTransactions(newTxs.sort((a, b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || "")));
       transactionsRef.current = newTxs;
       isInitialLoad.current = false;
+    }, (error) => {
+      console.error("Snapshot error:", error);
+      if (typeof window !== 'undefined') alert("خطأ في مراقبة البيانات اللحظية: " + error.message);
     }));
 
     if (isAdminUser) {
@@ -266,12 +267,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== "undefined") localStorage.removeItem('shabik_auth');
   };
 
-  // Task 1: Optimistic Admin Action
   const adminAction = async (id: string, action: 'approve' | 'reject') => {
     const previousTransactions = [...transactions];
-    const targetTx = transactions.find(t => t.id === id);
-    
-    // Immediate Update
     setTransactions(prev => prev.map(t => 
       t.id === id ? { ...t, status: action === 'approve' ? 'Completed' : 'Rejected' } : t
     ));
@@ -279,18 +276,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await processAdminAction(id, action);
       if (!res.success) throw new Error(res.message);
-    } catch (error) {
-      // Rollback
+    } catch (error: any) {
       setTransactions(previousTransactions);
-      if (typeof window !== 'undefined') alert("خطأ في الشبكة: تعذر تحديث حالة الطلب حالياً.");
+      if (typeof window !== 'undefined') alert("فشل معالجة الطلب: " + (error.message || String(error)));
     }
   };
 
-  // Task 1: Optimistic Balance Update
   const updateBalanceAdmin = async (phone: string, amount: number, operation: 'add' | 'subtract') => {
     const previousUsers = [...allUsers];
-    
-    // Immediate Update
     setAllUsers(prev => prev.map(u => {
       if (u.phone === phone) {
         const cur = Number(u.balance || 0);
@@ -302,10 +295,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await updateUserBalanceDirectlyAction(phone, amount, operation);
       if (!res.success) throw new Error("Server error");
-    } catch (error) {
-      // Rollback
+    } catch (error: any) {
       setAllUsers(previousUsers);
-      if (typeof window !== 'undefined') alert("فشل تعديل الرصيد، جاري التراجع عن التغيير.");
+      if (typeof window !== 'undefined') alert("خطأ في تحديث الرصيد: " + (error.message || String(error)));
     }
   };
 
@@ -315,31 +307,34 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const newBal = Math.max(0, userBalance - amount);
     setUserBalance(newBal);
     try {
-      await recordTransactionAction({
+      const result = await recordTransactionAction({
         external_order_id: externalId || "", type: 'طلب شحن', amount, status: initialStatus,
         date: now, createdAt: now, userName, userPhone, details, balanceBefore: before, balanceAfter: newBal
       });
+      if (!result.success) throw new Error(result.error);
       await syncBalanceAction(userPhone, newBal);
-    } catch (e) {}
+    } catch (e: any) {
+      console.error("Deduct Balance Error", e);
+      if (typeof window !== 'undefined') alert("فشل تنفيذ طلب الشحن: " + (e.message || String(e)));
+    }
   };
 
-  // Task 2: Decoupled Samsung Deposit Flow
   const requestDeposit = async (amount: number, proofImage: string) => {
     const now = new Date().toISOString();
     
     try {
-      // 1. Core Firestore Write (Non-blocking for FCM)
+      // 1. الأولوية المطلقة للحفظ في Firestore (بدون انتظار أي شيء آخر)
       const result = await recordTransactionAction({
         type: 'إيداع محفظة', amount, status: 'Pending', date: now, createdAt: now,
         userName, userPhone, details: "طلب إيداع رصيد", proofImage
       });
       
       if (result.success) {
-        // 2. Isolated Notification Logic (Fire and Forget)
+        // 2. منطق الإشعارات والصوت في بلوك منفصل تماماً ولا يعطل النتيجة
         (async () => {
           try {
             if (typeof window !== 'undefined') playNotificationSound();
-          } catch (e) { console.log("Sound logic skipped"); }
+          } catch (e) { console.log("Sound logic failure ignored"); }
         })();
 
         await refreshCloudData();
@@ -347,8 +342,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         throw new Error(result.error);
       }
     } catch (error: any) { 
-        console.error("Deposit Failure", error);
-        if (typeof window !== 'undefined') alert("حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى.");
+        console.error("Critical Deposit Failure:", error);
+        // عرض الخطأ التقني الحقيقي على شاشة السامسونج
+        if (typeof window !== 'undefined') alert("حدث خطأ تقني أثناء إرسال الطلب: " + (error.message || String(error)));
     }
   };
 
