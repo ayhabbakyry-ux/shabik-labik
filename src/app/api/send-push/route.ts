@@ -1,17 +1,25 @@
+
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار إرسال إشعارات FCM - نسخة مستقرة للمحفزات الثلاثة مع أولوية قصوى.
+ * @fileOverview مسار إرسال إشعارات FCM المطور - يستخدم متغيرات البيئة للأمان المطلق.
  */
 
 export async function POST(request: Request) {
     try {
         const { token, title, body, data } = await request.json();
         
-        if (!token) return NextResponse.json({ success: false, error: 'No Token' });
+        if (!token) {
+            return NextResponse.json({ success: false, error: 'Recipient Token is missing' });
+        }
 
-        // ملاحظة: هذا المفتاح يجب أن يكون مفتاح سيرفر FCM الفعلي من لوحة تحكم فايربيز
-        const SERVER_KEY = process.env.FCM_SERVER_KEY || "AAAA...REPLACE_WITH_ACTUAL_KEY"; 
+        // جلب مفتاح السيرفر من متغيرات البيئة (Vercel Environment Variables)
+        const SERVER_KEY = process.env.FCM_SERVER_KEY; 
+
+        if (!SERVER_KEY || SERVER_KEY === "YOUR_SERVER_KEY") {
+            console.error("FCM API: Missing FCM_SERVER_KEY in environment.");
+            return NextResponse.json({ success: false, error: 'Server configuration missing' });
+        }
 
         const response = await fetch('https://fcm.googleapis.com/fcm/send', {
             method: 'POST',
@@ -38,9 +46,9 @@ export async function POST(request: Request) {
         });
 
         const resData = await response.json();
-        return NextResponse.json({ success: true, resData });
+        return NextResponse.json({ success: true, info: resData });
     } catch (error: any) {
         console.error("Push API Critical Error:", error);
-        return NextResponse.json({ success: false, error: error.message });
+        return NextResponse.json({ success: false, error: error.message || String(error) });
     }
 }
