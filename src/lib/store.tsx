@@ -10,7 +10,9 @@ import {
   onSnapshot, 
   getDocs,
   enableNetwork,
-  orderBy
+  orderBy,
+  doc,
+  updateDoc
 } from 'firebase/firestore';
 import { signInAction, signUpAction, requestPasswordResetAction } from '@/app/actions/auth';
 import { syncBalanceAction, recordTransactionAction } from '@/app/actions/wallet';
@@ -25,7 +27,7 @@ import { changePasswordAction, updateProfileImageAction } from '@/app/actions/pr
 import { Transaction } from './types';
 
 /**
- * @fileOverview محرك البيانات المطور - تم تنفيذ "الأمر الصارم" لاستعادة السجل وتفعيل الإشعارات اللحظية 100%.
+ * @fileOverview محرك البيانات المطور - تنفيذ "الأمر الصارم" للأداء اللحظي وحل مشاكل السامسونج.
  */
 
 type UserContextType = {
@@ -83,14 +85,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";
 
+  // Task 3: Crash-Proof Sound Alert
   const playNotificationSound = useCallback(() => {
     if (typeof window === "undefined") return;
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
-      audio.play().catch(() => {});
-    } catch (e) {}
+      audio.play().catch(err => console.log("Audio Autoplay Guard:", err));
+    } catch (e) {
+      console.log("Audio Context Error Ignored");
+    }
   }, []);
 
+  // Task 3: Safe Notification Trigger
   const triggerNotification = useCallback((title: string, body: string) => {
     if (typeof window === "undefined") return;
     try {
@@ -126,11 +132,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       
       if (isAdminUser) {
         fetchPromises.push(getDocs(collection(db, "users")));
-        // جلب السجل كاملاً بدون LIMIT للمدير
         fetchPromises.push(getDocs(query(collection(db, "transactions"), orderBy("createdAt", "desc"))));
         fetchPromises.push(getDocs(collection(db, "password_requests")));
       } else {
-        // جلب السجل كاملاً بدون LIMIT للمستخدم
         fetchPromises.push(getDocs(query(collection(db, "transactions"), where("userPhone", "==", phoneClean), orderBy("createdAt", "desc"))));
       }
 
@@ -204,7 +208,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           const txId = change.doc.id;
 
           if (change.type === "added") {
-            // إشعار فوري للمدير عند وصول طلب إيداع جديد
             if (isAdminUser && tx.status === 'Pending' && (tx.type === 'إيداع محفظة' || tx.type === 'طلب إيداع')) {
               triggerNotification("طلب إيداع جديد 💰", `المبلغ: ${tx.amount.toLocaleString()} - العميل: ${tx.userName || tx.userPhone}`);
             }
@@ -213,7 +216,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           if (change.type === "modified") {
             const oldTx = transactionsRef.current.find(t => t.id === txId);
             if (oldTx && oldTx.status === 'Pending' && tx.status !== 'Pending') {
-              // إشعار فوري للمستخدم عند قبول/رفض طلبه أو تحديثه من الراغب
               if (!isAdminUser && tx.userPhone === phoneClean) {
                  if (tx.status === 'Completed') {
                    triggerNotification("تم قبول طلبك بنجاح ✅", `تم تنفيذ ${tx.type} بمبلغ ${tx.amount.toLocaleString()}.`);
@@ -225,7 +227,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           }
         });
       }
-      setTransactions(newTxs);
+      // Task 4: Strict Chronological Sorting (Newest First)
+      setTransactions(newTxs.sort((a, b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || "")));
       transactionsRef.current = newTxs;
       isInitialLoad.current = false;
     }));
@@ -263,22 +266,31 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== "undefined") localStorage.removeItem('shabik_auth');
   };
 
+  // Task 1: Optimistic Admin Action
   const adminAction = async (id: string, action: 'approve' | 'reject') => {
     const previousTransactions = [...transactions];
+    const targetTx = transactions.find(t => t.id === id);
+    
+    // Immediate Update
     setTransactions(prev => prev.map(t => 
       t.id === id ? { ...t, status: action === 'approve' ? 'Completed' : 'Rejected' } : t
     ));
+
     try {
       const res = await processAdminAction(id, action);
       if (!res.success) throw new Error(res.message);
     } catch (error) {
+      // Rollback
       setTransactions(previousTransactions);
-      alert("فشل تحديث الطلب، يرجى التحقق من الإنترنت.");
+      if (typeof window !== 'undefined') alert("خطأ في الشبكة: تعذر تحديث حالة الطلب حالياً.");
     }
   };
 
+  // Task 1: Optimistic Balance Update
   const updateBalanceAdmin = async (phone: string, amount: number, operation: 'add' | 'subtract') => {
     const previousUsers = [...allUsers];
+    
+    // Immediate Update
     setAllUsers(prev => prev.map(u => {
       if (u.phone === phone) {
         const cur = Number(u.balance || 0);
@@ -286,12 +298,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
       return u;
     }));
+
     try {
       const res = await updateUserBalanceDirectlyAction(phone, amount, operation);
       if (!res.success) throw new Error("Server error");
     } catch (error) {
+      // Rollback
       setAllUsers(previousUsers);
-      alert("تعذر تعديل الرصيد حالياً.");
+      if (typeof window !== 'undefined') alert("فشل تعديل الرصيد، جاري التراجع عن التغيير.");
     }
   };
 
@@ -309,27 +323,32 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {}
   };
 
+  // Task 2: Decoupled Samsung Deposit Flow
   const requestDeposit = async (amount: number, proofImage: string) => {
     const now = new Date().toISOString();
+    
     try {
-      // إرسال الطلب للسيرفر مباشرة مع معالجة استقرار السامسونج
+      // 1. Core Firestore Write (Non-blocking for FCM)
       const result = await recordTransactionAction({
         type: 'إيداع محفظة', amount, status: 'Pending', date: now, createdAt: now,
         userName, userPhone, details: "طلب إيداع رصيد", proofImage
       });
       
-      if (!result.success) {
-        if (result.error?.includes("unexpected response")) {
-           alert("حدث تعليق بسيط في الاتصال، يرجى إعادة المحاولة.");
-        } else {
-           alert("خطأ: " + result.error);
-        }
-      } else {
-        // تحديث محلي فوري لإظهار الطلب قبل وصول تحديث Firestore
+      if (result.success) {
+        // 2. Isolated Notification Logic (Fire and Forget)
+        (async () => {
+          try {
+            if (typeof window !== 'undefined') playNotificationSound();
+          } catch (e) { console.log("Sound logic skipped"); }
+        })();
+
         await refreshCloudData();
+      } else {
+        throw new Error(result.error);
       }
     } catch (error: any) { 
-        console.error("Deposit request error", error);
+        console.error("Deposit Failure", error);
+        if (typeof window !== 'undefined') alert("حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى.");
     }
   };
 
@@ -341,9 +360,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   
   const requestNotificationPermission = async () => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
-      const permission = await Notification.requestPermission();
-      setNotificationsEnabled(permission === "granted");
-      if (permission === "granted") unlockAudio();
+      try {
+        const permission = await Notification.requestPermission();
+        setNotificationsEnabled(permission === "granted");
+        if (permission === "granted") unlockAudio();
+      } catch (e) { console.log("Permission Guarded"); }
     }
   };
 
