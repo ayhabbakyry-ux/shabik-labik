@@ -12,7 +12,8 @@ import {
   enableNetwork,
   disableNetwork,
   doc,
-  updateDoc
+  updateDoc,
+  addDoc
 } from 'firebase/firestore';
 import { signInAction, signUpAction, requestPasswordResetAction } from '@/app/actions/auth';
 import { syncBalanceAction, recordTransactionAction } from '@/app/actions/wallet';
@@ -27,8 +28,8 @@ import { changePasswordAction, updateProfileImageAction } from '@/app/actions/pr
 import { Transaction } from './types';
 
 /**
- * @fileOverview محرك البيانات المطور - نسخة الاستقرار القصوى (V18): 
- * فصل جراحي كامل للإشعارات لضمان عدم تعليق عمليات الإيداع في السامسونج.
+ * @fileOverview محرك البيانات المطور - نسخة الاستقرار القصوى (V19): 
+ * الفصل الجراحي المطلق للحفظ في Firestore عن نظام الإشعارات لحل مشكلة السامسونج نهائياً.
  */
 
 type UserContextType = {
@@ -85,7 +86,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";
 
-  // --- دالة الفرز في الذاكرة (لحل مشكلة Index Error) ---
   const sortTransactionsClientSide = useCallback((txs: Transaction[]) => {
     return [...txs].sort((a, b) => {
       const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.date ? new Date(a.date).getTime() : 0);
@@ -94,7 +94,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // --- نظام الصوت المعزول (Fire-and-Forget) ---
   const playNotificationSound = useCallback(() => {
     if (typeof window === "undefined" || !isAudioUnlocked) return;
     try {
@@ -103,7 +102,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {}
   }, [isAudioUnlocked]);
 
-  // --- نظام التنبيهات المدمج المعزول ---
   const triggerNotification = useCallback((title: string, body: string) => {
     if (typeof window === "undefined") return;
     try {
@@ -117,9 +115,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {}
   }, [playNotificationSound]);
 
-  // --- نظام الدفع (Push) المعزول تماماً ---
   const triggerPushSilently = useCallback((targetPhone: string, title: string, body: string) => {
-    // تشغيل فوري بدون await لمنع تعطيل واجهة المستخدم
     (async () => {
       try {
         const q = query(collection(db, "users"), where("phone", "==", targetPhone.trim()));
@@ -132,7 +128,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, title, body })
-        }).catch(() => {});
+        }).catch(e => console.log("Push failed silently"));
       } catch (e) {}
     })();
   }, []);
@@ -207,10 +203,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setTransactions(sortTransactionsClientSide(rawTxs));
       }
     } catch (e: any) {
-      if (e.message.includes("unexpected response")) {
-         await disableNetwork(db).catch(() => {});
-         await enableNetwork(db).catch(() => {});
-      }
+      console.log("Cloud Fetch Error:", e.message);
     }
   }, [isLoggedIn, userPhone, sortTransactionsClientSide]);
 
@@ -335,40 +328,67 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const before = userBalance;
     const newBal = Math.max(0, userBalance - amount);
     setUserBalance(newBal);
+    
     try {
-      const result = await recordTransactionAction({
-        external_order_id: externalId || "", type: 'طلب شحن', amount, status: initialStatus,
-        date: new Date().toISOString(), createdAt: new Date().toISOString(), userName, userPhone, details: productDetails, balanceBefore: before, balanceAfter: newBal
-      });
-      if (!result.success) throw new Error();
-      await syncBalanceAction(userPhone, newBal);
+      const now = new Date().toISOString();
+      const txData = {
+        external_order_id: externalId || "",
+        type: 'طلب شحن',
+        amount,
+        status: initialStatus,
+        date: now,
+        createdAt: now,
+        userName,
+        userPhone: userPhone.trim(),
+        details: productDetails,
+        balanceBefore: before,
+        balanceAfter: newBal
+      };
+
+      // 1. الحفظ المباشر في قاعدة البيانات (الأولوية القصوى)
+      await addDoc(collection(db, "transactions"), txData);
+
+      // 2. تحديث الرصيد في قاعدة البيانات
+      const userQ = query(collection(db, "users"), where("phone", "==", userPhone.trim()));
+      const snap = await getDocs(userQ);
+      if (!snap.empty) {
+        await updateDoc(doc(db, "users", snap.docs[0].id), { balance: newBal });
+      }
+
     } catch (e: any) {
       setUserBalance(before);
-      alert("🚨 خطأ تقني: " + (e.message || e));
+      alert("🚨 فشل تنفيذ العملية (خطأ شبكة): " + (e.message || e));
     }
   };
 
   const requestDeposit = async (amount: number, proofImage: string) => {
     try {
-      // 1. الأولوية القصوى للحفظ في السيرفر
-      const result = await recordTransactionAction({
-        type: 'إيداع محفظة', amount, status: 'Pending', date: new Date().toISOString(), createdAt: new Date().toISOString(),
-        userName, userPhone, details: "طلب إيداع رصيد", proofImage
-      });
+      const now = new Date().toISOString();
+      const txData = {
+        type: 'إيداع محفظة',
+        amount,
+        status: 'Pending',
+        date: now,
+        createdAt: now,
+        userName,
+        userPhone: userPhone.trim(),
+        details: "طلب إيداع رصيد",
+        proofImage
+      };
+
+      // 1. الحفظ المباشر في Firestore (مستقر جداً للسامسونج)
+      await addDoc(collection(db, "transactions"), txData);
       
-      if (result.success) {
-        // 2. تشغيل التنبيهات في الخلفية بدون انتظار (Fire-and-Forget)
-        playNotificationSound();
-        refreshCloudData().catch(() => {});
-        triggerPushSilently(ADMIN_PHONE, "طلب إيداع جديد 💰", `المبلغ: ${amount.toLocaleString()} - العميل: ${userName || userPhone}`);
-        
-        // 3. رسالة نجاح فورية للمستخدم
-        alert("✅ تم إرسال طلبك بنجاح للمدير.");
-      } else {
-        throw new Error(result.error);
-      }
+      // 2. إظهار النجاح فوراً للمستخدم
+      alert("✅ تم إرسال طلبك بنجاح للمدير.");
+
+      // 3. المهام الخلفية (Fire-and-Forget) بدون انتظار
+      playNotificationSound();
+      refreshCloudData().catch(() => {});
+      triggerPushSilently(ADMIN_PHONE, "طلب إيداع جديد 💰", `المبلغ: ${amount.toLocaleString()} - العميل: ${userName || userPhone}`);
+
     } catch (error: any) { 
-        alert("🚨 فشل في إرسال الطلب: " + (error.message || error));
+        alert("🚨 فشل في إرسال الطلب (عطل شبكة): " + (error.message || error));
     }
   };
 
