@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -5,7 +6,7 @@ import { useUser } from "@/lib/store";
 import { Navbar, DesktopHeader } from "@/components/layout/Navbar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { useRouter } from "next/navigation";
-import { KeyRound, ShieldCheck, ArrowRight, Menu, CheckCircle2, Lock } from "lucide-react";
+import { KeyRound, ShieldCheck, ArrowRight, Menu, CheckCircle2, Lock, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +18,11 @@ export default function ChangePasswordPage() {
   const [currentPass, setCurrentPass] = useState("");
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
+  
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
@@ -93,13 +99,20 @@ export default function ChangePasswordPage() {
                 <div className="relative">
                   <Lock className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input 
-                    type="password"
+                    type={showCurrent ? "text" : "password"}
                     placeholder="••••••••" 
-                    className="pr-10 h-12 text-right rounded-xl border-muted bg-muted/20" 
+                    className="pr-10 pl-12 h-12 text-right rounded-xl border-muted bg-muted/20" 
                     value={currentPass} 
                     onChange={(e) => setCurrentPass(e.target.value)}
                     required
                   />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowCurrent(!showCurrent)}
+                    className="absolute left-3 top-3 h-6 w-6 text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
+                  >
+                    {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -108,13 +121,20 @@ export default function ChangePasswordPage() {
                 <div className="relative">
                   <KeyRound className="absolute right-3 top-3 h-4 w-4 text-primary opacity-50" />
                   <Input 
-                    type="password"
+                    type={showNew ? "text" : "password"}
                     placeholder="أدخل كلمة مرور قوية" 
-                    className="pr-10 h-12 text-right rounded-xl border-muted bg-white" 
+                    className="pr-10 pl-12 h-12 text-right rounded-xl border-muted bg-white" 
                     value={newPass} 
                     onChange={(e) => setNewPass(e.target.value)}
                     required
                   />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowNew(!showNew)}
+                    className="absolute left-3 top-3 h-6 w-6 text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
+                  >
+                    {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -123,13 +143,20 @@ export default function ChangePasswordPage() {
                 <div className="relative">
                   <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-primary opacity-50" />
                   <Input 
-                    type="password"
+                    type={showConfirm ? "text" : "password"}
                     placeholder="أعد كتابة الجديدة" 
-                    className="pr-10 h-12 text-right rounded-xl border-muted bg-white" 
+                    className="pr-10 pl-12 h-12 text-right rounded-xl border-muted bg-white" 
                     value={confirmPass} 
                     onChange={(e) => setConfirmPass(e.target.value)}
                     required
                   />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowConfirm(!showConfirm)}
+                    className="absolute left-3 top-3 h-6 w-6 text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
+                  >
+                    {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
               </div>
 
