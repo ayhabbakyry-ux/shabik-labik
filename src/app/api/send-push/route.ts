@@ -2,8 +2,8 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview محرك إرسال إشعارات FCM المطور (FCM Legacy & v1 Hybrid Structure)
- * تم ضبطه ليرسل إشعارات "عالية الأولوية" تظهر فوراً في ستارة الموبايل.
+ * @fileOverview محرك إرسال إشعارات FCM - النسخة النهائية المستقرة.
+ * تم ضبطه ليتوافق مع ستارة الموبايل (System Tray) عبر الأولوية القصوى.
  */
 
 export async function POST(request: Request) {
@@ -14,7 +14,6 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: 'Recipient Token is missing' });
         }
 
-        // استخدام المفتاح السحابي (Legacy Server Key) لضمان العمل الفوري
         const SERVER_KEY = process.env.FCM_SERVER_KEY; 
 
         if (!SERVER_KEY) {
@@ -22,16 +21,16 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: 'Server key not configured' });
         }
 
-        // بناء الحمولة (Payload) المتوافقة مع أجهزة الأندرويد والآيفون
+        // بناء الحمولة (Payload) التي تجبر النظام على عرض الإشعار
         const payload = {
             to: token,
             notification: {
                 title: title,
                 body: body,
                 sound: "default",
-                priority: "high",
                 icon: "https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg",
-                click_action: url || "https://shabik-labik.vercel.app/history"
+                click_action: url || "https://shabik-labik.vercel.app/history",
+                android_channel_id: "shabik_notifs"
             },
             data: {
                 url: url || "https://shabik-labik.vercel.app/history",
@@ -52,7 +51,7 @@ export async function POST(request: Request) {
         });
 
         const resData = await response.json();
-        console.log("FCM Delivery Result:", resData);
+        console.log("FCM Delivery Result:", JSON.stringify(resData));
 
         return NextResponse.json({ success: true, info: resData });
     } catch (error: any) {

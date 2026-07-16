@@ -115,7 +115,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const token = userData.fcmToken;
         if (!token) return;
 
-        // إرسال الإشعار عبر الـ API
         fetch('/api/send-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -140,17 +139,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const setupFCM = useCallback(async (phone: string) => {
     if (typeof window === "undefined") return;
     
-    const isCompatible = 'serviceWorker' in navigator && 'Notification' in window && 'PushManager' in window;
+    const isCompatible = 'serviceWorker' in navigator && 'Notification' in window;
     if (!isCompatible) return;
 
     try {
       const messaging = await getMessagingSafe();
       if (!messaging) return;
       
-      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
       
       const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
-      if (!vapidKey) return;
+      if (!vapidKey) {
+        console.warn("VAPID KEY is missing in environment!");
+        return;
+      }
 
       const token = await getToken(messaging, { 
         serviceWorkerRegistration: registration,
@@ -163,14 +165,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const snap = await getDocs(q);
         if (!snap.empty) {
           const userDoc = snap.docs[0];
-          if (userDoc.data().fcmToken !== token) {
-            await updateDoc(doc(db, "users", userDoc.id), { fcmToken: token });
-          }
+          await updateDoc(doc(db, "users", userDoc.id), { fcmToken: token });
+          setNotificationsEnabled(true);
         }
       }
 
     } catch (e: any) {
-      logTechnicalError("FCM Setup Architecture", e);
+      logTechnicalError("FCM Core Link", e);
     }
   }, []);
 
@@ -178,13 +179,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       try {
         const permission = await Notification.requestPermission();
-        setNotificationsEnabled(permission === "granted");
         if (permission === "granted") {
           unlockAudio();
           if (userPhone) setupFCM(userPhone);
+        } else {
+           setNotificationsEnabled(false);
         }
       } catch (e) {
-        logTechnicalError("Permission Request Flow", e);
+        logTechnicalError("Permission UI Handler", e);
       }
     }
   };
@@ -211,15 +213,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const txSnap = await getDocs(txQ);
       const rawTxs = txSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
       setTransactions(sortTransactionsClientSide(rawTxs));
-
-      if (isAdminUser) {
-        const allUsersSnap = await getDocs(collection(db, "users"));
-        setAllUsers(allUsersSnap.docs.map(d => ({ ...d.data(), id: d.id })));
-        const passSnap = await getDocs(collection(db, "password_requests"));
-        setPasswordRequests(passSnap.docs.map(d => ({ ...d.data(), id: d.id })));
-      }
     } catch (e: any) {
-       logTechnicalError("Cloud Data Refresh", e);
+       logTechnicalError("Cloud Refresh", e);
     }
   }, [isLoggedIn, userPhone, sortTransactionsClientSide]);
 
@@ -242,7 +237,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     refreshCloudData();
-    setupFCM(userPhone);
+    
+    if (Notification.permission === "granted") {
+      setupFCM(userPhone);
+    }
 
     const unsubscribes: (() => void)[] = [];
     const phoneClean = userPhone.trim();
@@ -261,33 +259,21 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       : query(collection(db, "transactions"), where("userPhone", "==", phoneClean));
 
     unsubscribes.push(onSnapshot(txQuery, (snap) => {
-      try {
-        const rawTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
-        const sortedTxs = sortTransactionsClientSide(rawTxs);
-        
-        if (!isInitialLoad.current) {
-          snap.docChanges().forEach((change) => {
-            const tx = change.doc.data() as Transaction;
-            if (change.type === "added" && isAdminUser && tx.status === 'Pending') {
-              playNotificationSound();
-            }
-          });
-        }
-        setTransactions(sortedTxs);
-        isInitialLoad.current = false;
-      } catch (e) {
-        logTechnicalError("Transaction Sync", e);
+      const rawTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
+      const sortedTxs = sortTransactionsClientSide(rawTxs);
+      
+      if (!isInitialLoad.current) {
+        snap.docChanges().forEach((change) => {
+          const tx = change.doc.data() as Transaction;
+          if (change.type === "added" && isAdminUser && tx.status === 'Pending') {
+            playNotificationSound();
+          }
+        });
       }
+      setTransactions(sortedTxs);
+      isInitialLoad.current = false;
     }));
 
-    if (isAdminUser) {
-      unsubscribes.push(onSnapshot(collection(db, "users"), (snap) => {
-        setAllUsers(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      }));
-      unsubscribes.push(onSnapshot(collection(db, "password_requests"), (snap) => {
-        setPasswordRequests(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      }));
-    }
     return () => unsubscribes.forEach(unsub => unsub());
   }, [isLoggedIn, userPhone, playNotificationSound, refreshCloudData, sortTransactionsClientSide, setupFCM]);
 
@@ -297,14 +283,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const data = { phone: phoneClean, name: "المدير العام" };
       setIsLoggedIn(true); setUserPhone(phoneClean); setUserName(data.name);
       localStorage.setItem('shabik_auth', JSON.stringify(data));
-      setupFCM(phoneClean);
       return { success: true, message: "مرحباً بك يا مدير." };
     }
     const result = await signInAction(phoneClean, password);
     if (result.success && result.user) {
       setIsLoggedIn(true); setUserPhone(result.user.phone); setUserName(result.user.name);
       localStorage.setItem('shabik_auth', JSON.stringify(result.user));
-      setupFCM(phoneClean);
     }
     return result;
   };
@@ -320,17 +304,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const res = await processAdminAction(id, action);
-      if (!res.success) throw new Error("Database Write Failed");
+      if (!res.success) throw new Error("DB Error");
       
       if (tx.userPhone) {
         const title = action === 'approve' ? "✅ تم قبول الإيداع" : "❌ طلب مرفوض";
         const body = action === 'approve' 
           ? `تمت إضافة ${tx.amount.toLocaleString()} ل.س إلى رصيدك بنجاح.` 
-          : "نعتذر، تم رفض طلب الإيداع الخاص بك. تواصل مع الدعم.";
+          : "نعتذر، تم رفض طلب الإيداع الخاص بك.";
         triggerPushSilently(tx.userPhone, title, body, "/wallet");
       }
     } catch (e) {
-      logTechnicalError("Admin Finalization", e);
+      logTechnicalError("Admin Push Action", e);
     }
   };
 
@@ -338,7 +322,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await updateUserBalanceDirectlyAction(phone, amount, operation);
       if (res.success) {
-         triggerPushSilently(phone, "💰 تحديث رصيد", `قام المدير بـ ${operation === 'add' ? 'إضافة' : 'سحب'} ${amount} ل.س من حسابك.`, "/wallet");
+         triggerPushSilently(phone, "💰 تحديث رصيد", `تم ${operation === 'add' ? 'إضافة' : 'سحب'} مبلغ من حسابك.`, "/wallet");
       }
     } catch (e) {
       logTechnicalError("Balance Direct Update", e);
@@ -367,12 +351,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       };
 
       await addDoc(collection(db, "transactions"), txData);
-      // إشعار فوري للمدير
-      triggerPushSilently(ADMIN_PHONE, "🚀 طلب شحن جديد", `قام ${userName} بطلب شحن: ${productDetails}`, "/admin");
+      triggerPushSilently(ADMIN_PHONE, "🚀 طلب شحن جديد", `قام ${userName} بطلب شحن جديد.`, "/admin");
       
     } catch (e: any) {
       setUserBalance(before);
-      logTechnicalError("Deduction Logic Failure", e);
+      logTechnicalError("Deduction Push Failure", e);
     }
   };
 
@@ -392,13 +375,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       };
 
       await addDoc(collection(db, "transactions"), txData);
-      // إشعار فوري للمدير مثل الواتساب
-      triggerPushSilently(ADMIN_PHONE, "💳 إيداع جديد وصل!", `قام ${userName} بإرسال ${amount} ل.س. يرجى المراجعة.`, "/admin");
+      triggerPushSilently(ADMIN_PHONE, "💳 إيداع جديد وصل!", `قام ${userName} بإرسال ${amount.toLocaleString()} ل.س.`, "/admin");
       
-      alert("تم إرسال طلب الإيداع بنجاح. سيتم تفعيله فور المراجعة.");
+      alert("تم إرسال طلب الإيداع بنجاح.");
     } catch (error: any) { 
-        logTechnicalError("Deposit Submission Crash Protection", error);
-        alert("فشل في إرسال الطلب: " + (error.message || "خطأ غير معروف"));
+        logTechnicalError("Deposit Push Crash Protection", error);
     }
   };
 
@@ -425,11 +406,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           
           if (final) {
             await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
-            if (final === 'Completed') {
-               triggerPushSilently(order.userPhone || userPhone, "✨ شحن مكتمل", `تم تنفيذ طلب الشحن الخاص بك بنجاح!`, "/history");
-            } else {
-               triggerPushSilently(order.userPhone || userPhone, "⚠️ فشل الشحن", `نأسف، تم رفض طلب الشحن وإعادة الرصيد لمحفظتك.`, "/history");
-            }
+            triggerPushSilently(order.userPhone || userPhone, final === 'Completed' ? "✨ شحن مكتمل" : "⚠️ فشل الشحن", "يرجى مراجعة سجل الطلبات.", "/history");
           }
         }
       } catch (err) {}
