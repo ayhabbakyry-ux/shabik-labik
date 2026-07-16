@@ -56,7 +56,7 @@ type UserContextType = {
   refreshCloudData: () => Promise<void>;
   isAudioUnlocked: boolean;
   unlockAudio: () => void;
-  triggerPushSilently: (targetPhone: string, title: string, body: string) => void;
+  triggerPushSilently: (targetPhone: string, title: string, body: string, url?: string) => void;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -101,7 +101,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {}
   }, [isAudioUnlocked]);
 
-  const triggerPushSilently = useCallback((targetPhone: string, title: string, body: string) => {
+  const triggerPushSilently = useCallback((targetPhone: string, title: string, body: string, url?: string) => {
     if (typeof window === "undefined") return;
     
     (async () => {
@@ -115,11 +115,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const token = userData.fcmToken;
         if (!token) return;
 
-        // إرسال غير معطل (Non-blocking)
+        // إرسال الإشعار عبر الـ API
         fetch('/api/send-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, title, body })
+          body: JSON.stringify({ token, title, body, url })
         }).catch(err => logTechnicalError("API Push Call", err));
         
       } catch (e) {
@@ -150,27 +150,24 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
       
       const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
-      if (!vapidKey) {
-        console.warn("FCM: NEXT_PUBLIC_FIREBASE_VAPID_KEY is missing. Notifications will not be registered.");
-        return;
-      }
+      if (!vapidKey) return;
 
-      getToken(messaging, { 
+      const token = await getToken(messaging, { 
         serviceWorkerRegistration: registration,
         vapidKey: vapidKey
-      }).then(async (token) => {
-        if (token) {
-          const phoneClean = phone.trim();
-          const q = query(collection(db, "users"), where("phone", "==", phoneClean));
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-            const userDoc = snap.docs[0];
-            if (userDoc.data().fcmToken !== token) {
-              await updateDoc(doc(db, "users", userDoc.id), { fcmToken: token });
-            }
+      });
+
+      if (token) {
+        const phoneClean = phone.trim();
+        const q = query(collection(db, "users"), where("phone", "==", phoneClean));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const userDoc = snap.docs[0];
+          if (userDoc.data().fcmToken !== token) {
+            await updateDoc(doc(db, "users", userDoc.id), { fcmToken: token });
           }
         }
-      }).catch(err => logTechnicalError("FCM Token Persistence", err));
+      }
 
     } catch (e: any) {
       logTechnicalError("FCM Setup Architecture", e);
@@ -326,11 +323,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (!res.success) throw new Error("Database Write Failed");
       
       if (tx.userPhone) {
-        const title = action === 'approve' ? "تم تحديث الرصيد" : "طلب مرفوض";
+        const title = action === 'approve' ? "✅ تم قبول الإيداع" : "❌ طلب مرفوض";
         const body = action === 'approve' 
-          ? `تمت إضافة مبلغ ${tx.amount.toLocaleString()} ل.س إلى رصيدك` 
-          : "تم رفض طلب الإيداع الخاص بك، يرجى مراجعة الإدارة.";
-        triggerPushSilently(tx.userPhone, title, body);
+          ? `تمت إضافة ${tx.amount.toLocaleString()} ل.س إلى رصيدك بنجاح.` 
+          : "نعتذر، تم رفض طلب الإيداع الخاص بك. تواصل مع الدعم.";
+        triggerPushSilently(tx.userPhone, title, body, "/wallet");
       }
     } catch (e) {
       logTechnicalError("Admin Finalization", e);
@@ -340,7 +337,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const updateBalanceAdmin = async (phone: string, amount: number, operation: 'add' | 'subtract') => {
     try {
       const res = await updateUserBalanceDirectlyAction(phone, amount, operation);
-      if (!res.success) throw new Error();
+      if (res.success) {
+         triggerPushSilently(phone, "💰 تحديث رصيد", `قام المدير بـ ${operation === 'add' ? 'إضافة' : 'سحب'} ${amount} ل.س من حسابك.`, "/wallet");
+      }
     } catch (e) {
       logTechnicalError("Balance Direct Update", e);
     }
@@ -368,7 +367,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       };
 
       await addDoc(collection(db, "transactions"), txData);
-      triggerPushSilently(ADMIN_PHONE, "طلب شحن جديد", `هناك طلب شحن بقيمة ${amount} ل.س من ${userName}`);
+      // إشعار فوري للمدير
+      triggerPushSilently(ADMIN_PHONE, "🚀 طلب شحن جديد", `قام ${userName} بطلب شحن: ${productDetails}`, "/admin");
       
     } catch (e: any) {
       setUserBalance(before);
@@ -387,14 +387,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         createdAt: now,
         userName,
         userPhone: userPhone.trim(),
-        details: "طلب إيداع رصيد",
+        details: "طلب إيداع رصيد جديد",
         proofImage
       };
 
       await addDoc(collection(db, "transactions"), txData);
-      triggerPushSilently(ADMIN_PHONE, "طلب إيداع جديد", `قام ${userName} بإرسال إيداع بقيمة ${amount} ل.س`);
+      // إشعار فوري للمدير مثل الواتساب
+      triggerPushSilently(ADMIN_PHONE, "💳 إيداع جديد وصل!", `قام ${userName} بإرسال ${amount} ل.س. يرجى المراجعة.`, "/admin");
       
-      alert("تم إرسال طلبك بنجاح للمدير.");
+      alert("تم إرسال طلب الإيداع بنجاح. سيتم تفعيله فور المراجعة.");
     } catch (error: any) { 
         logTechnicalError("Deposit Submission Crash Protection", error);
         alert("فشل في إرسال الطلب: " + (error.message || "خطأ غير معروف"));
@@ -425,8 +426,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           if (final) {
             await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
             if (final === 'Completed') {
-               const targetId = order.details?.split('ID: ')[1] || "حسابك";
-               triggerPushSilently(order.userPhone || userPhone, "تم اكتمال الشحن", `تمت عملية شحن ${targetId} بنجاح`);
+               triggerPushSilently(order.userPhone || userPhone, "✨ شحن مكتمل", `تم تنفيذ طلب الشحن الخاص بك بنجاح!`, "/history");
+            } else {
+               triggerPushSilently(order.userPhone || userPhone, "⚠️ فشل الشحن", `نأسف، تم رفض طلب الشحن وإعادة الرصيد لمحفظتك.`, "/history");
             }
           }
         }
