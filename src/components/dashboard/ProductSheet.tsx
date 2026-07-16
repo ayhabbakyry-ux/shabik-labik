@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -14,11 +14,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PackageX, RefreshCw, ShoppingCart, AlertCircle, ArrowRight, User, Wallet } from "lucide-react";
+import { Loader2, PackageX, RefreshCw, ShoppingCart, AlertCircle, ArrowRight, User, Wallet, ShieldCheck, Activity } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useUser } from "@/lib/store";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { getMessagingSafe } from '@/lib/firebase-config';
+import { getToken } from 'firebase/messaging';
 
 interface ProductItem {
   id: string | number;
@@ -46,6 +48,14 @@ export function ProductSheet({
   
   const [globalTargetId, setGlobalTargetId] = useState("");
   const [dynamicAmount, setDynamicAmount] = useState<string>("");
+
+  // حالات التشخيص (Diagnostics)
+  const [diag, setDiag] = useState({
+    vapid: 'Checking...',
+    permission: 'Checking...',
+    sw: 'Checking...',
+    token: 'Checking...'
+  });
   
   const { toast } = useToast();
   const { userBalance, deductBalance } = useUser();
@@ -66,6 +76,44 @@ export function ProductSheet({
     const cost = amount * 1.02;
     return `${cost.toFixed(1).replace('.0', '')} ل.س`;
   }, [isShamCash, dynamicAmount]);
+
+  // تشغيل الفحص عند فتح الشاشة
+  useEffect(() => {
+    const runDiagnostics = async () => {
+      const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+      const vapid = vapidKey ? 'Loaded ✅' : 'MISSING IN .ENV ❌';
+      const permission = typeof window !== 'undefined' ? Notification.permission : 'Not Supported';
+      
+      let sw = 'Checking...';
+      try {
+        if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          sw = regs.length > 0 ? `Active (${regs.length}) ✅` : 'NOT FOUND ❌';
+        } else {
+          sw = 'Not Supported ❌';
+        }
+      } catch (e) { sw = 'Error Checking SW'; }
+
+      let tokenResult = 'Waiting for trigger...';
+      if (permission === 'granted' && vapidKey) {
+        try {
+          const messaging = await getMessagingSafe();
+          if (messaging) {
+            const token = await getToken(messaging, { vapidKey });
+            tokenResult = token ? `Generated: ${token.substring(0, 10)}... ✅` : 'Failed to generate token ❌';
+          }
+        } catch (err: any) {
+          tokenResult = `ERROR: ${err.message || 'Unknown FCM Error'} ❌`;
+        }
+      } else if (permission === 'denied') {
+        tokenResult = 'Blocked by user ❌';
+      }
+
+      setDiag({ vapid, permission, sw, token: tokenResult });
+    };
+
+    runDiagnostics();
+  }, []);
 
   const fetchProducts = useCallback(async () => {
     setFetching(true);
@@ -117,9 +165,7 @@ export function ProductSheet({
       const result = await response.json();
 
       if (result.success) {
-          // دالة deductBalance محمية داخلياً ولا تعطل الكود
           await deductBalance(finalPrice, `${serviceName} - الحساب: ${link} ${isShamCash ? '(مبلغ: ' + amt + ')' : ''}`, 'Pending', result.order_id);
-          
           toast({ title: "تم إرسال الطلب", description: result.message || "جاري المعالجة من قبل المزود." });
           if (isShamCash) {
             setGlobalTargetId("");
@@ -139,115 +185,102 @@ export function ProductSheet({
     <Sheet onOpenChange={(open) => { if (open) fetchProducts(); }}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col border-none bg-background shadow-2xl" dir="rtl">
-        <div className="p-4 border-b bg-white/80 backdrop-blur-md sticky top-0 z-20 space-y-4">
-          <SheetHeader>
-            <div className="flex items-center justify-between">
-              <SheetClose asChild>
-                <Button variant="ghost" size="sm" className="flex items-center gap-1 text-primary font-bold">
-                  <ArrowRight className="h-4 w-4" /> <span>رجوع</span>
-                </Button>
-              </SheetClose>
-              <Button variant="ghost" size="icon" onClick={fetchProducts} disabled={fetching} className="rounded-full">
-                <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
-              </Button>
-            </div>
-            <div className="text-right">
-              <SheetTitle className="text-xl font-bold font-headline text-primary">{serviceName}</SheetTitle>
-              <SheetDescription className="text-xs">
-                {isShamCash ? "أدخل رقم الحساب والمبلغ المطلوب شحنه" : "أدخل المعرف (ID) ثم اختر الباقة"}
-              </SheetDescription>
-            </div>
-          </SheetHeader>
-
-          <div className="space-y-3">
-             <div className="bg-primary/5 p-3 rounded-2xl border border-primary/10 space-y-1.5">
-                <label className="text-[10px] font-black text-primary pr-1 block">رقم الحساب أو الموبايل</label>
-                <div className="relative">
-                   <User className="absolute right-3 top-3 h-4 w-4 text-primary opacity-50" />
-                   <Input 
-                     type="text"
-                     placeholder="أدخل رقم الحساب أو الـ Hash" 
-                     className="text-right h-11 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-primary font-bold" 
-                     value={globalTargetId} 
-                     onChange={(e) => setGlobalTargetId(e.target.value)} 
-                   />
-                </div>
-             </div>
-
-             {isShamCash && (
-               <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 space-y-3 animate-in slide-in-from-top-2">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-emerald-700 pr-1 block">المبلغ المطلوب شحنه</label>
-                    <div className="relative">
-                      <Wallet className="absolute right-3 top-3 h-4 w-4 text-emerald-600 opacity-50" />
-                      <Input 
-                        type="number"
-                        placeholder="مابين 100 و 50000" 
-                        className="text-right h-12 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-emerald-500 text-lg font-black"
-                        value={dynamicAmount} 
-                        onChange={(e) => setDynamicAmount(e.target.value)} 
-                      />
-                    </div>
-                    {dynamicAmount && Number(dynamicAmount) < 100 && (
-                      <p className="text-[10px] text-red-600 font-bold pr-1">يجب أن تكون الكمية 100 أو أكثر</p>
-                    )}
-                    {dynamicAmount && Number(dynamicAmount) > 50000 && (
-                      <p className="text-[10px] text-red-600 font-bold pr-1">يجب أن تكون الكمية 50,000 أو أقل</p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between bg-white/50 p-3 rounded-xl border border-emerald-100">
-                     <span className="text-xs font-bold text-emerald-800">التكلفة الإجمالية:</span>
-                     <span className="text-lg font-black text-emerald-600" dir="ltr">{formattedShamPrice}</span>
-                  </div>
-
-                  <div className="pt-2">
-                    <Button 
-                      onClick={() => handleOrder(null)} 
-                      disabled={!isShamValid || ordering !== null}
-                      className={cn(
-                        "w-full h-14 font-black text-lg rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2",
-                        isShamValid 
-                          ? "bg-[#8b5cf6] hover:bg-[#7c3aed] text-white shadow-purple-200" 
-                          : "bg-gray-300 text-gray-500 cursor-not-allowed shadow-none"
-                      )}
-                    >
-                      {ordering !== null ? <Loader2 className="h-5 w-5 animate-spin" /> : "إرسال طلب الشحن"}
+        <ScrollArea className="flex-1">
+          <div className="p-4 space-y-4">
+            <div className="p-4 border-b bg-white/80 backdrop-blur-md sticky top-0 z-20 space-y-4">
+              <SheetHeader>
+                <div className="flex items-center justify-between">
+                  <SheetClose asChild>
+                    <Button variant="ghost" size="sm" className="flex items-center gap-1 text-primary font-bold">
+                      <ArrowRight className="h-4 w-4" /> <span>رجوع</span>
                     </Button>
+                  </SheetClose>
+                  <Button variant="ghost" size="icon" onClick={fetchProducts} disabled={fetching} className="rounded-full">
+                    <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
+                  </Button>
+                </div>
+                <div className="text-right">
+                  <SheetTitle className="text-xl font-bold font-headline text-primary">{serviceName}</SheetTitle>
+                  <SheetDescription className="text-xs">
+                    {isShamCash ? "أدخل رقم الحساب والمبلغ المطلوب شحنه" : "أدخل المعرف (ID) ثم اختر الباقة"}
+                  </SheetDescription>
+                </div>
+              </SheetHeader>
 
-                    <p className="text-center text-[10px] text-red-600 font-black mt-3 animate-pulse">
-                      ⚠️ تنبيه: هذا المنتج يعمل بشكل يدوي.
-                    </p>
+              <div className="space-y-3">
+                 <div className="bg-primary/5 p-3 rounded-2xl border border-primary/10 space-y-1.5">
+                    <label className="text-[10px] font-black text-primary pr-1 block">رقم الحساب أو الموبايل</label>
+                    <div className="relative">
+                       <User className="absolute right-3 top-3 h-4 w-4 text-primary opacity-50" />
+                       <Input 
+                         type="text"
+                         placeholder="أدخل رقم الحساب أو الـ Hash" 
+                         className="text-right h-11 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-primary font-bold" 
+                         value={globalTargetId} 
+                         onChange={(e) => setGlobalTargetId(e.target.value)} 
+                       />
+                    </div>
+                 </div>
+
+                 {isShamCash && (
+                   <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 space-y-3 animate-in slide-in-from-top-2">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-emerald-700 pr-1 block">المبلغ المطلوب شحنه</label>
+                        <div className="relative">
+                          <Wallet className="absolute right-3 top-3 h-4 w-4 text-emerald-600 opacity-50" />
+                          <Input 
+                            type="number"
+                            placeholder="مابين 100 و 50000" 
+                            className="text-right h-12 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-emerald-500 text-lg font-black"
+                            value={dynamicAmount} 
+                            onChange={(e) => setDynamicAmount(e.target.value)} 
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between bg-white/50 p-3 rounded-xl border border-emerald-100">
+                         <span className="text-xs font-bold text-emerald-800">التكلفة الإجمالية:</span>
+                         <span className="text-lg font-black text-emerald-600" dir="ltr">{formattedShamPrice}</span>
+                      </div>
+
+                      <div className="pt-2">
+                        <Button 
+                          onClick={() => handleOrder(null)} 
+                          disabled={!isShamValid || ordering !== null}
+                          className={cn(
+                            "w-full h-14 font-black text-lg rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2",
+                            isShamValid 
+                              ? "bg-[#8b5cf6] hover:bg-[#7c3aed] text-white shadow-purple-200" 
+                              : "bg-gray-300 text-gray-500 cursor-not-allowed shadow-none"
+                          )}
+                        >
+                          {ordering !== null ? <Loader2 className="h-5 w-5 animate-spin" /> : "إرسال طلب الشحن"}
+                        </Button>
+
+                        <p className="text-center text-[10px] text-red-600 font-black mt-3 animate-pulse">
+                          ⚠️ تنبيه: هذا المنتج يعمل بشكل يدوي.
+                        </p>
+                      </div>
+                   </div>
+                 )}
+              </div>
+            </div>
+
+            <div className="bg-muted/30 rounded-2xl">
+              {!isShamCash && (
+                fetching ? (
+                  <div className="py-20 flex flex-col items-center justify-center gap-3">
+                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                    <p className="text-sm font-bold text-muted-foreground">جاري سحب البيانات...</p>
                   </div>
-               </div>
-             )}
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-hidden bg-muted/30">
-          {!isShamCash && (
-            fetching ? (
-              <div className="h-full flex flex-col items-center justify-center gap-3">
-                <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                <p className="text-sm font-bold text-muted-foreground">جاري سحب البيانات...</p>
-              </div>
-            ) : errorMsg ? (
-              <div className="h-full p-6 flex flex-col items-center justify-center text-center gap-4">
-                 <AlertCircle className="h-10 w-10 text-destructive" />
-                 <p className="font-bold text-destructive text-sm leading-relaxed">{errorMsg}</p>
-                 <Button onClick={fetchProducts} variant="outline" size="sm" className="rounded-xl font-bold">إعادة المحاولة</Button>
-              </div>
-            ) : (
-              <ScrollArea className="h-full p-4">
-                {allProducts.filter(p => {
-                    const searchKey = filterValue.toLowerCase().trim();
-                    const prodName = (p.name || "").toLowerCase();
-                    if (prodName.includes("shamna") || prodName.includes("شامنا")) return false;
-                    if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
-                    if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
-                    return prodName.includes(searchKey);
-                }).length > 0 ? (
-                  <div className="grid gap-3 pb-24">
+                ) : errorMsg ? (
+                  <div className="p-6 flex flex-col items-center justify-center text-center gap-4">
+                     <AlertCircle className="h-10 w-10 text-destructive" />
+                     <p className="font-bold text-destructive text-sm leading-relaxed">{errorMsg}</p>
+                     <Button onClick={fetchProducts} variant="outline" size="sm" className="rounded-xl font-bold">إعادة المحاولة</Button>
+                  </div>
+                ) : (
+                  <div className="p-4 space-y-3">
                     {allProducts.filter(p => {
                         const searchKey = filterValue.toLowerCase().trim();
                         const prodName = (p.name || "").toLowerCase();
@@ -255,43 +288,91 @@ export function ProductSheet({
                         if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
                         if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
                         return prodName.includes(searchKey);
-                    }).map((product) => {
-                      const finalPrice = Number(product.price) + 2;
-                      return (
-                        <Card key={product.id} className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-all">
-                          <CardContent className="p-4 flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-3 flex-1">
-                              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
-                                <ShoppingCart className="h-4 w-4" />
+                    }).length > 0 ? (
+                      allProducts.filter(p => {
+                          const searchKey = filterValue.toLowerCase().trim();
+                          const prodName = (p.name || "").toLowerCase();
+                          if (prodName.includes("shamna") || prodName.includes("شامنا")) return false;
+                          if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
+                          if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
+                          return prodName.includes(searchKey);
+                      }).map((product) => {
+                        const finalPrice = Number(product.price) + 2;
+                        return (
+                          <Card key={product.id} className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-all">
+                            <CardContent className="p-4 flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-3 flex-1">
+                                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+                                  <ShoppingCart className="h-4 w-4" />
+                                </div>
+                                <div className="text-right">
+                                  <h4 className="font-bold text-foreground text-[13px] leading-tight">{product.name}</h4>
+                                  <p className="text-primary font-black text-sm mt-1">{finalPrice.toLocaleString()} <span className="text-[9px] font-medium">ل.س</span></p>
+                                </div>
                               </div>
-                              <div className="text-right">
-                                <h4 className="font-bold text-foreground text-[13px] leading-tight">{product.name}</h4>
-                                <p className="text-primary font-black text-sm mt-1">{finalPrice.toLocaleString()} <span className="text-[9px] font-medium">ل.س</span></p>
-                              </div>
-                            </div>
-                            <Button 
-                              onClick={() => handleOrder(product)} 
-                              disabled={ordering === String(product.id)}
-                              className="rounded-xl font-bold px-6 h-10 text-xs shadow-lg bg-primary shadow-primary/10"
-                            >
-                              {ordering === String(product.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : "شحن"}
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
+                              <Button 
+                                onClick={() => handleOrder(product)} 
+                                disabled={ordering === String(product.id)}
+                                className="rounded-xl font-bold px-6 h-10 text-xs shadow-lg bg-primary shadow-primary/10"
+                              >
+                                {ordering === String(product.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : "شحن"}
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        );
+                      })
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4">
+                        <PackageX className="h-10 w-10 opacity-30" />
+                        <p className="text-sm font-bold">لا توجد باقات متاحة لهذا القسم حالياً.</p>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4">
-                    <PackageX className="h-10 w-10 opacity-30" />
-                    <p className="text-sm font-bold">لا توجد باقات متاحة لهذا القسم حالياً.</p>
+                )
+              )}
+            </div>
+
+            {/* لوحة تشخيص الإشعارات الطارئة */}
+            <div className="mt-8 p-4 bg-slate-900 text-white rounded-3xl border border-white/10 shadow-2xl space-y-3 overflow-hidden">
+               <div className="flex items-center gap-2 border-b border-white/10 pb-3 mb-2">
+                  <Activity className="h-4 w-4 text-yellow-400" />
+                  <p className="font-black text-xs text-yellow-400 font-headline">تشخيص نظام الإشعارات (للمدير)</p>
+               </div>
+               
+               <div className="grid gap-2 text-[10px] font-mono">
+                  <div className="flex justify-between items-center bg-white/5 p-2 rounded-xl">
+                    <span className="opacity-70">VAPID Key:</span>
+                    <span className={diag.vapid.includes('✅') ? "text-green-400 font-bold" : "text-red-400 font-bold"}>{diag.vapid}</span>
                   </div>
-                )}
-              </ScrollArea>
-            )
-          )}
-        </div>
+                  
+                  <div className="flex justify-between items-center bg-white/5 p-2 rounded-xl">
+                    <span className="opacity-70">Permission:</span>
+                    <span className={diag.permission === 'granted' ? "text-green-400 font-bold" : "text-red-400 font-bold"}>{diag.permission}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center bg-white/5 p-2 rounded-xl">
+                    <span className="opacity-70">Service Worker:</span>
+                    <span className={diag.sw.includes('✅') ? "text-green-400 font-bold" : "text-red-400 font-bold"}>{diag.sw}</span>
+                  </div>
+
+                  <div className="bg-white/5 p-3 rounded-xl space-y-1">
+                    <div className="flex items-center gap-1 opacity-70">
+                       <ShieldCheck className="h-3 w-3" />
+                       <span>FCM Token Result:</span>
+                    </div>
+                    <p className={cn(
+                      "text-wrap break-all leading-relaxed",
+                      diag.token.includes('ERROR') ? "text-red-400 font-bold" : "text-blue-300"
+                    )}>{diag.token}</p>
+                  </div>
+               </div>
+               
+               <p className="text-[8px] text-center opacity-40 uppercase tracking-widest pt-2">System Diagnostic v4.0</p>
+            </div>
+          </div>
+        </ScrollArea>
       </SheetContent>
     </Sheet>
   );
 }
+
