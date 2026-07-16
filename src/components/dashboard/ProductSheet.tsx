@@ -234,6 +234,7 @@ export function ProductSheet({
                 <div className="relative">
                    <User className="absolute right-3 top-3 h-4 w-4 text-primary opacity-50" />
                    <Input 
+                     type="text"
                      placeholder="رقم الحساب المطلوب" 
                      className="text-right h-11 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-primary font-bold" 
                      value={globalTargetId} 
