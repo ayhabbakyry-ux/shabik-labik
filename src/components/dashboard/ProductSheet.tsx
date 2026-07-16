@@ -55,7 +55,7 @@ export function ProductSheet({
   }, [filterValue]);
 
   /**
-   * منطق حساب السعر النهائي المطور (V3)
+   * منطق حساب السعر النهائي المطور (V4)
    * 1. الاتصالات: السعر الأصلي + (الرصيد الاسمي * 0.02)
    * 2. الألعاب: السعر الأصلي + 2 ليرة ثابتة
    */
@@ -63,20 +63,15 @@ export function ProductSheet({
     const originalPrice = Number(product.price);
     
     if (isTelecom) {
-      // استخراج الرصيد الاسمي من الاسم (مثلاً "MTN 50" يستخرج 50)
       const matches = product.name.match(/\d+/);
       const nominalCredit = matches ? Number(matches[0]) : (originalPrice > 10 ? Math.round(originalPrice / 1.05) : originalPrice);
-      
-      // المعادلة: إضافة 0.20 ليرة لكل 10 ليرة اسمي (أي 2% من القيمة الاسمية)
       const markup = nominalCredit * 0.02;
       return originalPrice + markup;
     }
     
-    // قاعدة الألعاب والتطبيقات: السعر الأصلي + 2 ليرة عمولة ثابتة
     return originalPrice + 2;
   }, [isTelecom]);
 
-  // منطق التحقق الخاص بشام كاش فقط
   const isShamValid = useMemo(() => {
     const hasAccount = globalTargetId && globalTargetId.trim().length > 0;
     const amountNum = Number(dynamicAmount);
@@ -84,7 +79,6 @@ export function ProductSheet({
     return !!(hasAccount && hasValidAmount);
   }, [globalTargetId, dynamicAmount]);
 
-  // تسعير شام كاش (المبلغ + 2%) مع تنسيق خانتين عشريتين
   const formattedShamPrice = useMemo(() => {
     if (!isShamCash || !dynamicAmount) return "0.00 ل.س";
     const amount = Number(dynamicAmount);
