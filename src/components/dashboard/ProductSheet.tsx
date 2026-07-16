@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -51,7 +51,7 @@ export function ProductSheet({
 
   const isShamCash = serviceName === "شام كاش" || filterValue === "Sham Cash";
 
-  // SIMPLE VALIDATION LOGIC - STRENGTHENED
+  // STRICT VALIDATION LOGIC - NO REGEX
   const isShamValid = useMemo(() => {
     const hasAccount = globalTargetId && globalTargetId.trim().length > 0;
     const amountNum = Number(dynamicAmount);
@@ -63,13 +63,12 @@ export function ProductSheet({
     return !!(hasAccount && hasValidAmount);
   }, [globalTargetId, dynamicAmount]);
 
-  // Exact 1.02 Multiplier with English numerals
+  // Exact 1.02 Multiplier with English numerals and exact decimals
   const formattedShamPrice = useMemo(() => {
     if (!isShamCash || !dynamicAmount) return "0 ل.س";
     const amount = Number(dynamicAmount);
     if (isNaN(amount)) return "0 ل.س";
     const cost = amount * 1.02;
-    // Force English numerals and exact decimal
     return `${cost.toFixed(1).replace('.0', '')} ل.س`;
   }, [isShamCash, dynamicAmount]);
 
@@ -100,69 +99,59 @@ export function ProductSheet({
     
     return allProducts.filter(p => {
       const prodName = (p.name || "").toLowerCase();
-      const catName = (p.category_name || "").toLowerCase();
       
       // Strict block for "Shamna" items
       if (prodName.includes("shamna") || prodName.includes("شامنا")) return false;
 
-      const isSyriatelMatch = searchKey === "syriatel" && (prodName.includes("سيريتل") || catName.includes("سيريتل") || prodName.includes("syriatel"));
-      const isMTNMatch = (searchKey === "mtn") && (prodName.includes("mtn") || prodName.includes("ام تي ان") || catName.includes("mtn"));
-      const isShamMatch = (searchKey === "sham cash") && (prodName.includes("شام") || catName.includes("شام") || prodName.includes("sham"));
-      
-      if (isSyriatelMatch || isMTNMatch || isShamMatch) return true;
-      if (searchKey === "tiktok") return prodName.includes("tiktok") || prodName.includes("تيك") || catName.includes("تيك");
+      if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
+      if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
+      if (searchKey === "sham cash") return prodName.includes("شام") || prodName.includes("sham");
+      if (searchKey === "tiktok") return prodName.includes("tiktok") || prodName.includes("تيك");
       if (searchKey === "bigo") return prodName.includes("bigo") || prodName.includes("بيجو");
       if (searchKey === "jawaker") return prodName.includes("jawaker") || prodName.includes("جواكر");
       
-      return prodName.includes(searchKey) || catName.includes(searchKey);
+      return prodName.includes(searchKey);
     }).map(p => {
       const price = Number(p.price);
       let finalPrice = price + 2; 
-      return { ...p, customerPrice: finalPrice.toFixed(2) };
+      return { ...p, customerPrice: finalPrice.toFixed(0) };
     });
   }, [allProducts, filterValue]);
 
+  // Find the Sham Cash Product Object robustly
   const shamCashBaseProduct = useMemo(() => {
-    return filteredProducts.find(p => p.name.includes("شام") || p.name.toLowerCase().includes("sham"));
-  }, [filteredProducts]);
+    return allProducts.find(p => {
+      const name = (p.name || "").toLowerCase();
+      return (name.includes("شام") || name.includes("sham")) && !name.includes("shamna") && !name.includes("شامنا");
+    });
+  }, [allProducts]);
 
   const handleOrder = async (product: any) => {
-    // FIX: Guard against undefined product which caused the crash
-    if (!product) {
-      if (isShamCash) {
-        toast({ 
-          title: "جاري التحميل", 
-          description: "يرجى الانتظار لحين اكتمال جلب بيانات الخدمة من السيرفر.", 
-          variant: "destructive" 
-        });
-      }
-      return;
-    }
+    // If Sham Cash and product object is missing, try using our found base product
+    const targetProduct = product || (isShamCash ? shamCashBaseProduct : null);
 
-    if (!isShamValid && isShamCash) return;
-    if (!globalTargetId.trim()) {
-      toast({ title: "حقل مطلوب", description: "يرجى إدخال رقم الحساب المستهدف أولاً.", variant: "destructive" });
-      return;
-    }
+    if (!targetProduct && !isShamCash) return;
+
+    if (isShamCash && !isShamValid) return;
 
     const amt = Number(dynamicAmount);
-    const finalPrice = isShamCash ? (amt * 1.02) : Number(product.customerPrice);
+    const finalPrice = isShamCash ? (amt * 1.02) : Number(targetProduct.customerPrice);
 
     if (userBalance < finalPrice) {
       toast({ title: "رصيد غير كافٍ", description: "يرجى شحن محفظتك أولاً لإتمام العملية.", variant: "destructive" });
       return;
     }
 
-    setOrdering(String(product.id));
+    setOrdering(String(targetProduct?.id || "sham"));
     
     try {
       const response = await fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-              product_id: product.id,
-              playerId: globalTargetId,
-              qty: isShamCash ? amt : 1,
+              product_id: targetProduct?.id, // Mapping 'service'
+              playerId: globalTargetId, // Mapping 'link'
+              qty: isShamCash ? amt : 1, // Mapping 'quantity'
               order_uuid: crypto.randomUUID()
           })
       });
@@ -171,8 +160,13 @@ export function ProductSheet({
 
       if (result.success) {
           const isPending = result.status_type === 'pending';
-          deductBalance(finalPrice, `${product.name} - الحساب: ${globalTargetId} (مبلغ: ${isShamCash ? amt : ''})`, isPending ? 'Pending' : 'Completed', result.order_id);
+          // Wallet deduction uses finalPrice (multiplied), API uses amt (raw)
+          deductBalance(finalPrice, `${targetProduct?.name || 'شام كاش'} - الحساب: ${globalTargetId} (مبلغ: ${isShamCash ? amt : ''})`, isPending ? 'Pending' : 'Completed', result.order_id);
           toast({ title: isPending ? "الطلب قيد الانتظار" : "تمت العملية", description: result.message });
+          if (isShamCash) {
+            setGlobalTargetId("");
+            setDynamicAmount("");
+          }
       } else {
           toast({ title: "فشل الطلب", description: result.message, variant: "destructive" });
       }
@@ -246,16 +240,15 @@ export function ProductSheet({
                   <div className="pt-2">
                     <Button 
                       onClick={() => handleOrder(shamCashBaseProduct)} 
-                      // FIX: Ensure button is disabled if product data is missing to prevent crash
-                      disabled={!isShamValid || !shamCashBaseProduct || ordering === String(shamCashBaseProduct?.id)}
+                      disabled={!isShamValid || ordering !== null}
                       className={cn(
                         "w-full h-14 font-black text-lg rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2",
-                        (isShamValid && shamCashBaseProduct) 
+                        isShamValid 
                           ? "bg-[#8b5cf6] hover:bg-[#7c3aed] text-white shadow-purple-200" 
                           : "bg-gray-300 text-gray-500 cursor-not-allowed shadow-none"
                       )}
                     >
-                      {(ordering === String(shamCashBaseProduct?.id) || (isShamCash && fetching)) ? <Loader2 className="h-5 w-5 animate-spin" /> : "إرسال طلب الشحن"}
+                      {(ordering !== null || (isShamCash && fetching)) ? <Loader2 className="h-5 w-5 animate-spin" /> : "إرسال طلب الشحن"}
                     </Button>
                     <p className="text-center text-[10px] text-red-600 font-black mt-3 animate-pulse">
                       ⚠️ تنبيه: هذا المنتج يعمل بشكل يدوي.
