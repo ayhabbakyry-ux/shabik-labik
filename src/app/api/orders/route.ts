@@ -48,7 +48,7 @@ export async function POST(request: Request) {
         console.log('API_DEBUG -> Alragheb Raw Response:', JSON.stringify(rawData));
 
         // تحليل استجابة السيرفر بناءً على حالة النجاح
-        // سيرفر الراغب قد يرجع status: "OK" أو success: true
+        // سيرفر الراغب يرجع "status": "OK" عند نجاح استلام الطلب
         if (rawData.status === "OK" || rawData.success === true || rawData["الحالة"] === "قبول") {
             const orderId = rawData.data?.order_id || rawData.order_id || rawData.data?.['رقم_الطلب'] || "";
             return NextResponse.json({ 

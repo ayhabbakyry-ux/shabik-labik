@@ -51,6 +51,7 @@ export function ProductSheet({
 
   const isShamCash = serviceName === "شام كاش" || filterValue === "Sham Cash";
 
+  // منطق التحقق البسيط والفعال لفك قفل الزر البنفسجي
   const isShamValid = useMemo(() => {
     const hasAccount = globalTargetId && globalTargetId.trim().length > 0;
     const amountNum = Number(dynamicAmount);
@@ -58,6 +59,7 @@ export function ProductSheet({
     return !!(hasAccount && hasValidAmount);
   }, [globalTargetId, dynamicAmount]);
 
+  // الحساب الدقيق 1.02 بالأرقام الإنجليزية ورمز ل.س وبدون تقريب قسري
   const formattedShamPrice = useMemo(() => {
     if (!isShamCash || !dynamicAmount) return "0 ل.س";
     const amount = Number(dynamicAmount);
@@ -75,68 +77,29 @@ export function ProductSheet({
       
       if (Array.isArray(data)) {
         setAllProducts(data);
-        if (data.length === 0) setErrorMsg("السيرفر أرجع قائمة فارغة (رصيد الموفر قد يكون 0)");
       } else if (data && data.error) {
         setErrorMsg(data.error);
-      } else {
-        setErrorMsg("تعذر تحليل البيانات القادمة من السيرفر.");
       }
     } catch (error: any) {
-      setErrorMsg("فشل الاتصال بمسار المنتجات المحلي.");
+      setErrorMsg("فشل الاتصال بمسار المنتجات.");
     } finally {
       setFetching(false);
     }
   }, []);
 
-  const shamCashBaseProduct = useMemo(() => {
-    return allProducts.find(p => {
-      const n = (p.name || "").toLowerCase();
-      return (n.includes("شام") || n.includes("sham")) && !n.includes("shamna") && !n.includes("شامنا");
-    });
-  }, [allProducts]);
-
-  const filteredProducts = useMemo(() => {
-    if (!allProducts.length) return [];
-    const searchKey = filterValue.toLowerCase().trim();
-    
-    return allProducts.filter(p => {
-      const prodName = (p.name || "").toLowerCase();
-      if (prodName.includes("shamna") || prodName.includes("شامنا")) return false;
-
-      if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
-      if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
-      if (searchKey === "sham cash") return prodName.includes("شام") || prodName.includes("sham");
-      if (searchKey === "tiktok") return prodName.includes("tiktok") || prodName.includes("تيك");
-      if (searchKey === "bigo") return prodName.includes("bigo") || prodName.includes("بيجو");
-      if (searchKey === "jawaker") return prodName.includes("jawaker") || prodName.includes("جواكر");
-      
-      return prodName.includes(searchKey);
-    }).map(p => {
-      const price = Number(p.price);
-      let finalPrice = price + 2; 
-      return { ...p, customerPrice: finalPrice.toFixed(0) };
-    });
-  }, [allProducts, filterValue]);
-
   const handleOrder = async (product: any) => {
-    const targetProduct = product || (isShamCash ? shamCashBaseProduct : null);
-
-    if (!targetProduct && !isShamCash) {
-      toast({ title: "عذراً", description: "جاري تحميل بيانات الخدمة، يرجى المحاولة بعد قليل.", variant: "destructive" });
-      return;
-    }
-
     if (isShamCash && !isShamValid) return;
 
     const amt = Number(dynamicAmount);
-    const finalPrice = isShamCash ? (amt * 1.02) : Number(targetProduct?.customerPrice || 0);
+    const finalPrice = isShamCash ? (amt * 1.02) : Number(product?.customerPrice || 0);
 
     if (userBalance < finalPrice) {
       toast({ title: "رصيد غير كافٍ", description: "يرجى شحن محفظتك أولاً لإتمام العملية.", variant: "destructive" });
       return;
     }
 
-    const serviceId = targetProduct?.id;
+    // تثبيت المعرف 840 لشام كاش السورية كما في الإنتاج النهائي
+    const serviceId = isShamCash ? 840 : (product?.id || product?.service);
     const link = globalTargetId;
     const quantity = isShamCash ? amt : 1;
 
@@ -156,7 +119,7 @@ export function ProductSheet({
       const result = await response.json();
 
       if (result.success) {
-          deductBalance(finalPrice, `${targetProduct?.name || 'شام كاش'} - الحساب: ${link} ${isShamCash ? '(مبلغ: ' + amt + ')' : ''}`, 'Pending', result.order_id);
+          deductBalance(finalPrice, `${serviceName} - الحساب: ${link} ${isShamCash ? '(مبلغ: ' + amt + ')' : ''}`, 'Pending', result.order_id);
           toast({ title: "تم إرسال الطلب", description: result.message || "جاري المعالجة من قبل المزود." });
           if (isShamCash) {
             setGlobalTargetId("");
@@ -225,6 +188,12 @@ export function ProductSheet({
                         onChange={(e) => setDynamicAmount(e.target.value)} 
                       />
                     </div>
+                    {dynamicAmount && Number(dynamicAmount) < 100 && (
+                      <p className="text-[10px] text-red-600 font-bold pr-1">يجب أن تكون الكمية 100 أو أكثر</p>
+                    )}
+                    {dynamicAmount && Number(dynamicAmount) > 50000 && (
+                      <p className="text-[10px] text-red-600 font-bold pr-1">يجب أن تكون الكمية 50,000 أو أقل</p>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between bg-white/50 p-3 rounded-xl border border-emerald-100">
@@ -245,27 +214,6 @@ export function ProductSheet({
                     >
                       {ordering !== null ? <Loader2 className="h-5 w-5 animate-spin" /> : "إرسال طلب الشحن"}
                     </Button>
-
-                    <div className="mt-4 p-3 bg-gray-100 border border-gray-300 rounded text-xs text-black max-h-48 overflow-y-auto">
-                      <p className="font-bold text-red-600 mb-1">📋 قائمة الخدمات المتاحة (للتصحيح):</p>
-                      {fetching ? (
-                         <p className="text-blue-600 animate-pulse text-center py-2">جاري سحب البيانات من سيرفر الراغب...</p>
-                      ) : errorMsg ? (
-                         <div className="bg-red-50 p-2 rounded border border-red-200">
-                            <p className="text-red-700 font-black">خطأ السيرفر:</p>
-                            <p className="text-red-600">{errorMsg}</p>
-                         </div>
-                      ) : allProducts && allProducts.length > 0 ? (
-                        allProducts.map((s) => (
-                          <div key={s.id} className="border-b py-1 flex justify-between">
-                            <span>{s.name}</span>
-                            <span className="font-bold text-purple-700">ID: {s.id}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-gray-500 text-center">القائمة فارغة تماماً.</p>
-                      )}
-                    </div>
 
                     <p className="text-center text-[10px] text-red-600 font-black mt-3 animate-pulse">
                       ⚠️ تنبيه: هذا المنتج يعمل بشكل يدوي.
@@ -291,30 +239,47 @@ export function ProductSheet({
               </div>
             ) : (
               <ScrollArea className="h-full p-4">
-                {filteredProducts.length > 0 ? (
+                {allProducts.filter(p => {
+                    const searchKey = filterValue.toLowerCase().trim();
+                    const prodName = (p.name || "").toLowerCase();
+                    if (prodName.includes("shamna") || prodName.includes("شامنا")) return false;
+                    if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
+                    if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
+                    return prodName.includes(searchKey);
+                }).length > 0 ? (
                   <div className="grid gap-3 pb-24">
-                    {filteredProducts.map((product) => (
-                      <Card key={product.id} className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-all">
-                        <CardContent className="p-4 flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-3 flex-1">
-                            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
-                              <ShoppingCart className="h-4 w-4" />
+                    {allProducts.filter(p => {
+                        const searchKey = filterValue.toLowerCase().trim();
+                        const prodName = (p.name || "").toLowerCase();
+                        if (prodName.includes("shamna") || prodName.includes("شامنا")) return false;
+                        if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
+                        if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
+                        return prodName.includes(searchKey);
+                    }).map((product) => {
+                      const finalPrice = Number(product.price) + 2;
+                      return (
+                        <Card key={product.id} className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-all">
+                          <CardContent className="p-4 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3 flex-1">
+                              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+                                <ShoppingCart className="h-4 w-4" />
+                              </div>
+                              <div className="text-right">
+                                <h4 className="font-bold text-foreground text-[13px] leading-tight">{product.name}</h4>
+                                <p className="text-primary font-black text-sm mt-1">{finalPrice.toLocaleString()} <span className="text-[9px] font-medium">ل.س</span></p>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <h4 className="font-bold text-foreground text-[13px] leading-tight">{product.name}</h4>
-                              <p className="text-primary font-black text-sm mt-1">{Number(product.customerPrice).toLocaleString()} <span className="text-[9px] font-medium">ل.س</span></p>
-                            </div>
-                          </div>
-                          <Button 
-                            onClick={() => handleOrder(product)} 
-                            disabled={ordering === String(product.id)}
-                            className="rounded-xl font-bold px-6 h-10 text-xs shadow-lg bg-primary shadow-primary/10"
-                          >
-                            {ordering === String(product.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : "شحن"}
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    ))}
+                            <Button 
+                              onClick={() => handleOrder(product)} 
+                              disabled={ordering === String(product.id)}
+                              className="rounded-xl font-bold px-6 h-10 text-xs shadow-lg bg-primary shadow-primary/10"
+                            >
+                              {ordering === String(product.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : "شحن"}
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4">
