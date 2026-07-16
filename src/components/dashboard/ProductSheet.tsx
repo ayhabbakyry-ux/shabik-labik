@@ -26,6 +26,7 @@ interface ProductItem {
   category_name?: string;
   category_id?: string | number;
   image?: string;
+  customerPrice?: string;
 }
 
 export function ProductSheet({ 
@@ -50,7 +51,6 @@ export function ProductSheet({
 
   const isShamCash = serviceName === "شام كاش" || filterValue === "Sham Cash";
 
-  // منطق التحقق الصارم: الزر يعمل إذا كان الحساب غير فارغ والمبلغ بين 100 و 50,000
   const isShamValid = useMemo(() => {
     const hasAccount = globalTargetId && globalTargetId.trim().length > 0;
     const amountNum = Number(dynamicAmount);
@@ -58,7 +58,6 @@ export function ProductSheet({
     return !!(hasAccount && hasValidAmount);
   }, [globalTargetId, dynamicAmount]);
 
-  // حساب التكلفة الكلية (1.02) بالأرقام الإنجليزية وبدون تقريب
   const formattedShamPrice = useMemo(() => {
     if (!isShamCash || !dynamicAmount) return "0 ل.س";
     const amount = Number(dynamicAmount);
@@ -88,7 +87,6 @@ export function ProductSheet({
     }
   }, []);
 
-  // البحث عن المنتج الأساسي لشام كاش في القائمة المجلوبة
   const shamCashBaseProduct = useMemo(() => {
     return allProducts.find(p => {
       const n = (p.name || "").toLowerCase();
@@ -102,7 +100,6 @@ export function ProductSheet({
     
     return allProducts.filter(p => {
       const prodName = (p.name || "").toLowerCase();
-      // استثناء منتجات شامنا تي في نهائياً
       if (prodName.includes("shamna") || prodName.includes("شامنا")) return false;
 
       if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
@@ -115,14 +112,12 @@ export function ProductSheet({
       return prodName.includes(searchKey);
     }).map(p => {
       const price = Number(p.price);
-      // في الباقات العادية نضيف عمولة ثابتة 2 ليرة (أو حسب رغبتك)
       let finalPrice = price + 2; 
       return { ...p, customerPrice: finalPrice.toFixed(0) };
     });
   }, [allProducts, filterValue]);
 
   const handleOrder = async (product: any) => {
-    // إذا كان شام كاش، نستخدم المنتج المجلوب المخصص له
     const targetProduct = product || (isShamCash ? shamCashBaseProduct : null);
 
     if (!targetProduct && !isShamCash) {
@@ -160,7 +155,6 @@ export function ProductSheet({
       const result = await response.json();
 
       if (result.success) {
-          // خصم المبلغ الإجمالي (شامل العمولة) من المحفظة المحلية
           deductBalance(finalPrice, `${targetProduct?.name || 'شام كاش'} - الحساب: ${link} ${isShamCash ? '(مبلغ: ' + amt + ')' : ''}`, 'Pending', result.order_id);
           toast({ title: "تم إرسال الطلب", description: result.message || "جاري المعالجة من قبل المزود." });
           if (isShamCash) {
@@ -250,6 +244,21 @@ export function ProductSheet({
                     >
                       {ordering !== null ? <Loader2 className="h-5 w-5 animate-spin" /> : "إرسال طلب الشحن"}
                     </Button>
+
+                    <div className="mt-4 p-3 bg-gray-100 border border-gray-300 rounded text-xs text-black max-h-48 overflow-y-auto">
+                      <p className="font-bold text-red-600 mb-1">📋 قائمة الخدمات المتاحة (للتصحيح):</p>
+                      {allProducts && allProducts.length > 0 ? (
+                        allProducts.map((s) => (
+                          <div key={s.id} className="border-b py-1 flex justify-between">
+                            <span>{s.name}</span>
+                            <span className="font-bold text-purple-700">ID: {s.id}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-gray-500 text-center">جاري جلب الخدمات أو القائمة فارغة...</p>
+                      )}
+                    </div>
+
                     <p className="text-center text-[10px] text-red-600 font-black mt-3 animate-pulse">
                       ⚠️ تنبيه: هذا المنتج يعمل بشكل يدوي.
                     </p>
