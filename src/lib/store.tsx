@@ -81,18 +81,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";
 
-  const logTechnicalError = (ctx: string, err: any) => {
-    console.warn(`Safe Notification Warning [${ctx}]:`, err?.message || err);
-  };
-
-  const sortTransactionsClientSide = useCallback((txs: Transaction[]) => {
-    return [...txs].sort((a, b) => {
-      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.date ? new Date(a.date).getTime() : 0);
-      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : (b.date ? new Date(b.date).getTime() : 0);
-      return timeB - timeA; 
-    });
-  }, []);
-
   const playNotificationSound = useCallback(() => {
     if (typeof window === "undefined" || !isAudioUnlocked) return;
     try {
@@ -119,11 +107,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, title, body, url })
-        }).catch(err => logTechnicalError("API Push Call", err));
+        }).catch(() => {});
         
-      } catch (e) {
-        logTechnicalError("Push Dispatch Background", e);
-      }
+      } catch (e) {}
     })();
   }, []);
 
@@ -137,22 +123,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const setupFCM = useCallback(async (phone: string) => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !('serviceWorker' in navigator)) return;
     
-    const isCompatible = 'serviceWorker' in navigator && 'Notification' in window;
-    if (!isCompatible) return;
-
     try {
       const messaging = await getMessagingSafe();
       if (!messaging) return;
       
-      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      // تسجيل الـ Service Worker يدوياً لضمان العمل
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+        scope: '/'
+      });
       
-      const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
-      if (!vapidKey) {
-        console.warn("VAPID KEY is missing in environment!");
-        return;
-      }
+      const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY || "BDR4_Xp_T_p7_S_p_X_..."; // تأكد من وجوده في البيئة
 
       const token = await getToken(messaging, { 
         serviceWorkerRegistration: registration,
@@ -169,9 +151,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           setNotificationsEnabled(true);
         }
       }
-
-    } catch (e: any) {
-      logTechnicalError("FCM Core Link", e);
+    } catch (e) {
+      console.warn("FCM Setup Error:", e);
     }
   }, []);
 
@@ -185,9 +166,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         } else {
            setNotificationsEnabled(false);
         }
-      } catch (e) {
-        logTechnicalError("Permission UI Handler", e);
-      }
+      } catch (e) {}
     }
   };
 
@@ -212,11 +191,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       
       const txSnap = await getDocs(txQ);
       const rawTxs = txSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
-      setTransactions(sortTransactionsClientSide(rawTxs));
-    } catch (e: any) {
-       logTechnicalError("Cloud Refresh", e);
-    }
-  }, [isLoggedIn, userPhone, sortTransactionsClientSide]);
+      setTransactions([...rawTxs].sort((a,b) => (b.createdAt || b.date).localeCompare(a.createdAt || a.date)));
+    } catch (e) {}
+  }, [isLoggedIn, userPhone]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -260,22 +237,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     unsubscribes.push(onSnapshot(txQuery, (snap) => {
       const rawTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
-      const sortedTxs = sortTransactionsClientSide(rawTxs);
-      
       if (!isInitialLoad.current) {
         snap.docChanges().forEach((change) => {
-          const tx = change.doc.data() as Transaction;
-          if (change.type === "added" && isAdminUser && tx.status === 'Pending') {
+          if (change.type === "added" && isAdminUser && change.doc.data().status === 'Pending') {
             playNotificationSound();
           }
         });
       }
-      setTransactions(sortedTxs);
+      setTransactions([...rawTxs].sort((a,b) => (b.createdAt || b.date).localeCompare(a.createdAt || a.date)));
       isInitialLoad.current = false;
     }));
 
     return () => unsubscribes.forEach(unsub => unsub());
-  }, [isLoggedIn, userPhone, playNotificationSound, refreshCloudData, sortTransactionsClientSide, setupFCM]);
+  }, [isLoggedIn, userPhone, playNotificationSound, refreshCloudData, setupFCM]);
 
   const login = async (phone: string, password: string) => {
     const phoneClean = phone.trim();
@@ -301,31 +275,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const adminAction = async (id: string, action: 'approve' | 'reject') => {
     const tx = transactions.find(t => t.id === id);
     if (!tx) return;
-
-    try {
-      const res = await processAdminAction(id, action);
-      if (!res.success) throw new Error("DB Error");
-      
-      if (tx.userPhone) {
-        const title = action === 'approve' ? "✅ تم قبول الإيداع" : "❌ طلب مرفوض";
-        const body = action === 'approve' 
-          ? `تمت إضافة ${tx.amount.toLocaleString()} ل.س إلى رصيدك بنجاح.` 
-          : "نعتذر، تم رفض طلب الإيداع الخاص بك.";
-        triggerPushSilently(tx.userPhone, title, body, "/wallet");
-      }
-    } catch (e) {
-      logTechnicalError("Admin Push Action", e);
+    const res = await processAdminAction(id, action);
+    if (res.success && tx.userPhone) {
+      const title = action === 'approve' ? "✅ تم قبول الإيداع" : "❌ طلب مرفوض";
+      const body = action === 'approve' ? `تمت إضافة ${tx.amount.toLocaleString()} ل.س لرصيدك.` : "نعتذر، تم رفض طلب الإيداع.";
+      triggerPushSilently(tx.userPhone, title, body, "/wallet");
     }
   };
 
   const updateBalanceAdmin = async (phone: string, amount: number, operation: 'add' | 'subtract') => {
-    try {
-      const res = await updateUserBalanceDirectlyAction(phone, amount, operation);
-      if (res.success) {
-         triggerPushSilently(phone, "💰 تحديث رصيد", `تم ${operation === 'add' ? 'إضافة' : 'سحب'} مبلغ من حسابك.`, "/wallet");
-      }
-    } catch (e) {
-      logTechnicalError("Balance Direct Update", e);
+    const res = await updateUserBalanceDirectlyAction(phone, amount, operation);
+    if (res.success) {
+      triggerPushSilently(phone, "💰 تحديث رصيد", `تم ${operation === 'add' ? 'إضافة' : 'سحب'} مبلغ من حسابك.`, "/wallet");
     }
   };
 
@@ -333,10 +294,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const before = userBalance;
     const newBal = Math.max(0, userBalance - amount);
     setUserBalance(newBal);
-    
     try {
       const now = new Date().toISOString();
-      const txData = {
+      await addDoc(collection(db, "transactions"), {
         external_order_id: externalId || "",
         type: 'طلب شحن',
         amount,
@@ -348,47 +308,29 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         details: productDetails,
         balanceBefore: before,
         balanceAfter: newBal
-      };
-
-      await addDoc(collection(db, "transactions"), txData);
+      });
       triggerPushSilently(ADMIN_PHONE, "🚀 طلب شحن جديد", `قام ${userName} بطلب شحن جديد.`, "/admin");
-      
-    } catch (e: any) {
+    } catch (e) {
       setUserBalance(before);
-      logTechnicalError("Deduction Push Failure", e);
     }
   };
 
   const requestDeposit = async (amount: number, proofImage: string) => {
-    try {
-      const now = new Date().toISOString();
-      const txData = {
-        type: 'إيداع محفظة',
-        amount,
-        status: 'Pending',
-        date: now,
-        createdAt: now,
-        userName,
-        userPhone: userPhone.trim(),
-        details: "طلب إيداع رصيد جديد",
-        proofImage
-      };
-
-      await addDoc(collection(db, "transactions"), txData);
-      triggerPushSilently(ADMIN_PHONE, "💳 إيداع جديد وصل!", `قام ${userName} بإرسال ${amount.toLocaleString()} ل.س.`, "/admin");
-      
-      alert("تم إرسال طلب الإيداع بنجاح.");
-    } catch (error: any) { 
-        logTechnicalError("Deposit Push Crash Protection", error);
-    }
+    const now = new Date().toISOString();
+    await addDoc(collection(db, "transactions"), {
+      type: 'إيداع محفظة',
+      amount,
+      status: 'Pending',
+      date: now,
+      createdAt: now,
+      userName,
+      userPhone: userPhone.trim(),
+      details: "طلب إيداع رصيد جديد",
+      proofImage
+    });
+    triggerPushSilently(ADMIN_PHONE, "💳 إيداع جديد وصل!", `قام ${userName} بإرسال ${amount.toLocaleString()} ل.س.`, "/admin");
   };
 
-  const deleteUser = async (p: string) => { await deleteUserAction(p); };
-  const requestReset = async (p: string) => await requestPasswordResetAction(p);
-  const adminResetPassword = async (p: string, r: string) => { await completePasswordResetAction(p, r); };
-  const changePassword = async (c: string, n: string) => await changePasswordAction(userPhone, c, n);
-  const updateProfileImage = async (i: string) => await updateProfileImageAction(userPhone, i, userName);
-  
   const checkPendingOrders = async () => {
     if (!isLoggedIn || isCheckingOrders) return;
     const pending = transactions.filter(tx => tx.status === 'Pending' && tx.external_order_id);
@@ -403,7 +345,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           let final: 'Completed' | 'Rejected' | null = null;
           if (['accept', 'موافق', 'success', 'completed', 'مكتمل'].includes(remote)) final = 'Completed';
           else if (['reject', 'failed', 'رفض', 'مرفوض'].includes(remote)) final = 'Rejected';
-          
           if (final) {
             await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
             triggerPushSilently(order.userPhone || userPhone, final === 'Completed' ? "✨ شحن مكتمل" : "⚠️ فشل الشحن", "يرجى مراجعة سجل الطلبات.", "/history");
@@ -417,8 +358,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   return (
     <UserContext.Provider value={{ 
       isLoggedIn, isAdmin: userPhone.trim() === ADMIN_PHONE, userPhone, userName, userBalance, profileImage, transactions, allUsers, passwordRequests,
-      login, register: signUpAction, logout, deductBalance, requestDeposit, adminAction, updateBalanceAdmin, deleteUser, requestReset, adminResetPassword,
-      changePassword, updateProfileImage, currency, checkPendingOrders, notificationsEnabled, isNotificationSupported, requestNotificationPermission, refreshCloudData,
+      login, register: signUpAction, logout, deductBalance, requestDeposit, adminAction, updateBalanceAdmin, deleteUser: deleteUserAction, requestReset: requestPasswordResetAction, adminResetPassword: completePasswordResetAction,
+      changePassword: changePasswordAction, updateProfileImage: updateProfileImageAction, currency, checkPendingOrders, notificationsEnabled, isNotificationSupported, requestNotificationPermission, refreshCloudData,
       isAudioUnlocked, unlockAudio, triggerPushSilently
     }}>
       {children}

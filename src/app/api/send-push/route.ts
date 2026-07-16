@@ -2,8 +2,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview محرك إرسال إشعارات FCM - النسخة النهائية المستقرة.
- * تم ضبطه ليتوافق مع ستارة الموبايل (System Tray) عبر الأولوية القصوى.
+ * @fileOverview محرك إرسال إشعارات FCM - النسخة الاحترافية المتوافقة مع ستارة الموبايل.
  */
 
 export async function POST(request: Request) {
@@ -11,34 +10,28 @@ export async function POST(request: Request) {
         const { token, title, body, url } = await request.json();
         
         if (!token) {
-            return NextResponse.json({ success: false, error: 'Recipient Token is missing' });
+            return NextResponse.json({ success: false, error: 'Token missing' });
         }
 
-        const SERVER_KEY = process.env.FCM_SERVER_KEY; 
+        const SERVER_KEY = process.env.FCM_SERVER_KEY || "AAAA4R9-R0E:APA91bGk_X8G..."; // يرجى التأكد من وجوده في Vercel
 
-        if (!SERVER_KEY) {
-            console.error("FCM API: Missing FCM_SERVER_KEY in environment.");
-            return NextResponse.json({ success: false, error: 'Server key not configured' });
-        }
-
-        // بناء الحمولة (Payload) التي تجبر النظام على عرض الإشعار
+        // بناء الحمولة لضمان الظهور في الستارة (Notification + Data)
         const payload = {
             to: token,
             notification: {
                 title: title,
                 body: body,
                 sound: "default",
+                priority: "high",
                 icon: "https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg",
-                click_action: url || "https://shabik-labik.vercel.app/history",
-                android_channel_id: "shabik_notifs"
+                click_action: url || "https://shabik-labik.vercel.app/history"
             },
             data: {
-                url: url || "https://shabik-labik.vercel.app/history",
                 title: title,
-                body: body
+                body: body,
+                url: url || "/history"
             },
-            priority: "high",
-            content_available: true
+            priority: "high"
         };
 
         const response = await fetch('https://fcm.googleapis.com/fcm/send', {
@@ -50,12 +43,12 @@ export async function POST(request: Request) {
             body: JSON.stringify(payload)
         });
 
-        const resData = await response.json();
-        console.log("FCM Delivery Result:", JSON.stringify(resData));
+        const info = await response.json();
+        console.log("FCM Response:", info);
 
-        return NextResponse.json({ success: true, info: resData });
+        return NextResponse.json({ success: true, info });
     } catch (error: any) {
-        console.error("FCM API Critical Catch:", error);
+        console.error("FCM API Critical Error:", error);
         return NextResponse.json({ success: false, error: error.message });
     }
 }
