@@ -49,6 +49,20 @@ export function ProductSheet({
   const { userBalance, deductBalance } = useUser();
 
   const isShamCash = serviceName === "شام كاش" || filterValue === "Sham Cash";
+  const isTelecom = useMemo(() => {
+    const filter = filterValue.toLowerCase();
+    return filter.includes('mtn') || filter.includes('syriatel');
+  }, [filterValue]);
+
+  // منطق حساب السعر النهائي للمنتجات العادية (غير شام كاش)
+  const calculateProductPrice = useCallback((originalPrice: number) => {
+    if (isTelecom) {
+      // قاعدة الاتصالات: السعر الأصلي * 1.07 (زيادة 7%)
+      return originalPrice * 1.07;
+    }
+    // قاعدة الألعاب والتطبيقات: السعر الأصلي + 2 ليرة عمولة ثابتة
+    return originalPrice + 2;
+  }, [isTelecom]);
 
   // منطق التحقق الخاص بشام كاش فقط
   const isShamValid = useMemo(() => {
@@ -87,7 +101,6 @@ export function ProductSheet({
   }, []);
 
   const handleOrder = async (product: any) => {
-    // 1. حساب السعر النهائي بناءً على نوع الخدمة
     let finalPrice = 0;
     let serviceId = 0;
     let link = globalTargetId;
@@ -97,18 +110,17 @@ export function ProductSheet({
       if (!isShamValid) return;
       const amt = Number(dynamicAmount);
       finalPrice = amt * 1.02;
-      serviceId = 840; // تثبيت الـ ID لشام كاش ليرة سورية
+      serviceId = 840; 
       quantity = amt;
     } else {
       if (!product) return;
-      // استعادة التسعير الأصلي للوحدات: السعر من المزود + 2 ليرة عمولة ثابتة
-      finalPrice = Number(product.price) + 2;
+      // استخدام منطق الحساب الجديد بناءً على النوع
+      finalPrice = calculateProductPrice(Number(product.price));
       serviceId = Number(product.id);
       link = globalTargetId;
       quantity = 1;
     }
 
-    // 2. التحقق من الرصيد
     if (userBalance < finalPrice) {
       toast({ 
         title: "رصيد غير كافٍ", 
@@ -143,7 +155,6 @@ export function ProductSheet({
       const result = await response.json();
 
       if (result.success) {
-          // الخصم الفعلي من المحفظة وحفظ السجل
           await deductBalance(
             finalPrice, 
             `${serviceName} - الحساب: ${link} ${isShamCash ? '(مبلغ: ' + quantity + ')' : ''}`, 
@@ -294,8 +305,8 @@ export function ProductSheet({
                           if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
                           return prodName.includes(searchKey);
                       }).map((product) => {
-                        // استعادة التسعير الأصلي: السعر من السيرفر + 2 ليرة عمولة
-                        const finalPrice = Number(product.price) + 2;
+                        // تطبيق منطق الحساب الجديد في العرض
+                        const finalPrice = calculateProductPrice(Number(product.price));
                         return (
                           <Card key={product.id} className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-all">
                             <CardContent className="p-4 flex items-center justify-between gap-4">
@@ -305,7 +316,7 @@ export function ProductSheet({
                                 </div>
                                 <div className="text-right">
                                   <h4 className="font-bold text-foreground text-[13px] leading-tight">{product.name}</h4>
-                                  <p className="text-primary font-black text-sm mt-1">{finalPrice.toLocaleString()} <span className="text-[9px] font-medium">ل.س</span></p>
+                                  <p className="text-primary font-black text-sm mt-1">{finalPrice.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})} <span className="text-[9px] font-medium">ل.س</span></p>
                                 </div>
                               </div>
                               <Button 
