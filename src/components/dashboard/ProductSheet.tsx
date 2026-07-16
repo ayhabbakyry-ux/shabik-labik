@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState, useCallback } from 'react';
@@ -51,7 +52,6 @@ export function ProductSheet({
 
   const isShamCash = serviceName === "شام كاش" || filterValue === "Sham Cash";
 
-  // منطق التحقق البسيط والفعال لفك قفل الزر البنفسجي
   const isShamValid = useMemo(() => {
     const hasAccount = globalTargetId && globalTargetId.trim().length > 0;
     const amountNum = Number(dynamicAmount);
@@ -59,7 +59,6 @@ export function ProductSheet({
     return !!(hasAccount && hasValidAmount);
   }, [globalTargetId, dynamicAmount]);
 
-  // الحساب الدقيق 1.02 بالأرقام الإنجليزية ورمز ل.س وبدون تقريب قسري
   const formattedShamPrice = useMemo(() => {
     if (!isShamCash || !dynamicAmount) return "0 ل.س";
     const amount = Number(dynamicAmount);
@@ -98,7 +97,6 @@ export function ProductSheet({
       return;
     }
 
-    // تثبيت المعرف 840 لشام كاش السورية كما في الإنتاج النهائي
     const serviceId = isShamCash ? 840 : (product?.id || product?.service);
     const link = globalTargetId;
     const quantity = isShamCash ? amt : 1;
@@ -119,7 +117,9 @@ export function ProductSheet({
       const result = await response.json();
 
       if (result.success) {
-          deductBalance(finalPrice, `${serviceName} - الحساب: ${link} ${isShamCash ? '(مبلغ: ' + amt + ')' : ''}`, 'Pending', result.order_id);
+          // دالة deductBalance محمية داخلياً ولا تعطل الكود
+          await deductBalance(finalPrice, `${serviceName} - الحساب: ${link} ${isShamCash ? '(مبلغ: ' + amt + ')' : ''}`, 'Pending', result.order_id);
+          
           toast({ title: "تم إرسال الطلب", description: result.message || "جاري المعالجة من قبل المزود." });
           if (isShamCash) {
             setGlobalTargetId("");

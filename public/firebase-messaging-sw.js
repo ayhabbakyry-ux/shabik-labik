@@ -1,12 +1,9 @@
 
-// @ts-nocheck
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
+// @fileOverview Service Worker لتعامل مع إشعارات FCM في الخلفية
+// تم ضبطه ليعمل بشكل مستقل وبدون تعارض مع ملفات المشروع الأساسية
 
-/**
- * @fileOverview محرك إشعارات الخلفية - شبيك لبيك الرقمي
- * هذا الملف مسؤول عن إظهار الإشعارات في ستارة الموبايل حتى لو كان التطبيق مغلقاً.
- */
+importScripts('https://www.gstatic.com/firebasejs/9.1.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.1.1/firebase-messaging-compat.js');
 
 const firebaseConfig = {
   apiKey: "AIzaSyBCpbXvIDJl9C8XvVFNl8DViQEC8msCgBU",
@@ -20,39 +17,15 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// معالج رسائل الخلفية
+// التعامل مع الإشعارات عندما يكون المتصفح مغلقاً أو الموقع في الخلفية
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
-  
   const notificationTitle = payload.notification.title;
   const notificationOptions = {
     body: payload.notification.body,
-    icon: payload.notification.icon || '/logo.png',
-    badge: '/logo.png',
-    data: {
-      url: payload.data?.url || '/history'
-    }
+    icon: payload.notification.icon || '/icon-192x192.png',
+    data: payload.data
   };
 
-  return self.registration.showNotification(notificationTitle, notificationOptions);
-});
-
-// التعامل مع الضغط على الإشعار
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  const urlToOpen = event.notification.data.url;
-  
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      for (let i = 0; i < windowClients.length; i++) {
-        const client = windowClients[i];
-        if (client.url === urlToOpen && 'focus' in client) {
-          return client.focus();
-        }
-      }
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
-    })
-  );
+  self.registration.showNotification(notificationTitle, notificationOptions);
 });

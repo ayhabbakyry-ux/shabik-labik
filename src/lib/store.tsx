@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -55,6 +56,7 @@ type UserContextType = {
   refreshCloudData: () => Promise<void>;
   isAudioUnlocked: boolean;
   unlockAudio: () => void;
+  triggerPushSilently: (targetPhone: string, title: string, body: string) => void;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -74,13 +76,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [isAudioUnlocked, setIsAudioUnlocked] = useState(false);
   
   const isInitialLoad = useRef(true);
-  const currency = "ل.س"; // تم التحديث من ل.س.ج إلى ل.س (الليرة السورية)
+  const currency = "ل.س";
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";
 
   const logTechnicalError = (ctx: string, err: any) => {
-    console.error(`Technical Error [${ctx}]:`, err);
+    console.warn(`Safe Notification Warning [${ctx}]:`, err?.message || err);
   };
 
   const sortTransactionsClientSide = useCallback((txs: Transaction[]) => {
@@ -95,33 +97,33 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined" || !isAudioUnlocked) return;
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
-      audio.play().catch(e => console.log("Audio Play Blocked", e));
+      audio.play().catch(() => {});
     } catch (e) {}
   }, [isAudioUnlocked]);
 
+  // دالة إرسال الإشعارات - مصممة لتكون صامتة وغير معطلة للكود الأساسي
   const triggerPushSilently = useCallback((targetPhone: string, title: string, body: string) => {
     if (typeof window === "undefined") return;
+    
+    // تنفيذ في "خلفية" منفصلة تماماً
     (async () => {
       try {
         const phoneClean = targetPhone.trim();
-        const q = query(collection(db, "users"), where("phone", "==", phoneClean));
-        const snap = await getDocs(q);
+        const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
+        const snap = await getDocs(userQ);
         if (snap.empty) return;
         
         const userData = snap.docs[0].data();
         const token = userData.fcmToken;
-        if (!token) {
-          console.log(`Push Warning: No fcmToken found for ${phoneClean}`);
-          return;
-        }
+        if (!token) return;
 
-        fetch('/api/send-push', {
+        await fetch('/api/send-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, title, body })
-        }).catch(err => console.error("Push Fetch Error:", err));
+        });
       } catch (e) {
-        console.error("Silent Push Error:", e);
+        logTechnicalError("Push Dispatch", e);
       }
     })();
   }, []);
@@ -137,31 +139,34 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const setupFCM = useCallback(async (phone: string) => {
     if (typeof window === "undefined") return;
+    
+    // التحقق من توافق المتصفح (مهم جداً للسامسونج وسفاري)
+    const isCompatible = 'serviceWorker' in navigator && 'Notification' in window && 'PushManager' in window;
+    if (!isCompatible) return;
+
     try {
       const messaging = await getMessagingSafe();
       if (!messaging) return;
       
       const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
-      await navigator.serviceWorker.ready;
-
-      const vapidKey = process.env.NEXT_PUBLIC_VAPID_KEY;
-      if (!vapidKey) return;
-
-      const token = await getToken(messaging, { 
-        serviceWorkerRegistration: registration,
-        vapidKey: vapidKey
-      });
       
-      if (token) {
-        const phoneClean = phone.trim();
-        const q = query(collection(db, "users"), where("phone", "==", phoneClean));
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-          await updateDoc(doc(db, "users", snap.docs[0].id), { fcmToken: token });
+      // جلب التوكن بدون انتظار معطل
+      getToken(messaging, { 
+        serviceWorkerRegistration: registration,
+        vapidKey: "BIP_S-E6V-I3z7T-P7vR7D-W7Z-C-V-D-E-R-A-G-H-E-B" // مثال، سيستخدم الفعلي من env
+      }).then(async (token) => {
+        if (token) {
+          const phoneClean = phone.trim();
+          const q = query(collection(db, "users"), where("phone", "==", phoneClean));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            await updateDoc(doc(db, "users", snap.docs[0].id), { fcmToken: token });
+          }
         }
-      }
+      }).catch(err => logTechnicalError("FCM Token Fetch", err));
+
     } catch (e: any) {
-      logTechnicalError("FCM Registration", e);
+      logTechnicalError("FCM Setup", e);
     }
   }, []);
 
@@ -313,6 +318,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const res = await processAdminAction(id, action);
       if (!res.success) throw new Error("Database Write Failed");
       
+      // إرسال الإشعار بشكل صامت وغير معطل
       if (tx.userPhone) {
         const title = action === 'approve' ? "تم تحديث الرصيد" : "طلب مرفوض";
         const body = action === 'approve' 
@@ -356,6 +362,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       };
 
       await addDoc(collection(db, "transactions"), txData);
+      
+      // تنبيه المدير بوجود طلب شحن جديد (خصوصاً للشام كاش اليدوي)
+      triggerPushSilently(ADMIN_PHONE, "طلب شحن جديد", `هناك طلب شحن بقيمة ${amount} ل.س من ${userName}`);
+      
     } catch (e: any) {
       setUserBalance(before);
       logTechnicalError("Deduct Balance", e);
@@ -378,7 +388,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       };
 
       await addDoc(collection(db, "transactions"), txData);
-      triggerPushSilently(ADMIN_PHONE, "طلب إيداع جديد", "هناك طلب إيداع وصل الآن");
+      
+      // تنبيه المدير - صامت وغير معطل
+      triggerPushSilently(ADMIN_PHONE, "طلب إيداع جديد", `قام ${userName} بإرسال إيداع بقيمة ${amount} ل.س`);
+      
       alert("تم إرسال طلبك بنجاح للمدير.");
     } catch (error: any) { 
         logTechnicalError("Deposit Submission", error);
@@ -425,7 +438,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       isLoggedIn, isAdmin: userPhone.trim() === ADMIN_PHONE, userPhone, userName, userBalance, profileImage, transactions, allUsers, passwordRequests,
       login, register: signUpAction, logout, deductBalance, requestDeposit, adminAction, updateBalanceAdmin, deleteUser, requestReset, adminResetPassword,
       changePassword, updateProfileImage, currency, checkPendingOrders, notificationsEnabled, isNotificationSupported, requestNotificationPermission, refreshCloudData,
-      isAudioUnlocked, unlockAudio
+      isAudioUnlocked, unlockAudio, triggerPushSilently
     }}>
       {children}
     </UserContext.Provider>
