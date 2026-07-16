@@ -49,13 +49,18 @@ export function ProductSheet({
 
   const isShamCash = serviceName === "شام كاش" || filterValue === "Sham Cash";
 
-  // حساب التكلفة الكلية لشام كاش (المبلغ * 1.02) بدقة عشرية كاملة بدون تقريب
+  // حساب التكلفة الكلية لشام كاش (المبلغ * 1.02) بدقة عشرية كاملة وبدون أي تقريب
   const calculatedCost = useMemo(() => {
     if (!isShamCash || !dynamicAmount) return 0;
     const amount = Number(dynamicAmount);
     if (isNaN(amount)) return 0;
-    return amount * 1.02; // إظهار القيمة العشرية الخام كما هي
+    return amount * 1.02;
   }, [isShamCash, dynamicAmount]);
+
+  // تنسيق السعر بالأرقام الإنجليزية القياسية وعملة "ل.س" حصراً
+  const formattedShamPrice = useMemo(() => {
+    return `${calculatedCost.toFixed(1).replace('.0', '')} ل.س`;
+  }, [calculatedCost]);
 
   // التحقق من صحة المبلغ لشام كاش
   useEffect(() => {
@@ -140,7 +145,6 @@ export function ProductSheet({
     });
   }, [allProducts, filterValue, isShamCash]);
 
-  // الحصول على المنتج الأساسي لشام كاش (الذي يستخدم الكمية الديناميكية)
   const shamCashBaseProduct = useMemo(() => {
     return filteredProducts.find(p => p.name.includes("شام") || p.name.toLowerCase().includes("sham"));
   }, [filteredProducts]);
@@ -222,7 +226,6 @@ export function ProductSheet({
             </div>
           </SheetHeader>
 
-          {/* نموذج إدخال البيانات الموحد */}
           <div className="space-y-3">
              <div className="bg-primary/5 p-3 rounded-2xl border border-primary/10 space-y-1.5">
                 <label className="text-[10px] font-black text-primary pr-1 block">
@@ -257,7 +260,7 @@ export function ProductSheet({
 
                   <div className="flex items-center justify-between bg-white/50 p-3 rounded-xl border border-emerald-100">
                      <span className="text-xs font-bold text-emerald-800">التكلفة الإجمالية:</span>
-                     <span className="text-lg font-black text-emerald-600">{calculatedCost.toLocaleString('ar-SY', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {currency}</span>
+                     <span className="text-lg font-black text-emerald-600" dir="ltr">{formattedShamPrice}</span>
                   </div>
 
                   {amountError && (
@@ -269,7 +272,7 @@ export function ProductSheet({
                   <div className="pt-2">
                     <Button 
                       onClick={() => handleOrder(shamCashBaseProduct)} 
-                      disabled={ordering === String(shamCashBaseProduct?.id) || !!amountError || !dynamicAmount || !shamCashBaseProduct}
+                      disabled={ordering === String(shamCashBaseProduct?.id) || !!amountError || !dynamicAmount || !shamCashBaseProduct || !globalTargetId.trim()}
                       className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-lg rounded-2xl shadow-xl shadow-emerald-100 transition-all active:scale-95"
                     >
                       {ordering === String(shamCashBaseProduct?.id) ? <Loader2 className="h-5 w-5 animate-spin" /> : "إرسال طلب الشحن"}
@@ -283,7 +286,6 @@ export function ProductSheet({
           </div>
         </div>
 
-        {/* عرض المنتجات لغير شام كاش */}
         <div className="flex-1 overflow-hidden bg-muted/30">
           {!isShamCash && (
             fetching ? (

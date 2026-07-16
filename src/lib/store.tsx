@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -75,7 +74,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [isAudioUnlocked, setIsAudioUnlocked] = useState(false);
   
   const isInitialLoad = useRef(true);
-  const currency = "ل.س.ج";
+  const currency = "ل.س"; // تم التحديث من ل.س.ج إلى ل.س (الليرة السورية)
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";
@@ -143,15 +142,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (!messaging) return;
       
       const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
-      
-      // انتظار تفعيل الـ Service Worker لضمان استلام التوكن
       await navigator.serviceWorker.ready;
 
       const vapidKey = process.env.NEXT_PUBLIC_VAPID_KEY;
-      if (!vapidKey) {
-        console.warn("FCM: Missing NEXT_PUBLIC_VAPID_KEY environment variable.");
-        return;
-      }
+      if (!vapidKey) return;
 
       const token = await getToken(messaging, { 
         serviceWorkerRegistration: registration,
@@ -164,7 +158,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const snap = await getDocs(q);
         if (!snap.empty) {
           await updateDoc(doc(db, "users", snap.docs[0].id), { fcmToken: token });
-          console.log("FCM: Token updated successfully in Firestore.");
         }
       }
     } catch (e: any) {
@@ -320,7 +313,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const res = await processAdminAction(id, action);
       if (!res.success) throw new Error("Database Write Failed");
       
-      // محفز إشعار القبول/الرفض في الخلفية
       if (tx.userPhone) {
         const title = action === 'approve' ? "تم تحديث الرصيد" : "طلب مرفوض";
         const body = action === 'approve' 
@@ -386,10 +378,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       };
 
       await addDoc(collection(db, "transactions"), txData);
-      
-      // إشعار المدير الفوري
       triggerPushSilently(ADMIN_PHONE, "طلب إيداع جديد", "هناك طلب إيداع وصل الآن");
-      
       alert("تم إرسال طلبك بنجاح للمدير.");
     } catch (error: any) { 
         logTechnicalError("Deposit Submission", error);
