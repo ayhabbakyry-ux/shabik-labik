@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -51,24 +51,25 @@ export function ProductSheet({
 
   const isShamCash = serviceName === "شام كاش" || filterValue === "Sham Cash";
 
-  // SIMPLE VALIDATION LOGIC
+  // SIMPLE VALIDATION LOGIC - STRENGTHENED
   const isShamValid = useMemo(() => {
     const hasAccount = globalTargetId && globalTargetId.trim().length > 0;
     const amountNum = Number(dynamicAmount);
     const hasValidAmount = !isNaN(amountNum) && amountNum >= 100 && amountNum <= 50000;
     
-    // Debug log as requested by Admin
+    // Debug log to monitor states in browser
     console.log("Validation State:", { globalTargetId, dynamicAmount, isShamValid: !!(hasAccount && hasValidAmount) });
     
     return !!(hasAccount && hasValidAmount);
   }, [globalTargetId, dynamicAmount]);
 
-  // Exact 1.02 Multiplier with no rounding, forced English numerals
+  // Exact 1.02 Multiplier with English numerals
   const formattedShamPrice = useMemo(() => {
     if (!isShamCash || !dynamicAmount) return "0 ل.س";
     const amount = Number(dynamicAmount);
     if (isNaN(amount)) return "0 ل.س";
     const cost = amount * 1.02;
+    // Force English numerals and exact decimal
     return `${cost.toFixed(1).replace('.0', '')} ل.س`;
   }, [isShamCash, dynamicAmount]);
 
@@ -116,7 +117,7 @@ export function ProductSheet({
       return prodName.includes(searchKey) || catName.includes(searchKey);
     }).map(p => {
       const price = Number(p.price);
-      let finalPrice = price + 2; // Default markup for games/services
+      let finalPrice = price + 2; 
       return { ...p, customerPrice: finalPrice.toFixed(2) };
     });
   }, [allProducts, filterValue]);
@@ -126,6 +127,18 @@ export function ProductSheet({
   }, [filteredProducts]);
 
   const handleOrder = async (product: any) => {
+    // FIX: Guard against undefined product which caused the crash
+    if (!product) {
+      if (isShamCash) {
+        toast({ 
+          title: "جاري التحميل", 
+          description: "يرجى الانتظار لحين اكتمال جلب بيانات الخدمة من السيرفر.", 
+          variant: "destructive" 
+        });
+      }
+      return;
+    }
+
     if (!isShamValid && isShamCash) return;
     if (!globalTargetId.trim()) {
       toast({ title: "حقل مطلوب", description: "يرجى إدخال رقم الحساب المستهدف أولاً.", variant: "destructive" });
@@ -233,15 +246,16 @@ export function ProductSheet({
                   <div className="pt-2">
                     <Button 
                       onClick={() => handleOrder(shamCashBaseProduct)} 
-                      disabled={!isShamValid || ordering === String(shamCashBaseProduct?.id)}
+                      // FIX: Ensure button is disabled if product data is missing to prevent crash
+                      disabled={!isShamValid || !shamCashBaseProduct || ordering === String(shamCashBaseProduct?.id)}
                       className={cn(
                         "w-full h-14 font-black text-lg rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2",
-                        isShamValid 
+                        (isShamValid && shamCashBaseProduct) 
                           ? "bg-[#8b5cf6] hover:bg-[#7c3aed] text-white shadow-purple-200" 
                           : "bg-gray-300 text-gray-500 cursor-not-allowed shadow-none"
                       )}
                     >
-                      {ordering === String(shamCashBaseProduct?.id) ? <Loader2 className="h-5 w-5 animate-spin" /> : "إرسال طلب الشحن"}
+                      {(ordering === String(shamCashBaseProduct?.id) || (isShamCash && fetching)) ? <Loader2 className="h-5 w-5 animate-spin" /> : "إرسال طلب الشحن"}
                     </Button>
                     <p className="text-center text-[10px] text-red-600 font-black mt-3 animate-pulse">
                       ⚠️ تنبيه: هذا المنتج يعمل بشكل يدوي.
@@ -278,7 +292,7 @@ export function ProductSheet({
                             </div>
                             <div className="text-right">
                               <h4 className="font-bold text-foreground text-[13px] leading-tight">{product.name}</h4>
-                              <p className="text-primary font-black text-sm mt-1">{Number(product.customerPrice).toLocaleString()} <span className="text-[9px] font-medium">{currency}</span></p>
+                              <p className="text-primary font-black text-sm mt-1">{Number(product.customerPrice).toLocaleString()} <span className="text-[9px] font-medium">ل.س</span></p>
                             </div>
                           </div>
                           <Button 
