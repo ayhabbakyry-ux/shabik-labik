@@ -13,11 +13,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PackageX, RefreshCw, ShoppingCart, AlertCircle, ArrowRight, User, Wallet, Info } from "lucide-react";
+import { Loader2, PackageX, RefreshCw, ShoppingCart, AlertCircle, ArrowRight, User, Wallet } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useUser } from "@/lib/store";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 interface ProductItem {
   id: string | number;
@@ -50,12 +49,12 @@ export function ProductSheet({
 
   const isShamCash = serviceName === "شام كاش" || filterValue === "Sham Cash";
 
-  // حساب التكلفة الكلية لشام كاش (المبلغ * 1.02) باستخدام التقريب الرياضي القياسي
+  // حساب التكلفة الكلية لشام كاش (المبلغ * 1.02) بدقة عشرية كاملة بدون تقريب
   const calculatedCost = useMemo(() => {
     if (!isShamCash || !dynamicAmount) return 0;
     const amount = Number(dynamicAmount);
     if (isNaN(amount)) return 0;
-    return Math.round(amount * 1.02);
+    return amount * 1.02; // إظهار القيمة العشرية الخام كما هي
   }, [isShamCash, dynamicAmount]);
 
   // التحقق من صحة المبلغ لشام كاش
@@ -161,7 +160,7 @@ export function ProductSheet({
         return;
       }
       finalQty = Number(dynamicAmount);
-      finalPrice = calculatedCost; // استخدام السعر المضرب في 1.02
+      finalPrice = calculatedCost; 
     }
 
     if (userBalance < finalPrice) {
@@ -178,7 +177,7 @@ export function ProductSheet({
           body: JSON.stringify({
               product_id: product.id,
               playerId: globalTargetId,
-              qty: finalQty, // إرسال المبلغ الأصلي ككمية للسيرفر
+              qty: finalQty,
               order_uuid: crypto.randomUUID()
           })
       });
@@ -187,7 +186,6 @@ export function ProductSheet({
 
       if (result.success) {
           const isPending = result.status_type === 'pending';
-          // خصم السعر مع العمولة (1.02) من المحفظة
           deductBalance(finalPrice, `${product.name} - الحساب: ${globalTargetId} (مبلغ: ${finalQty})`, isPending ? 'Pending' : 'Completed', result.order_id);
           toast({ title: isPending ? "الطلب قيد المعالجة" : "تمت العملية", description: result.message });
       } else {
@@ -259,7 +257,7 @@ export function ProductSheet({
 
                   <div className="flex items-center justify-between bg-white/50 p-3 rounded-xl border border-emerald-100">
                      <span className="text-xs font-bold text-emerald-800">التكلفة الإجمالية:</span>
-                     <span className="text-lg font-black text-emerald-600">{calculatedCost.toLocaleString()} {currency}</span>
+                     <span className="text-lg font-black text-emerald-600">{calculatedCost.toLocaleString('ar-SY', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {currency}</span>
                   </div>
 
                   {amountError && (
