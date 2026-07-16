@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -46,10 +46,11 @@ export function ProductSheet({
   const [dynamicAmount, setDynamicAmount] = useState<string>("");
   
   const { toast } = useToast();
-  const { currency, userBalance, deductBalance } = useUser();
+  const { userBalance, deductBalance } = useUser();
 
   const isShamCash = serviceName === "شام كاش" || filterValue === "Sham Cash";
 
+  // منطق التحقق الصارم: الزر يعمل إذا كان الحساب غير فارغ والمبلغ بين 100 و 50,000
   const isShamValid = useMemo(() => {
     const hasAccount = globalTargetId && globalTargetId.trim().length > 0;
     const amountNum = Number(dynamicAmount);
@@ -57,6 +58,7 @@ export function ProductSheet({
     return !!(hasAccount && hasValidAmount);
   }, [globalTargetId, dynamicAmount]);
 
+  // حساب التكلفة الكلية (1.02) بالأرقام الإنجليزية وبدون تقريب
   const formattedShamPrice = useMemo(() => {
     if (!isShamCash || !dynamicAmount) return "0 ل.س";
     const amount = Number(dynamicAmount);
@@ -86,6 +88,7 @@ export function ProductSheet({
     }
   }, []);
 
+  // البحث عن المنتج الأساسي لشام كاش في القائمة المجلوبة
   const shamCashBaseProduct = useMemo(() => {
     return allProducts.find(p => {
       const n = (p.name || "").toLowerCase();
@@ -99,6 +102,7 @@ export function ProductSheet({
     
     return allProducts.filter(p => {
       const prodName = (p.name || "").toLowerCase();
+      // استثناء منتجات شامنا تي في نهائياً
       if (prodName.includes("shamna") || prodName.includes("شامنا")) return false;
 
       if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
@@ -111,12 +115,14 @@ export function ProductSheet({
       return prodName.includes(searchKey);
     }).map(p => {
       const price = Number(p.price);
+      // في الباقات العادية نضيف عمولة ثابتة 2 ليرة (أو حسب رغبتك)
       let finalPrice = price + 2; 
       return { ...p, customerPrice: finalPrice.toFixed(0) };
     });
   }, [allProducts, filterValue]);
 
   const handleOrder = async (product: any) => {
+    // إذا كان شام كاش، نستخدم المنتج المجلوب المخصص له
     const targetProduct = product || (isShamCash ? shamCashBaseProduct : null);
 
     if (!targetProduct && !isShamCash) {
@@ -138,12 +144,6 @@ export function ProductSheet({
     const link = globalTargetId;
     const quantity = isShamCash ? amt : 1;
 
-    console.log("SENDING ALRAGHEB PAYLOAD:", {
-      service: serviceId,
-      link: link,
-      quantity: quantity
-    });
-
     setOrdering(String(serviceId || "ordering"));
     
     try {
@@ -153,17 +153,16 @@ export function ProductSheet({
           body: JSON.stringify({
               service: serviceId,
               link: link,
-              quantity: quantity,
-              order_uuid: crypto.randomUUID()
+              quantity: quantity
           })
       });
 
       const result = await response.json();
 
       if (result.success) {
-          const isPending = result.status_type === 'pending';
-          deductBalance(finalPrice, `${targetProduct?.name || 'شام كاش'} - الحساب: ${link} ${isShamCash ? '(مبلغ: ' + amt + ')' : ''}`, isPending ? 'Pending' : 'Completed', result.order_id);
-          toast({ title: isPending ? "الطلب قيد الانتظار" : "تمت العملية", description: result.message });
+          // خصم المبلغ الإجمالي (شامل العمولة) من المحفظة المحلية
+          deductBalance(finalPrice, `${targetProduct?.name || 'شام كاش'} - الحساب: ${link} ${isShamCash ? '(مبلغ: ' + amt + ')' : ''}`, 'Pending', result.order_id);
+          toast({ title: "تم إرسال الطلب", description: result.message || "جاري المعالجة من قبل المزود." });
           if (isShamCash) {
             setGlobalTargetId("");
             setDynamicAmount("");
@@ -172,7 +171,7 @@ export function ProductSheet({
           toast({ title: "فشل الطلب", description: result.message || "رفض المزود تنفيذ العملية.", variant: "destructive" });
       }
     } catch (error: any) {
-      toast({ title: "خطأ اتصال", description: "تعذر الاتصال بسيرفر الشحن حالياً. يرجى مراجعة الإنترنت.", variant: "destructive" });
+      toast({ title: "خطأ اتصال", description: "تعذر الاتصال بسيرفر الشحن حالياً.", variant: "destructive" });
     } finally {
       setOrdering(null);
     }

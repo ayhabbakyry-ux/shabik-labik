@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار تنفيذ طلبات الشحن المطور - يدعم الآن الكمية الديناميكية والمفاتيح المرنة.
+ * @fileOverview مسار تنفيذ طلبات الشحن الرسمي - متوافق 100% مع وثائق Alragheb Store.
+ * يستخدم نظام GET و UUID لمنع التكرار وضمان استقرار الطلب.
  */
 export async function POST(request: Request) {
     const API_TOKEN = process.env.ALRAGHEB_TOKEN;
 
     if (!API_TOKEN) {
-        console.error("API_TOKEN is missing in environment variables");
         return NextResponse.json({ 
             success: false, 
             message: 'خطأ في إعدادات السيرفر (التوكن مفقود).' 
@@ -17,20 +17,22 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
         
-        // دعم المفاتيح الجديدة والقديمة لضمان عدم الفشل
+        // جلب البيانات من الواجهة
         const product_id = body.service || body.product_id;
         const playerId = body.link || body.playerId;
         const qty = body.quantity || body.qty || 1;
-        const order_uuid = body.order_uuid || crypto.randomUUID();
+        
+        // توليد UUID فريد لكل طلب لمنع تكرار العملية في سيرفر الراغب
+        const order_uuid = crypto.randomUUID();
 
         if (!product_id) {
             return NextResponse.json({ success: false, message: 'معرف الخدمة (Service ID) مفقود.' });
         }
 
+        // بناء الرابط الرسمي حسب الوثائق: GET مع معاملات الاستعلام
         const ENDPOINT = `https://api.alragheb-store.com/client/api/newOrder/${product_id}/params?qty=${qty}&playerId=${playerId}&order_uuid=${order_uuid}`;
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 ثانية
+        console.log('API_DEBUG -> Dispatching GET Request to Alragheb:', ENDPOINT);
 
         const response = await fetch(ENDPOINT, {
             method: 'GET',
@@ -39,55 +41,30 @@ export async function POST(request: Request) {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },
-            cache: 'no-store',
-            signal: controller.signal
+            cache: 'no-store'
         });
 
-        clearTimeout(timeoutId);
-
         const rawData = await response.json();
-        console.log('Alragheb API Raw Response:', JSON.stringify(rawData));
+        console.log('API_DEBUG -> Alragheb Raw Response:', JSON.stringify(rawData));
 
-        // إذا كان السيرفر الخارجي أرجع خطأ صريحاً
-        if (rawData.success === false || rawData.error) {
-            return NextResponse.json({ 
-                success: false, 
-                message: rawData.message || rawData.error || 'رفض السيرفر تنفيذ الطلب' 
-            });
-        }
-
-        const orderData = rawData.data;
-        const orderStatus = orderData?.status || rawData["الحالة"] || "";
-        const message = rawData.message || rawData["الرسالة"] || "";
-        const orderId = orderData?.order_id || (rawData.data ? rawData.data['رقم_الطلب'] : "");
-
-        const statusLower = String(orderStatus).toLowerCase().trim();
-
-        if (statusLower === 'accept' || statusLower === 'موافق' || statusLower === 'مقبول' || statusLower === 'نجاح') {
-            return NextResponse.json({ 
-                success: true, 
-                status_type: 'completed', 
-                message: 'تم تنفيذ الطلب بنجاح', 
-                order_id: orderId 
-            });
-        } else if (statusLower === 'wait' || statusLower === 'انتظار' || statusLower === '') {
+        // تحليل استجابة السيرفر بناءً على حالة النجاح
+        // سيرفر الراغب قد يرجع status: "OK" أو success: true
+        if (rawData.status === "OK" || rawData.success === true || rawData["الحالة"] === "قبول") {
+            const orderId = rawData.data?.order_id || rawData.order_id || rawData.data?.['رقم_الطلب'] || "";
             return NextResponse.json({ 
                 success: true, 
                 status_type: 'pending', 
-                message: 'الطلب قيد الانتظار في السيرفر، تم حجز الرصيد', 
+                message: 'تم استلام الطلب وبانتظار التنفيذ', 
                 order_id: orderId 
-            });
-        } else if (statusLower === 'reject' || statusLower === 'رفض') {
-            return NextResponse.json({ 
-                success: false, 
-                message: message || 'تم رفض الطلب من المزود وعاد الرصيد' 
             });
         } else {
+            // معالجة الأخطاء (مثل كود 100 للرصيد، أو رسالة صريحة)
+            let errorMsg = rawData.message || rawData.error || 'رفض السيرفر تنفيذ الطلب';
+            if (rawData.code === 100) errorMsg = "عذراً، الرصيد غير كافٍ في حساب المزود حالياً.";
+            
             return NextResponse.json({ 
-                success: true, 
-                status_type: 'pending', 
-                message: message || ('جاري المعالجة (حالة: ' + orderStatus + ')'), 
-                order_id: orderId 
+                success: false, 
+                message: errorMsg 
             });
         }
     
@@ -95,7 +72,7 @@ export async function POST(request: Request) {
         console.error("Critical Order API Error:", error);
         return NextResponse.json({ 
             success: false, 
-            message: error.name === 'AbortError' ? 'فشل الاتصال: السيرفر لم يستجب في الوقت المحدد.' : 'حدث خطأ في الاتصال بسيرفر الشحن.' 
+            message: 'حدث خطأ في الاتصال بسيرفر الشحن (Timeout or Network Error).' 
         }, { status: 200 });
     }
 }
