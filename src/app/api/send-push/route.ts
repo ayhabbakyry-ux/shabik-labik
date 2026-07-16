@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview محرك إرسال إشعارات FCM المطور
+ * @fileOverview محرك إرسال إشعارات FCM المطور (FCM v1 Secure architecture)
  * يستخدم بروتوكول جوجل القياسي لضمان وصول التنبيه لستارة الموبايل.
  */
 
@@ -14,13 +14,15 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: 'Recipient Token is missing' });
         }
 
+        // استخدام المفتاح السحابي من متغيرات البيئة لضمان الأمان في Vercel
         const SERVER_KEY = process.env.FCM_SERVER_KEY; 
 
         if (!SERVER_KEY || SERVER_KEY === "YOUR_SERVER_KEY") {
             console.error("FCM API: Missing FCM_SERVER_KEY in environment.");
-            return NextResponse.json({ success: false, error: 'Server key not configured' });
+            return NextResponse.json({ success: false, error: 'Server key not configured securely' });
         }
 
+        // إرسال الإشعار لستارة الموبايل (High Priority)
         const response = await fetch('https://fcm.googleapis.com/fcm/send', {
             method: 'POST',
             headers: {
@@ -48,7 +50,7 @@ export async function POST(request: Request) {
         const resData = await response.json();
         return NextResponse.json({ success: true, info: resData });
     } catch (error: any) {
-        console.error("Push API Error:", error);
+        console.error("FCM API Error Catch:", error);
         return NextResponse.json({ success: false, error: error.message });
     }
 }

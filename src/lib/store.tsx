@@ -101,11 +101,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {}
   }, [isAudioUnlocked]);
 
-  // دالة إرسال الإشعارات - مصممة لتكون صامتة وغير معطلة للكود الأساسي
   const triggerPushSilently = useCallback((targetPhone: string, title: string, body: string) => {
     if (typeof window === "undefined") return;
     
-    // تنفيذ في "خلفية" منفصلة تماماً
     (async () => {
       try {
         const phoneClean = targetPhone.trim();
@@ -117,13 +115,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const token = userData.fcmToken;
         if (!token) return;
 
-        await fetch('/api/send-push', {
+        // إرسال غير معطل (Non-blocking)
+        fetch('/api/send-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, title, body })
-        });
+        }).catch(err => logTechnicalError("API Push Call", err));
+        
       } catch (e) {
-        logTechnicalError("Push Dispatch", e);
+        logTechnicalError("Push Dispatch Background", e);
       }
     })();
   }, []);
@@ -140,7 +140,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const setupFCM = useCallback(async (phone: string) => {
     if (typeof window === "undefined") return;
     
-    // التحقق من توافق المتصفح (مهم جداً للسامسونج وسفاري)
     const isCompatible = 'serviceWorker' in navigator && 'Notification' in window && 'PushManager' in window;
     if (!isCompatible) return;
 
@@ -150,23 +149,31 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       
       const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
       
-      // جلب التوكن بدون انتظار معطل
+      const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+      if (!vapidKey) {
+        console.warn("FCM: NEXT_PUBLIC_FIREBASE_VAPID_KEY is missing. Notifications will not be registered.");
+        return;
+      }
+
       getToken(messaging, { 
         serviceWorkerRegistration: registration,
-        vapidKey: "BIP_S-E6V-I3z7T-P7vR7D-W7Z-C-V-D-E-R-A-G-H-E-B" // مثال، سيستخدم الفعلي من env
+        vapidKey: vapidKey
       }).then(async (token) => {
         if (token) {
           const phoneClean = phone.trim();
           const q = query(collection(db, "users"), where("phone", "==", phoneClean));
           const snap = await getDocs(q);
           if (!snap.empty) {
-            await updateDoc(doc(db, "users", snap.docs[0].id), { fcmToken: token });
+            const userDoc = snap.docs[0];
+            if (userDoc.data().fcmToken !== token) {
+              await updateDoc(doc(db, "users", userDoc.id), { fcmToken: token });
+            }
           }
         }
-      }).catch(err => logTechnicalError("FCM Token Fetch", err));
+      }).catch(err => logTechnicalError("FCM Token Persistence", err));
 
     } catch (e: any) {
-      logTechnicalError("FCM Setup", e);
+      logTechnicalError("FCM Setup Architecture", e);
     }
   }, []);
 
@@ -180,7 +187,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           if (userPhone) setupFCM(userPhone);
         }
       } catch (e) {
-        logTechnicalError("Permission Request", e);
+        logTechnicalError("Permission Request Flow", e);
       }
     }
   };
@@ -215,7 +222,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setPasswordRequests(passSnap.docs.map(d => ({ ...d.data(), id: d.id })));
       }
     } catch (e: any) {
-       logTechnicalError("Data Refresh", e);
+       logTechnicalError("Cloud Data Refresh", e);
     }
   }, [isLoggedIn, userPhone, sortTransactionsClientSide]);
 
@@ -272,7 +279,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setTransactions(sortedTxs);
         isInitialLoad.current = false;
       } catch (e) {
-        logTechnicalError("Transaction Stream", e);
+        logTechnicalError("Transaction Sync", e);
       }
     }));
 
@@ -318,7 +325,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const res = await processAdminAction(id, action);
       if (!res.success) throw new Error("Database Write Failed");
       
-      // إرسال الإشعار بشكل صامت وغير معطل
       if (tx.userPhone) {
         const title = action === 'approve' ? "تم تحديث الرصيد" : "طلب مرفوض";
         const body = action === 'approve' 
@@ -327,7 +333,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         triggerPushSilently(tx.userPhone, title, body);
       }
     } catch (e) {
-      logTechnicalError("Admin Action", e);
+      logTechnicalError("Admin Finalization", e);
     }
   };
 
@@ -336,7 +342,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const res = await updateUserBalanceDirectlyAction(phone, amount, operation);
       if (!res.success) throw new Error();
     } catch (e) {
-      logTechnicalError("Balance Update", e);
+      logTechnicalError("Balance Direct Update", e);
     }
   };
 
@@ -362,13 +368,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       };
 
       await addDoc(collection(db, "transactions"), txData);
-      
-      // تنبيه المدير بوجود طلب شحن جديد (خصوصاً للشام كاش اليدوي)
       triggerPushSilently(ADMIN_PHONE, "طلب شحن جديد", `هناك طلب شحن بقيمة ${amount} ل.س من ${userName}`);
       
     } catch (e: any) {
       setUserBalance(before);
-      logTechnicalError("Deduct Balance", e);
+      logTechnicalError("Deduction Logic Failure", e);
     }
   };
 
@@ -388,13 +392,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       };
 
       await addDoc(collection(db, "transactions"), txData);
-      
-      // تنبيه المدير - صامت وغير معطل
       triggerPushSilently(ADMIN_PHONE, "طلب إيداع جديد", `قام ${userName} بإرسال إيداع بقيمة ${amount} ل.س`);
       
       alert("تم إرسال طلبك بنجاح للمدير.");
     } catch (error: any) { 
-        logTechnicalError("Deposit Submission", error);
+        logTechnicalError("Deposit Submission Crash Protection", error);
         alert("فشل في إرسال الطلب: " + (error.message || "خطأ غير معروف"));
     }
   };
@@ -447,6 +449,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
 export function useUser() {
   const context = useContext(UserContext);
-  if (context === undefined) throw new Error('useUser missing');
+  if (context === undefined) throw new Error('useUser context is missing');
   return context;
 }
