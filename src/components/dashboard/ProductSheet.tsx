@@ -41,47 +41,36 @@ export function ProductSheet({
   const [fetching, setFetching] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [ordering, setOrdering] = useState<string | null>(null);
+  
+  // States for inputs
   const [globalTargetId, setGlobalTargetId] = useState("");
   const [dynamicAmount, setDynamicAmount] = useState<string>("");
-  const [amountError, setAmountError] = useState<string | null>(null);
   
   const { toast } = useToast();
   const { currency, userBalance, deductBalance } = useUser();
 
   const isShamCash = serviceName === "شام كاش" || filterValue === "Sham Cash";
 
-  // حساب التكلفة الكلية لشام كاش (المبلغ * 1.02) بدقة عشرية كاملة وبدون أي تقريب
-  const calculatedCost = useMemo(() => {
-    if (!isShamCash || !dynamicAmount) return 0;
-    const amount = Number(dynamicAmount);
-    if (isNaN(amount)) return 0;
-    return amount * 1.02;
-  }, [isShamCash, dynamicAmount]);
-
-  // تنسيق السعر بالأرقام الإنجليزية القياسية وعملة "ل.س" حصراً وبدون تقريب
-  const formattedShamPrice = useMemo(() => {
-    return `${calculatedCost.toFixed(1).replace('.0', '')} ل.س`;
-  }, [calculatedCost]);
-
-  // التحقق من صحة المبلغ لشام كاش
-  useEffect(() => {
-    if (isShamCash && dynamicAmount) {
-      const val = Number(dynamicAmount);
-      if (val < 100) setAmountError("يجب أن تكون الكمية 100 أو أكثر");
-      else if (val > 50000) setAmountError("يجب أن تكون الكمية 50,000 أو أقل");
-      else setAmountError(null);
-    } else {
-      setAmountError(null);
-    }
-  }, [dynamicAmount, isShamCash]);
-
-  // منطق التحقق الصارم لتفعيل زر الإرسال بنسق اللون البنفسجي
+  // SIMPLE VALIDATION LOGIC
   const isShamValid = useMemo(() => {
-    return globalTargetId.trim() !== "" && 
-           Number(dynamicAmount) >= 100 && 
-           Number(dynamicAmount) <= 50000 && 
-           !amountError;
-  }, [globalTargetId, dynamicAmount, amountError]);
+    const hasAccount = globalTargetId && globalTargetId.trim().length > 0;
+    const amountNum = Number(dynamicAmount);
+    const hasValidAmount = !isNaN(amountNum) && amountNum >= 100 && amountNum <= 50000;
+    
+    // Debug log as requested by Admin
+    console.log("Validation State:", { globalTargetId, dynamicAmount, isShamValid: !!(hasAccount && hasValidAmount) });
+    
+    return !!(hasAccount && hasValidAmount);
+  }, [globalTargetId, dynamicAmount]);
+
+  // Exact 1.02 Multiplier with no rounding, forced English numerals
+  const formattedShamPrice = useMemo(() => {
+    if (!isShamCash || !dynamicAmount) return "0 ل.س";
+    const amount = Number(dynamicAmount);
+    if (isNaN(amount)) return "0 ل.س";
+    const cost = amount * 1.02;
+    return `${cost.toFixed(1).replace('.0', '')} ل.س`;
+  }, [isShamCash, dynamicAmount]);
 
   const fetchProducts = useCallback(async () => {
     setFetching(true);
@@ -108,16 +97,11 @@ export function ProductSheet({
     if (!allProducts.length) return [];
     const searchKey = filterValue.toLowerCase().trim();
     
-    const isMobileCredit = searchKey.includes("mtn") || 
-                           searchKey.includes("syriatel") || 
-                           searchKey.includes("elux") ||
-                           searchKey.includes("sham");
-
     return allProducts.filter(p => {
       const prodName = (p.name || "").toLowerCase();
       const catName = (p.category_name || "").toLowerCase();
       
-      // استبعاد باقات "شامنا" فوراً وبشكل صارم
+      // Strict block for "Shamna" items
       if (prodName.includes("shamna") || prodName.includes("شامنا")) return false;
 
       const isSyriatelMatch = searchKey === "syriatel" && (prodName.includes("سيريتل") || catName.includes("سيريتل") || prodName.includes("syriatel"));
@@ -125,56 +109,31 @@ export function ProductSheet({
       const isShamMatch = (searchKey === "sham cash") && (prodName.includes("شام") || catName.includes("شام") || prodName.includes("sham"));
       
       if (isSyriatelMatch || isMTNMatch || isShamMatch) return true;
-
       if (searchKey === "tiktok") return prodName.includes("tiktok") || prodName.includes("تيك") || catName.includes("تيك");
       if (searchKey === "bigo") return prodName.includes("bigo") || prodName.includes("بيجو");
       if (searchKey === "jawaker") return prodName.includes("jawaker") || prodName.includes("جواكر");
       
       return prodName.includes(searchKey) || catName.includes(searchKey);
-      
     }).map(p => {
       const price = Number(p.price);
-      const prodName = (p.name || "").toLowerCase();
-      
-      let finalPrice = price;
-      
-      if (isMobileCredit && !isShamCash) {
-        const unitsMatch = prodName.match(/\d+/);
-        const units = unitsMatch ? parseInt(unitsMatch[0]) : 0;
-        const markup = (units / 10) * 0.20;
-        finalPrice = price + markup;
-      } else if (!isShamCash) {
-        finalPrice = price + 2;
-      }
-
-      return {
-        ...p,
-        customerPrice: finalPrice.toFixed(2)
-      };
+      let finalPrice = price + 2; // Default markup for games/services
+      return { ...p, customerPrice: finalPrice.toFixed(2) };
     });
-  }, [allProducts, filterValue, isShamCash]);
+  }, [allProducts, filterValue]);
 
   const shamCashBaseProduct = useMemo(() => {
     return filteredProducts.find(p => p.name.includes("شام") || p.name.toLowerCase().includes("sham"));
   }, [filteredProducts]);
 
   const handleOrder = async (product: any) => {
-    if (!globalTargetId || !globalTargetId.trim()) {
+    if (!isShamValid && isShamCash) return;
+    if (!globalTargetId.trim()) {
       toast({ title: "حقل مطلوب", description: "يرجى إدخال رقم الحساب المستهدف أولاً.", variant: "destructive" });
       return;
     }
 
-    let finalQty = 1;
-    let finalPrice = Number(product.customerPrice);
-
-    if (isShamCash) {
-      if (!dynamicAmount || amountError) {
-        toast({ title: "خطأ في المبلغ", description: amountError || "يرجى إدخال مبلغ صحيح لشام كاش.", variant: "destructive" });
-        return;
-      }
-      finalQty = Number(dynamicAmount);
-      finalPrice = calculatedCost; 
-    }
+    const amt = Number(dynamicAmount);
+    const finalPrice = isShamCash ? (amt * 1.02) : Number(product.customerPrice);
 
     if (userBalance < finalPrice) {
       toast({ title: "رصيد غير كافٍ", description: "يرجى شحن محفظتك أولاً لإتمام العملية.", variant: "destructive" });
@@ -190,7 +149,7 @@ export function ProductSheet({
           body: JSON.stringify({
               product_id: product.id,
               playerId: globalTargetId,
-              qty: finalQty,
+              qty: isShamCash ? amt : 1,
               order_uuid: crypto.randomUUID()
           })
       });
@@ -199,8 +158,8 @@ export function ProductSheet({
 
       if (result.success) {
           const isPending = result.status_type === 'pending';
-          deductBalance(finalPrice, `${product.name} - الحساب: ${globalTargetId} (مبلغ: ${finalQty})`, isPending ? 'Pending' : 'Completed', result.order_id);
-          toast({ title: isPending ? "الطلب قيد المعالجة" : "تمت العملية", description: result.message });
+          deductBalance(finalPrice, `${product.name} - الحساب: ${globalTargetId} (مبلغ: ${isShamCash ? amt : ''})`, isPending ? 'Pending' : 'Completed', result.order_id);
+          toast({ title: isPending ? "الطلب قيد الانتظار" : "تمت العملية", description: result.message });
       } else {
           toast({ title: "فشل الطلب", description: result.message, variant: "destructive" });
       }
@@ -237,14 +196,12 @@ export function ProductSheet({
 
           <div className="space-y-3">
              <div className="bg-primary/5 p-3 rounded-2xl border border-primary/10 space-y-1.5">
-                <label className="text-[10px] font-black text-primary pr-1 block">
-                  رقم الحساب أو الموبايل
-                </label>
+                <label className="text-[10px] font-black text-primary pr-1 block">رقم الحساب أو الموبايل</label>
                 <div className="relative">
                    <User className="absolute right-3 top-3 h-4 w-4 text-primary opacity-50" />
                    <Input 
                      type="text"
-                     placeholder="رقم الحساب المطلوب" 
+                     placeholder="أدخل رقم الحساب أو الـ Hash" 
                      className="text-right h-11 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-primary font-bold" 
                      value={globalTargetId} 
                      onChange={(e) => setGlobalTargetId(e.target.value)} 
@@ -260,11 +217,8 @@ export function ProductSheet({
                       <Wallet className="absolute right-3 top-3 h-4 w-4 text-emerald-600 opacity-50" />
                       <Input 
                         type="number"
-                        placeholder="أدخل مابين 100 و 50000" 
-                        className={cn(
-                          "text-right h-12 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-emerald-500 text-lg font-black",
-                          amountError && "ring-2 ring-red-500"
-                        )} 
+                        placeholder="مابين 100 و 50000" 
+                        className="text-right h-12 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-emerald-500 text-lg font-black"
                         value={dynamicAmount} 
                         onChange={(e) => setDynamicAmount(e.target.value)} 
                       />
@@ -276,20 +230,14 @@ export function ProductSheet({
                      <span className="text-lg font-black text-emerald-600" dir="ltr">{formattedShamPrice}</span>
                   </div>
 
-                  {amountError && (
-                    <p className="text-[10px] text-red-600 font-bold pr-1 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" /> {amountError}
-                    </p>
-                  )}
-
                   <div className="pt-2">
                     <Button 
                       onClick={() => handleOrder(shamCashBaseProduct)} 
-                      disabled={!isShamValid || ordering === String(shamCashBaseProduct?.id) || !shamCashBaseProduct}
+                      disabled={!isShamValid || ordering === String(shamCashBaseProduct?.id)}
                       className={cn(
                         "w-full h-14 font-black text-lg rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2",
                         isShamValid 
-                          ? "bg-primary hover:bg-primary/90 text-white shadow-primary/20" 
+                          ? "bg-[#8b5cf6] hover:bg-[#7c3aed] text-white shadow-purple-200" 
                           : "bg-gray-300 text-gray-500 cursor-not-allowed shadow-none"
                       )}
                     >
