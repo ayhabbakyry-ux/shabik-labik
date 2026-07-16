@@ -75,13 +75,14 @@ export function ProductSheet({
       
       if (Array.isArray(data)) {
         setAllProducts(data);
+        if (data.length === 0) setErrorMsg("السيرفر أرجع قائمة فارغة (رصيد الموفر قد يكون 0)");
       } else if (data && data.error) {
         setErrorMsg(data.error);
       } else {
-        setErrorMsg("تعذر جلب البيانات من السيرفر.");
+        setErrorMsg("تعذر تحليل البيانات القادمة من السيرفر.");
       }
     } catch (error: any) {
-      setErrorMsg("خطأ في الاتصال بالسيرفر.");
+      setErrorMsg("فشل الاتصال بمسار المنتجات المحلي.");
     } finally {
       setFetching(false);
     }
@@ -247,7 +248,14 @@ export function ProductSheet({
 
                     <div className="mt-4 p-3 bg-gray-100 border border-gray-300 rounded text-xs text-black max-h-48 overflow-y-auto">
                       <p className="font-bold text-red-600 mb-1">📋 قائمة الخدمات المتاحة (للتصحيح):</p>
-                      {allProducts && allProducts.length > 0 ? (
+                      {fetching ? (
+                         <p className="text-blue-600 animate-pulse text-center py-2">جاري سحب البيانات من سيرفر الراغب...</p>
+                      ) : errorMsg ? (
+                         <div className="bg-red-50 p-2 rounded border border-red-200">
+                            <p className="text-red-700 font-black">خطأ السيرفر:</p>
+                            <p className="text-red-600">{errorMsg}</p>
+                         </div>
+                      ) : allProducts && allProducts.length > 0 ? (
                         allProducts.map((s) => (
                           <div key={s.id} className="border-b py-1 flex justify-between">
                             <span>{s.name}</span>
@@ -255,7 +263,7 @@ export function ProductSheet({
                           </div>
                         ))
                       ) : (
-                        <p className="text-gray-500 text-center">جاري جلب الخدمات أو القائمة فارغة...</p>
+                        <p className="text-gray-500 text-center">القائمة فارغة تماماً.</p>
                       )}
                     </div>
 
