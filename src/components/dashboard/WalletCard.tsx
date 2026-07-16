@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -92,7 +91,7 @@ export function WalletCard() {
       
       <div className="text-gray-500 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">الرصيد المتاح حالياً</div>
       <div className="text-white text-4xl md:text-5xl font-black mb-8 tracking-tighter">
-        {(userBalance || 0).toLocaleString()} <span className="text-xs font-medium text-gray-500">{currency}</span>
+        {(userBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs font-medium text-gray-500">{currency}</span>
       </div>
       
       <div className="flex gap-3 w-full">

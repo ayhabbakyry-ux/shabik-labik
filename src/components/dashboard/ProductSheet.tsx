@@ -84,13 +84,13 @@ export function ProductSheet({
     return !!(hasAccount && hasValidAmount);
   }, [globalTargetId, dynamicAmount]);
 
-  // تسعير شام كاش (المبلغ + 2%)
+  // تسعير شام كاش (المبلغ + 2%) مع تنسيق خانتين عشريتين
   const formattedShamPrice = useMemo(() => {
-    if (!isShamCash || !dynamicAmount) return "0 ل.س";
+    if (!isShamCash || !dynamicAmount) return "0.00 ل.س";
     const amount = Number(dynamicAmount);
-    if (isNaN(amount)) return "0 ل.س";
+    if (isNaN(amount)) return "0.00 ل.س";
     const cost = amount * 1.02;
-    return `${cost.toFixed(1).replace('.0', '')} ل.س`;
+    return `${cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ل.س`;
   }, [isShamCash, dynamicAmount]);
 
   const fetchProducts = useCallback(async () => {
@@ -126,7 +126,6 @@ export function ProductSheet({
       quantity = amt;
     } else {
       if (!product) return;
-      // استخدام منطق الحساب الجديد بناءً على نوع المنتج واسمه
       finalPrice = calculateProductPrice(product);
       serviceId = Number(product.id);
       link = globalTargetId;
@@ -317,7 +316,6 @@ export function ProductSheet({
                           if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
                           return prodName.includes(searchKey);
                       }).map((product) => {
-                        // تطبيق منطق الحساب الجديد بناءً على نوع المنتج واسمه
                         const finalPrice = calculateProductPrice(product);
                         return (
                           <Card key={product.id} className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-all">
@@ -328,7 +326,7 @@ export function ProductSheet({
                                 </div>
                                 <div className="text-right">
                                   <h4 className="font-bold text-foreground text-[13px] leading-tight">{product.name}</h4>
-                                  <p className="text-primary font-black text-sm mt-1">{finalPrice.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})} <span className="text-[9px] font-medium">ل.س</span></p>
+                                  <p className="text-primary font-black text-sm mt-1">{finalPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} <span className="text-[9px] font-medium">ل.س</span></p>
                                 </div>
                               </div>
                               <Button 

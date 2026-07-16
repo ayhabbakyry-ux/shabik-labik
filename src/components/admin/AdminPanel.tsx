@@ -192,7 +192,7 @@ export function AdminPanel() {
                       <div className="text-right w-full md:w-auto">
                         <p className="text-lg font-black">{tx.userName || "مستخدم مجهول"}</p>
                         <p className="text-xs text-muted-foreground font-mono">{tx.userPhone}</p>
-                        <p className="text-2xl font-black text-green-600 mt-2">{tx.amount.toLocaleString()} {currency}</p>
+                        <p className="text-2xl font-black text-green-600 mt-2">{tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}</p>
                       </div>
                       <div className="flex flex-col gap-2 w-full md:w-auto min-w-[150px]">
                         {tx.proofImage && (
@@ -244,7 +244,7 @@ export function AdminPanel() {
                             <p>{user.name}</p>
                             <p className="text-[10px] text-muted-foreground font-mono">{user.phone}</p>
                           </TableCell>
-                          <TableCell className="text-right font-black text-green-600">{(user.balance || 0).toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-black text-green-600">{(user.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                           <TableCell className="text-center">
                             <div className="flex items-center justify-center gap-1 min-w-[180px]">
                               <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg bg-red-50 text-red-600" onClick={() => handleUpdateBalance(user.phone, 'subtract')}><Minus className="h-4 w-4" /></Button>
@@ -275,7 +275,7 @@ export function AdminPanel() {
                       <div className="text-right space-y-1">
                           <p className="font-black text-xl text-primary">{req.userName}</p>
                           <p className="font-mono text-sm text-muted-foreground">{req.phone}</p>
-                          <p className="text-lg font-black text-green-600">{(req.balance || 0).toLocaleString()} {currency}</p>
+                          <p className="text-lg font-black text-green-600">{(req.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}</p>
                       </div>
                       <Button onClick={() => handleResetPassword(req.phone, req.id)} className="bg-primary text-white font-bold h-12 px-8 rounded-2xl shadow-lg shadow-primary/10">تهيئة 123456</Button>
                     </CardContent>

@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -73,14 +72,14 @@ export default function WalletPage() {
             />
             <span className="text-white font-bold text-lg font-headline">رصيدك الحالي</span>
             <span className="text-white font-black text-2xl mt-1">
-              SYP {userBalance.toLocaleString()}
+              SYP {userBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
 
           <div className="min-w-[85%] sm:min-w-[300px] bg-[#ff5252] p-6 rounded-2xl flex flex-col justify-between h-40 snap-center shadow-xl relative overflow-hidden group">
             <span className="text-[10px] font-bold self-start bg-black/20 px-2 py-0.5 rounded backdrop-blur-sm z-10">SYP</span>
             <div className="text-right z-10">
-              <h3 className="text-3xl font-black tracking-wide font-mono">178,909</h3>
+              <h3 className="text-3xl font-black tracking-wide font-mono">178,909.00</h3>
               <p className="text-sm opacity-90 font-medium mt-2">إجمالي مشتريات</p>
             </div>
             <ShoppingBag className="absolute left-[-10px] bottom-[-10px] h-24 w-24 opacity-10 -rotate-12 group-hover:scale-110 transition-transform" />
@@ -89,7 +88,7 @@ export default function WalletPage() {
           <div className="min-w-[85%] sm:min-w-[300px] bg-[#7c4dff] p-6 rounded-2xl flex flex-col justify-between h-40 snap-center shadow-xl relative overflow-hidden group">
             <span className="text-[10px] font-bold self-start bg-black/20 px-2 py-0.5 rounded backdrop-blur-sm z-10">SYP</span>
             <div className="text-right z-10">
-              <h3 className="text-3xl font-black tracking-wide font-mono">316,178</h3>
+              <h3 className="text-3xl font-black tracking-wide font-mono">316,178.00</h3>
               <p className="text-sm opacity-90 font-medium mt-2">الوارد</p>
             </div>
             <ArrowRight className="absolute left-[-10px] bottom-[-10px] h-24 w-24 opacity-10 rotate-[135deg] group-hover:scale-110 transition-transform" />
