@@ -1,6 +1,6 @@
 "use client";
 
-import { Smartphone, SmartphoneNfc, Phone, Gamepad2, Zap, Radio, Sword } from "lucide-react";
+import { Smartphone, SmartphoneNfc, Phone, Gamepad2, Zap, Radio, Sword, Landmark } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ProductSheet } from "./ProductSheet";
 
@@ -45,6 +45,15 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
           color: "text-red-600", 
           bg: "bg-red-50",
           imageUrl: "https://i.postimg.cc/9MwTgJxR/Screenshot-20260712-221408.png"
+        },
+        { 
+          id: "sham_cash", 
+          name: "شام كاش", 
+          filter: "Sham Cash", 
+          icon: Landmark, 
+          color: "text-emerald-600", 
+          bg: "bg-emerald-50",
+          imageUrl: "https://i.postimg.cc/Ssn0vPz0/Sham-Cash-Logo.png"
         },
         { id: "elux", name: "ELUX", filter: "ELUX", icon: SmartphoneNfc, color: "text-blue-600", bg: "bg-blue-50" },
       ]
