@@ -4,9 +4,9 @@ import { getAuth } from "firebase/auth";
 import { getMessaging, isSupported } from "firebase/messaging";
 
 /**
- * @fileOverview إعدادات الفايربيز المطورة - نسخة الاستقرار القصوى (V18).
- * تم حل مشكلة انقطاع اتصال WebChannelConnection RPC 'Listen' stream عبر فرض Long Polling.
- * تم تحديد معرف قاعدة البيانات بشكل صريح لضمان استقرار العمليات في كافة الشبكات.
+ * @fileOverview إعدادات الفايربيز النهائية (حقن مباشر للمفاتيح V20).
+ * تم حقن الـ API Keys مباشرة لضمان العمل على Vercel بدون ملفات .env.
+ * تم تفعيل Long Polling لحل مشكلة انقطاع اتصال Firestore في الشبكات الضعيفة.
  */
 
 const firebaseConfig = {
@@ -23,30 +23,29 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 let db: Firestore;
 
-// معرف قاعدة البيانات الافتراضي (default) لضمان الربط الصحيح
+// معرف قاعدة البيانات الافتراضي (default)
 const DATABASE_ID = "(default)";
 
-// الحل الجذري لمشاكل الاتصال في بيئة المتصفح (الموبايل والشبكات الضعيفة)
+// الحل الجذري لمشاكل الاتصال في الموبايل (Long Polling)
 if (typeof window !== "undefined") {
     try {
-        // استخدام initializeFirestore لفرض الإعدادات المتقدمة (Long Polling)
+        // فرض الإعدادات المتقدمة لضمان استقرار البث المباشر للبيانات
         db = initializeFirestore(app, {
             experimentalForceLongPolling: true,
-            // منع تعارض القنوات في المتصفحات التي تدعم الاتصال المتعدد
         }, DATABASE_ID);
-        console.log("🔥 Firestore Initialized with Long Polling");
+        console.log("🚀 Firebase: Connected with Stability Protocol (Long Polling)");
     } catch (e) {
-        // في حال كان المحرك قد بدأ بالفعل، نستخدم getFirestore مباشرة
+        // في حال كان المحرك قد بدأ بالفعل
         db = getFirestore(app, DATABASE_ID);
     }
 } else {
-    // بيئة السيرفر (SSR) - لا نحتاج لـ Long Polling هنا
+    // بيئة السيرفر
     db = getFirestore(app, DATABASE_ID);
 }
 
 const auth = getAuth(app);
 
-// دالة جلب Messaging بأمان لمنع انهيار الموقع في البيئات غير المدعومة (مثل Incognito)
+// جلب Messaging بأمان
 export const getMessagingSafe = async () => {
     if (typeof window !== "undefined" && await isSupported()) {
         return getMessaging(app);
