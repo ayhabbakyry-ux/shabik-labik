@@ -147,7 +147,7 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
                   <CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-3">
                     <div className={`w-20 h-20 rounded-full ${service.bg} flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner overflow-hidden`}>
                       {service.imageUrl ? (
-                        <img src={service.imageUrl} alt={service.name} className="w-full h-full object-cover" />
+                        <img src={service.imageUrl} alt={service.name} className="w-full h-full object-contain" />
                       ) : (
                         <service.icon className={`h-10 w-10 ${service.color}`} />
                       )}
