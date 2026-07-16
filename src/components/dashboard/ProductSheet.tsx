@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PackageX, RefreshCw, ShoppingCart, AlertCircle, ArrowRight, User, Wallet } from "lucide-react";
+import { Loader2, PackageX, RefreshCw, ShoppingCart, AlertCircle, ArrowRight, User, Wallet, Info } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useUser } from "@/lib/store";
 import { Input } from "@/components/ui/input";
@@ -50,7 +50,15 @@ export function ProductSheet({
 
   const isShamCash = serviceName === "شام كاش" || filterValue === "Sham Cash";
 
-  // تصفية الأخطاء للمبلغ في شام كاش
+  // حساب التكلفة الكلية لشام كاش (المبلغ * 1.02)
+  const calculatedCost = useMemo(() => {
+    if (!isShamCash || !dynamicAmount) return 0;
+    const amount = Number(dynamicAmount);
+    if (isNaN(amount)) return 0;
+    return Math.ceil(amount * 1.02);
+  }, [isShamCash, dynamicAmount]);
+
+  // التحقق من صحة المبلغ لشام كاش
   useEffect(() => {
     if (isShamCash && dynamicAmount) {
       const val = Number(dynamicAmount);
@@ -96,6 +104,9 @@ export function ProductSheet({
       const prodName = (p.name || "").toLowerCase();
       const catName = (p.category_name || "").toLowerCase();
       
+      // استبعاد باقات "شامنا" فوراً وبشكل صارم
+      if (prodName.includes("shamna") || prodName.includes("شامنا")) return false;
+
       const isSyriatelMatch = searchKey === "syriatel" && (prodName.includes("سيريتل") || catName.includes("سيريتل") || prodName.includes("syriatel"));
       const isMTNMatch = (searchKey === "mtn") && (prodName.includes("mtn") || prodName.includes("ام تي ان") || catName.includes("mtn"));
       const isShamMatch = (searchKey === "sham cash") && (prodName.includes("شام") || catName.includes("شام") || prodName.includes("sham"));
@@ -130,24 +141,27 @@ export function ProductSheet({
     });
   }, [allProducts, filterValue, isShamCash]);
 
+  // الحصول على المنتج الأساسي لشام كاش (الذي يستخدم الكمية الديناميكية)
+  const shamCashBaseProduct = useMemo(() => {
+    return filteredProducts.find(p => p.name.includes("شام") || p.name.toLowerCase().includes("sham"));
+  }, [filteredProducts]);
+
   const handleOrder = async (product: any) => {
-    // التحقق من الحساب
     if (!globalTargetId || !globalTargetId.trim()) {
-      toast({ title: "حقل مطلوب", description: "يرجى إدخال الحساب المستهدف في الأعلى أولاً.", variant: "destructive" });
+      toast({ title: "حقل مطلوب", description: "يرجى إدخال رقم الحساب المستهدف أولاً.", variant: "destructive" });
       return;
     }
 
     let finalQty = 1;
     let finalPrice = Number(product.customerPrice);
 
-    // منطق شام كاش الخاص
     if (isShamCash) {
       if (!dynamicAmount || amountError) {
         toast({ title: "خطأ في المبلغ", description: amountError || "يرجى إدخال مبلغ صحيح لشام كاش.", variant: "destructive" });
         return;
       }
       finalQty = Number(dynamicAmount);
-      finalPrice = finalQty; // في شام كاش المبلغ هو السعر
+      finalPrice = calculatedCost; // استخدام السعر المضرب في 1.02
     }
 
     if (userBalance < finalPrice) {
@@ -164,7 +178,7 @@ export function ProductSheet({
           body: JSON.stringify({
               product_id: product.id,
               playerId: globalTargetId,
-              qty: finalQty, // إرسال الكمية الديناميكية
+              qty: finalQty, // إرسال المبلغ الأصلي ككمية للسيرفر
               order_uuid: crypto.randomUUID()
           })
       });
@@ -173,7 +187,8 @@ export function ProductSheet({
 
       if (result.success) {
           const isPending = result.status_type === 'pending';
-          deductBalance(finalPrice, `${product.name} - الحساب: ${globalTargetId} (كمية: ${finalQty})`, isPending ? 'Pending' : 'Completed', result.order_id);
+          // خصم السعر مع العمولة (1.02) من المحفظة
+          deductBalance(finalPrice, `${product.name} - الحساب: ${globalTargetId} (مبلغ: ${finalQty})`, isPending ? 'Pending' : 'Completed', result.order_id);
           toast({ title: isPending ? "الطلب قيد المعالجة" : "تمت العملية", description: result.message });
       } else {
           toast({ title: "فشل الطلب", description: result.message, variant: "destructive" });
@@ -204,21 +219,22 @@ export function ProductSheet({
             <div className="text-right">
               <SheetTitle className="text-xl font-bold font-headline text-primary">{serviceName}</SheetTitle>
               <SheetDescription className="text-xs">
-                {isShamCash ? "أدخل رقم الحساب والمبلغ المطلوب" : "أدخل المعرف (ID) ثم اختر الباقة"}
+                {isShamCash ? "أدخل رقم الحساب والمبلغ المطلوب شحنه" : "أدخل المعرف (ID) ثم اختر الباقة"}
               </SheetDescription>
             </div>
           </SheetHeader>
 
+          {/* نموذج إدخال البيانات الموحد */}
           <div className="space-y-3">
              <div className="bg-primary/5 p-3 rounded-2xl border border-primary/10 space-y-1.5">
                 <label className="text-[10px] font-black text-primary pr-1 block">
-                  {isShamCash ? "رقم الحساب / الموبايل" : "المعرف المطلوب (Player ID / Number)"}
+                  رقم الحساب أو الموبايل
                 </label>
                 <div className="relative">
                    <User className="absolute right-3 top-3 h-4 w-4 text-primary opacity-50" />
                    <Input 
-                     placeholder="أدخل البيانات هنا" 
-                     className="text-right h-11 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-primary" 
+                     placeholder="رقم الحساب المطلوب" 
+                     className="text-right h-11 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-primary font-bold" 
                      value={globalTargetId} 
                      onChange={(e) => setGlobalTargetId(e.target.value)} 
                    />
@@ -226,77 +242,105 @@ export function ProductSheet({
              </div>
 
              {isShamCash && (
-               <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-100 space-y-1.5 animate-in slide-in-from-top-2">
-                  <label className="text-[10px] font-black text-emerald-700 pr-1 block">المبلغ المطلوب (Quantity)</label>
-                  <div className="relative">
-                    <Wallet className="absolute right-3 top-3 h-4 w-4 text-emerald-600 opacity-50" />
-                    <Input 
-                      type="number"
-                      placeholder="أدخل مابين 100 و 50000" 
-                      className={`text-right h-11 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-emerald-500 ${amountError ? 'ring-2 ring-red-500' : ''}`} 
-                      value={dynamicAmount} 
-                      onChange={(e) => setDynamicAmount(e.target.value)} 
-                    />
+               <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 space-y-3 animate-in slide-in-from-top-2">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-emerald-700 pr-1 block">المبلغ المطلوب شحنه</label>
+                    <div className="relative">
+                      <Wallet className="absolute right-3 top-3 h-4 w-4 text-emerald-600 opacity-50" />
+                      <Input 
+                        type="number"
+                        placeholder="أدخل مابين 100 و 50000" 
+                        className={`text-right h-12 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-emerald-500 text-lg font-black ${amountError ? 'ring-2 ring-red-500' : ''}`} 
+                        value={dynamicAmount} 
+                        onChange={(e) => setDynamicAmount(e.target.value)} 
+                      />
+                    </div>
                   </div>
+
+                  <div className="flex items-center justify-between bg-white/50 p-3 rounded-xl border border-emerald-100">
+                     <span className="text-xs font-bold text-emerald-800">التكلفة الإجمالية:</span>
+                     <span className="text-lg font-black text-emerald-600">{calculatedCost.toLocaleString()} {currency}</span>
+                  </div>
+
                   {amountError && (
-                    <p className="text-[10px] text-red-600 font-bold pr-1">{amountError}</p>
+                    <p className="text-[10px] text-red-600 font-bold pr-1 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" /> {amountError}
+                    </p>
                   )}
+
+                  <div className="pt-2">
+                    <Button 
+                      onClick={() => handleOrder(shamCashBaseProduct)} 
+                      disabled={ordering === String(shamCashBaseProduct?.id) || !!amountError || !dynamicAmount || !shamCashBaseProduct}
+                      className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-lg rounded-2xl shadow-xl shadow-emerald-100 transition-all active:scale-95"
+                    >
+                      {ordering === String(shamCashBaseProduct?.id) ? <Loader2 className="h-5 w-5 animate-spin" /> : "إرسال طلب الشحن"}
+                    </Button>
+                    <p className="text-center text-[10px] text-red-600 font-black mt-3 animate-pulse">
+                      ⚠️ تنبيه: هذا المنتج يعمل بشكل يدوي.
+                    </p>
+                  </div>
                </div>
              )}
           </div>
         </div>
 
+        {/* عرض المنتجات لغير شام كاش */}
         <div className="flex-1 overflow-hidden bg-muted/30">
-          {fetching ? (
-            <div className="h-full flex flex-col items-center justify-center gap-3">
-              <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="text-sm font-bold text-muted-foreground">جاري سحب البيانات...</p>
-            </div>
-          ) : errorMsg ? (
-            <div className="h-full p-6 flex flex-col items-center justify-center text-center gap-4">
-               <AlertCircle className="h-10 w-10 text-destructive" />
-               <p className="font-bold text-destructive text-sm leading-relaxed">{errorMsg}</p>
-               <Button onClick={fetchProducts} variant="outline" size="sm" className="rounded-xl font-bold">إعادة المحاولة</Button>
-            </div>
-          ) : (
-            <ScrollArea className="h-full p-4">
-              {filteredProducts.length > 0 ? (
-                <div className="grid gap-3 pb-24">
-                  {filteredProducts.map((product) => (
-                    <Card key={product.id} className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-all">
-                      <CardContent className="p-4 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3 flex-1">
-                          <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
-                            <ShoppingCart className="h-4 w-4" />
-                          </div>
-                          <div className="text-right">
-                            <h4 className="font-bold text-foreground text-[13px] leading-tight">{product.name}</h4>
-                            {!isShamCash && (
+          {!isShamCash && (
+            fetching ? (
+              <div className="h-full flex flex-col items-center justify-center gap-3">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                <p className="text-sm font-bold text-muted-foreground">جاري سحب البيانات...</p>
+              </div>
+            ) : errorMsg ? (
+              <div className="h-full p-6 flex flex-col items-center justify-center text-center gap-4">
+                 <AlertCircle className="h-10 w-10 text-destructive" />
+                 <p className="font-bold text-destructive text-sm leading-relaxed">{errorMsg}</p>
+                 <Button onClick={fetchProducts} variant="outline" size="sm" className="rounded-xl font-bold">إعادة المحاولة</Button>
+              </div>
+            ) : (
+              <ScrollArea className="h-full p-4">
+                {filteredProducts.length > 0 ? (
+                  <div className="grid gap-3 pb-24">
+                    {filteredProducts.map((product) => (
+                      <Card key={product.id} className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-all">
+                        <CardContent className="p-4 flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3 flex-1">
+                            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+                              <ShoppingCart className="h-4 w-4" />
+                            </div>
+                            <div className="text-right">
+                              <h4 className="font-bold text-foreground text-[13px] leading-tight">{product.name}</h4>
                               <p className="text-primary font-black text-sm mt-1">{Number(product.customerPrice).toLocaleString()} <span className="text-[9px] font-medium">{currency}</span></p>
-                            )}
-                            {isShamCash && (
-                              <p className="text-emerald-600 font-bold text-[10px] mt-1">تعبئة رصيد شام كاش</p>
-                            )}
+                            </div>
                           </div>
-                        </div>
-                        <Button 
-                          onClick={() => handleOrder(product)} 
-                          disabled={ordering === String(product.id) || (isShamCash && !!amountError)}
-                          className={`rounded-xl font-bold px-6 h-10 text-xs shadow-lg ${isShamCash ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' : 'bg-primary shadow-primary/10'}`}
-                        >
-                          {ordering === String(product.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : isShamCash ? "شحن الكمية" : "شحن"}
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4">
-                  <PackageX className="h-10 w-10 opacity-30" />
-                  <p className="text-sm font-bold">لا توجد باقات متاحة لهذا القسم حالياً.</p>
-                </div>
-              )}
-            </ScrollArea>
+                          <Button 
+                            onClick={() => handleOrder(product)} 
+                            disabled={ordering === String(product.id)}
+                            className="rounded-xl font-bold px-6 h-10 text-xs shadow-lg bg-primary shadow-primary/10"
+                          >
+                            {ordering === String(product.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : "شحن"}
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4">
+                    <PackageX className="h-10 w-10 opacity-30" />
+                    <p className="text-sm font-bold">لا توجد باقات متاحة لهذا القسم حالياً.</p>
+                  </div>
+                )}
+              </ScrollArea>
+            )
+          )}
+
+          {isShamCash && !shamCashBaseProduct && !fetching && (
+             <div className="h-full flex flex-col items-center justify-center p-10 text-center gap-4">
+                <Info className="h-12 w-12 text-primary opacity-20" />
+                <p className="text-sm font-bold text-muted-foreground">جاري ربط الخدمة اليدوية بسيرفر المزود، يرجى المحاولة بعد قليل.</p>
+             </div>
           )}
         </div>
       </SheetContent>
