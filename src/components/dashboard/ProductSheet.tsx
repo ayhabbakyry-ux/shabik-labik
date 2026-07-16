@@ -50,12 +50,12 @@ export function ProductSheet({
 
   const isShamCash = serviceName === "شام كاش" || filterValue === "Sham Cash";
 
-  // حساب التكلفة الكلية لشام كاش (المبلغ * 1.02)
+  // حساب التكلفة الكلية لشام كاش (المبلغ * 1.02) باستخدام التقريب الرياضي القياسي
   const calculatedCost = useMemo(() => {
     if (!isShamCash || !dynamicAmount) return 0;
     const amount = Number(dynamicAmount);
     if (isNaN(amount)) return 0;
-    return Math.ceil(amount * 1.02);
+    return Math.round(amount * 1.02);
   }, [isShamCash, dynamicAmount]);
 
   // التحقق من صحة المبلغ لشام كاش
@@ -334,13 +334,6 @@ export function ProductSheet({
                 )}
               </ScrollArea>
             )
-          )}
-
-          {isShamCash && !shamCashBaseProduct && !fetching && (
-             <div className="h-full flex flex-col items-center justify-center p-10 text-center gap-4">
-                <Info className="h-12 w-12 text-primary opacity-20" />
-                <p className="text-sm font-bold text-muted-foreground">جاري ربط الخدمة اليدوية بسيرفر المزود، يرجى المحاولة بعد قليل.</p>
-             </div>
           )}
         </div>
       </SheetContent>
