@@ -4,13 +4,13 @@ import { UserProvider } from '@/lib/store';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
-  title: 'شام كاش - شبيك لبيك الرقمي',
+  title: 'شبيك لبيك - للخدمات الرقمية',
   description: 'المنصة الموثوقة لخدمات الشحن التلقائي والألعاب',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'شام كاش',
+    title: 'شبيك لبيك',
   },
   formatDetection: {
     telephone: false,
