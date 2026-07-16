@@ -17,6 +17,7 @@ import { Loader2, PackageX, RefreshCw, ShoppingCart, AlertCircle, ArrowRight, Us
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useUser } from "@/lib/store";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 interface ProductItem {
   id: string | number;
@@ -57,7 +58,7 @@ export function ProductSheet({
     return amount * 1.02;
   }, [isShamCash, dynamicAmount]);
 
-  // تنسيق السعر بالأرقام الإنجليزية القياسية وعملة "ل.س" حصراً
+  // تنسيق السعر بالأرقام الإنجليزية القياسية وعملة "ل.س" حصراً وبدون تقريب
   const formattedShamPrice = useMemo(() => {
     return `${calculatedCost.toFixed(1).replace('.0', '')} ل.س`;
   }, [calculatedCost]);
@@ -73,6 +74,14 @@ export function ProductSheet({
       setAmountError(null);
     }
   }, [dynamicAmount, isShamCash]);
+
+  // منطق التحقق الصارم لتفعيل زر الإرسال بنسق اللون البنفسجي
+  const isShamValid = useMemo(() => {
+    return globalTargetId.trim() !== "" && 
+           Number(dynamicAmount) >= 100 && 
+           Number(dynamicAmount) <= 50000 && 
+           !amountError;
+  }, [globalTargetId, dynamicAmount, amountError]);
 
   const fetchProducts = useCallback(async () => {
     setFetching(true);
@@ -252,7 +261,10 @@ export function ProductSheet({
                       <Input 
                         type="number"
                         placeholder="أدخل مابين 100 و 50000" 
-                        className={`text-right h-12 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-emerald-500 text-lg font-black ${amountError ? 'ring-2 ring-red-500' : ''}`} 
+                        className={cn(
+                          "text-right h-12 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-emerald-500 text-lg font-black",
+                          amountError && "ring-2 ring-red-500"
+                        )} 
                         value={dynamicAmount} 
                         onChange={(e) => setDynamicAmount(e.target.value)} 
                       />
@@ -273,8 +285,13 @@ export function ProductSheet({
                   <div className="pt-2">
                     <Button 
                       onClick={() => handleOrder(shamCashBaseProduct)} 
-                      disabled={ordering === String(shamCashBaseProduct?.id) || !!amountError || !dynamicAmount || !shamCashBaseProduct || !globalTargetId.trim()}
-                      className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-lg rounded-2xl shadow-xl shadow-emerald-100 transition-all active:scale-95"
+                      disabled={!isShamValid || ordering === String(shamCashBaseProduct?.id) || !shamCashBaseProduct}
+                      className={cn(
+                        "w-full h-14 font-black text-lg rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2",
+                        isShamValid 
+                          ? "bg-primary hover:bg-primary/90 text-white shadow-primary/20" 
+                          : "bg-gray-300 text-gray-500 cursor-not-allowed shadow-none"
+                      )}
                     >
                       {ordering === String(shamCashBaseProduct?.id) ? <Loader2 className="h-5 w-5 animate-spin" /> : "إرسال طلب الشحن"}
                     </Button>
