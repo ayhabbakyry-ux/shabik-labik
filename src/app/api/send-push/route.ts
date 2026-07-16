@@ -13,9 +13,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: 'Token missing' });
         }
 
-        const SERVER_KEY = process.env.FCM_SERVER_KEY || "AAAA4R9-R0E:APA91bGk_X8G..."; // يرجى التأكد من وجوده في Vercel
+        const SERVER_KEY = process.env.FCM_SERVER_KEY || "AAAA4R9-R0E:APA91bGk_X8G_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X"; 
 
         // بناء الحمولة لضمان الظهور في الستارة (Notification + Data)
+        // يجب إرسال حقل notification لضمان عرض النظام للإشعار تلقائياً
         const payload = {
             to: token,
             notification: {
@@ -29,9 +30,11 @@ export async function POST(request: Request) {
             data: {
                 title: title,
                 body: body,
-                url: url || "/history"
+                url: url || "/history",
+                click_action: url || "/history"
             },
-            priority: "high"
+            priority: "high",
+            content_available: true
         };
 
         const response = await fetch('https://fcm.googleapis.com/fcm/send', {

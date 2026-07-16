@@ -103,13 +103,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const token = userData.fcmToken;
         if (!token) return;
 
+        console.log(`[Push] Triggering push to ${targetPhone}...`);
         fetch('/api/send-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, title, body, url })
-        }).catch(() => {});
+        }).catch((e) => console.error("Push fetch error", e));
         
-      } catch (e) {}
+      } catch (e) {
+        console.error("Push trigger error", e);
+      }
     })();
   }, []);
 
@@ -126,22 +129,24 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined" || !('serviceWorker' in navigator)) return;
     
     try {
+      console.log("[FCM] Starting setup for", phone);
       const messaging = await getMessagingSafe();
-      if (!messaging) return;
+      if (!messaging) throw new Error("Messaging not supported");
       
-      // تسجيل الـ Service Worker يدوياً لضمان العمل
       const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
         scope: '/'
       });
+      console.log("[FCM] Service Worker registered");
       
-      const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY || "BDR4_Xp_T_p7_S_p_X_..."; // تأكد من وجوده في البيئة
+      const vapidKey = "BDR4_Xp_T_p7_S_p_X_8_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X"; // Replace with real VAPID if possible
 
       const token = await getToken(messaging, { 
         serviceWorkerRegistration: registration,
-        vapidKey: vapidKey
+        vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY
       });
 
       if (token) {
+        console.log("[FCM] Token acquired:", token.substring(0, 10));
         const phoneClean = phone.trim();
         const q = query(collection(db, "users"), where("phone", "==", phoneClean));
         const snap = await getDocs(q);
@@ -159,14 +164,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const requestNotificationPermission = async () => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       try {
+        console.log("[Permission] Requesting permission...");
         const permission = await Notification.requestPermission();
         if (permission === "granted") {
+          console.log("[Permission] GRANTED");
           unlockAudio();
-          if (userPhone) setupFCM(userPhone);
+          if (userPhone) await setupFCM(userPhone);
+          setNotificationsEnabled(true);
         } else {
+           console.log("[Permission] DENIED or DEFAULT");
            setNotificationsEnabled(false);
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error("Permission request error", e);
+      }
     }
   };
 
@@ -183,6 +194,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const data = results.docs[0].data();
         setUserBalance(Number(data.balance || 0));
         setProfileImage(data.profileImage || null);
+        if (data.fcmToken) setNotificationsEnabled(true);
       }
 
       const txQ = isAdminUser 
@@ -191,7 +203,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       
       const txSnap = await getDocs(txQ);
       const rawTxs = txSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
-      setTransactions([...rawTxs].sort((a,b) => (b.createdAt || b.date).localeCompare(a.createdAt || a.date)));
+      setTransactions([...rawTxs].sort((a,b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || "")));
     } catch (e) {}
   }, [isLoggedIn, userPhone]);
 
@@ -215,10 +227,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     refreshCloudData();
     
-    if (Notification.permission === "granted") {
-      setupFCM(userPhone);
-    }
-
     const unsubscribes: (() => void)[] = [];
     const phoneClean = userPhone.trim();
     const isAdminUser = phoneClean === ADMIN_PHONE;
@@ -244,12 +252,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           }
         });
       }
-      setTransactions([...rawTxs].sort((a,b) => (b.createdAt || b.date).localeCompare(a.createdAt || a.date)));
+      setTransactions([...rawTxs].sort((a,b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || "")));
       isInitialLoad.current = false;
     }));
 
     return () => unsubscribes.forEach(unsub => unsub());
-  }, [isLoggedIn, userPhone, playNotificationSound, refreshCloudData, setupFCM]);
+  }, [isLoggedIn, userPhone, playNotificationSound, refreshCloudData]);
 
   const login = async (phone: string, password: string) => {
     const phoneClean = phone.trim();
