@@ -26,7 +26,6 @@ interface ProductItem {
   category_name?: string;
   category_id?: string | number;
   image?: string;
-  customerPrice?: string;
 }
 
 export function ProductSheet({ 
@@ -51,6 +50,7 @@ export function ProductSheet({
 
   const isShamCash = serviceName === "شام كاش" || filterValue === "Sham Cash";
 
+  // منطق التحقق الخاص بشام كاش فقط
   const isShamValid = useMemo(() => {
     const hasAccount = globalTargetId && globalTargetId.trim().length > 0;
     const amountNum = Number(dynamicAmount);
@@ -58,6 +58,7 @@ export function ProductSheet({
     return !!(hasAccount && hasValidAmount);
   }, [globalTargetId, dynamicAmount]);
 
+  // تسعير شام كاش (المبلغ + 2%)
   const formattedShamPrice = useMemo(() => {
     if (!isShamCash || !dynamicAmount) return "0 ل.س";
     const amount = Number(dynamicAmount);
@@ -86,21 +87,47 @@ export function ProductSheet({
   }, []);
 
   const handleOrder = async (product: any) => {
-    if (isShamCash && !isShamValid) return;
+    // 1. حساب السعر النهائي بناءً على نوع الخدمة
+    let finalPrice = 0;
+    let serviceId = 0;
+    let link = globalTargetId;
+    let quantity = 1;
 
-    const amt = Number(dynamicAmount);
-    const finalPrice = isShamCash ? (amt * 1.02) : Number(product?.customerPrice || 0);
+    if (isShamCash) {
+      if (!isShamValid) return;
+      const amt = Number(dynamicAmount);
+      finalPrice = amt * 1.02;
+      serviceId = 840; // تثبيت الـ ID لشام كاش ليرة سورية
+      quantity = amt;
+    } else {
+      if (!product) return;
+      // استعادة التسعير الأصلي للوحدات: السعر من المزود + 2 ليرة عمولة ثابتة
+      finalPrice = Number(product.price) + 2;
+      serviceId = Number(product.id);
+      link = globalTargetId;
+      quantity = 1;
+    }
 
+    // 2. التحقق من الرصيد
     if (userBalance < finalPrice) {
-      toast({ title: "رصيد غير كافٍ", description: "يرجى شحن محفظتك أولاً لإتمام العملية.", variant: "destructive" });
+      toast({ 
+        title: "رصيد غير كافٍ", 
+        description: "يرجى شحن محفظتك أولاً لإتمام العملية.", 
+        variant: "destructive" 
+      });
       return;
     }
 
-    const serviceId = isShamCash ? 840 : (product?.id || product?.service);
-    const link = globalTargetId;
-    const quantity = isShamCash ? amt : 1;
+    if (!link || link.trim().length === 0) {
+      toast({ 
+        title: "بيانات ناقصة", 
+        description: "يرجى إدخال رقم الحساب أو الـ ID المطلوب شحنه.", 
+        variant: "destructive" 
+      });
+      return;
+    }
 
-    setOrdering(String(serviceId || "ordering"));
+    setOrdering(String(serviceId));
     
     try {
       const response = await fetch('/api/orders', {
@@ -116,17 +143,36 @@ export function ProductSheet({
       const result = await response.json();
 
       if (result.success) {
-          await deductBalance(finalPrice, `${serviceName} - الحساب: ${link} ${isShamCash ? '(مبلغ: ' + amt + ')' : ''}`, 'Pending', result.order_id);
-          toast({ title: "تم إرسال الطلب", description: result.message || "جاري المعالجة من قبل المزود." });
+          // الخصم الفعلي من المحفظة وحفظ السجل
+          await deductBalance(
+            finalPrice, 
+            `${serviceName} - الحساب: ${link} ${isShamCash ? '(مبلغ: ' + quantity + ')' : ''}`, 
+            'Pending', 
+            result.order_id
+          );
+          
+          toast({ 
+            title: "تم إرسال الطلب", 
+            description: result.message || "جاري المعالجة من قبل المزود." 
+          });
+
           if (isShamCash) {
             setGlobalTargetId("");
             setDynamicAmount("");
           }
       } else {
-          toast({ title: "فشل الطلب", description: result.message || "رفض المزود تنفيذ العملية.", variant: "destructive" });
+          toast({ 
+            title: "فشل الطلب", 
+            description: result.message || "رفض المزود تنفيذ العملية.", 
+            variant: "destructive" 
+          });
       }
     } catch (error: any) {
-      toast({ title: "خطأ اتصال", description: "تعذر الاتصال بسيرفر الشحن حالياً.", variant: "destructive" });
+      toast({ 
+        title: "خطأ اتصال", 
+        description: "تعذر الاتصال بسيرفر الشحن حالياً.", 
+        variant: "destructive" 
+      });
     } finally {
       setOrdering(null);
     }
@@ -248,6 +294,7 @@ export function ProductSheet({
                           if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
                           return prodName.includes(searchKey);
                       }).map((product) => {
+                        // استعادة التسعير الأصلي: السعر من السيرفر + 2 ليرة عمولة
                         const finalPrice = Number(product.price) + 2;
                         return (
                           <Card key={product.id} className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-all">
