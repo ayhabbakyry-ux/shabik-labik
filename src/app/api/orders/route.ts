@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview مسار تنفيذ طلبات الشحن المطور - يضمن عدم انهيار الجلب حتى في حال تعثر السيرفر الخارجي.
+ * @fileOverview مسار تنفيذ طلبات الشحن المطور - يدعم الآن الكمية الديناميكية والمفاتيح المرنة.
  */
 export async function POST(request: Request) {
     const API_TOKEN = process.env.ALRAGHEB_TOKEN;
@@ -16,13 +16,21 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json();
-        const { product_id, playerId, order_uuid } = body;
-        const qty = 1;
+        
+        // دعم المفاتيح الجديدة والقديمة لضمان عدم الفشل
+        const product_id = body.service || body.product_id;
+        const playerId = body.link || body.playerId;
+        const qty = body.quantity || body.qty || 1;
+        const order_uuid = body.order_uuid || crypto.randomUUID();
+
+        if (!product_id) {
+            return NextResponse.json({ success: false, message: 'معرف الخدمة (Service ID) مفقود.' });
+        }
 
         const ENDPOINT = `https://api.alragheb-store.com/client/api/newOrder/${product_id}/params?qty=${qty}&playerId=${playerId}&order_uuid=${order_uuid}`;
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 ثانية للطلبات
+        const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 ثانية
 
         const response = await fetch(ENDPOINT, {
             method: 'GET',
@@ -37,12 +45,16 @@ export async function POST(request: Request) {
 
         clearTimeout(timeoutId);
 
-        if (!response.ok) {
-            throw new Error(`External API returned ${response.status}`);
-        }
-
         const rawData = await response.json();
-        console.log('Alragheb API Response:', JSON.stringify(rawData));
+        console.log('Alragheb API Raw Response:', JSON.stringify(rawData));
+
+        // إذا كان السيرفر الخارجي أرجع خطأ صريحاً
+        if (rawData.success === false || rawData.error) {
+            return NextResponse.json({ 
+                success: false, 
+                message: rawData.message || rawData.error || 'رفض السيرفر تنفيذ الطلب' 
+            });
+        }
 
         const orderData = rawData.data;
         const orderStatus = orderData?.status || rawData["الحالة"] || "";
@@ -74,7 +86,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ 
                 success: true, 
                 status_type: 'pending', 
-                message: 'جاري المعالجة (حالة: ' + orderStatus + ')', 
+                message: message || ('جاري المعالجة (حالة: ' + orderStatus + ')'), 
                 order_id: orderId 
             });
         }

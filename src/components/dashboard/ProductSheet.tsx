@@ -42,7 +42,6 @@ export function ProductSheet({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [ordering, setOrdering] = useState<string | null>(null);
   
-  // States for inputs
   const [globalTargetId, setGlobalTargetId] = useState("");
   const [dynamicAmount, setDynamicAmount] = useState<string>("");
   
@@ -51,19 +50,13 @@ export function ProductSheet({
 
   const isShamCash = serviceName === "شام كاش" || filterValue === "Sham Cash";
 
-  // STRICT VALIDATION LOGIC - NO REGEX
   const isShamValid = useMemo(() => {
     const hasAccount = globalTargetId && globalTargetId.trim().length > 0;
     const amountNum = Number(dynamicAmount);
     const hasValidAmount = !isNaN(amountNum) && amountNum >= 100 && amountNum <= 50000;
-    
-    // Debug log to monitor states in browser
-    console.log("Validation State:", { globalTargetId, dynamicAmount, isShamValid: !!(hasAccount && hasValidAmount) });
-    
     return !!(hasAccount && hasValidAmount);
   }, [globalTargetId, dynamicAmount]);
 
-  // Exact 1.02 Multiplier with English numerals and exact decimals
   const formattedShamPrice = useMemo(() => {
     if (!isShamCash || !dynamicAmount) return "0 ل.س";
     const amount = Number(dynamicAmount);
@@ -93,14 +86,19 @@ export function ProductSheet({
     }
   }, []);
 
+  const shamCashBaseProduct = useMemo(() => {
+    return allProducts.find(p => {
+      const n = (p.name || "").toLowerCase();
+      return (n.includes("شام") || n.includes("sham")) && !n.includes("shamna") && !n.includes("شامنا");
+    });
+  }, [allProducts]);
+
   const filteredProducts = useMemo(() => {
     if (!allProducts.length) return [];
     const searchKey = filterValue.toLowerCase().trim();
     
     return allProducts.filter(p => {
       const prodName = (p.name || "").toLowerCase();
-      
-      // Strict block for "Shamna" items
       if (prodName.includes("shamna") || prodName.includes("شامنا")) return false;
 
       if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
@@ -118,40 +116,44 @@ export function ProductSheet({
     });
   }, [allProducts, filterValue]);
 
-  // Find the Sham Cash Product Object robustly
-  const shamCashBaseProduct = useMemo(() => {
-    return allProducts.find(p => {
-      const name = (p.name || "").toLowerCase();
-      return (name.includes("شام") || name.includes("sham")) && !name.includes("shamna") && !name.includes("شامنا");
-    });
-  }, [allProducts]);
-
   const handleOrder = async (product: any) => {
-    // If Sham Cash and product object is missing, try using our found base product
     const targetProduct = product || (isShamCash ? shamCashBaseProduct : null);
 
-    if (!targetProduct && !isShamCash) return;
+    if (!targetProduct && !isShamCash) {
+      toast({ title: "عذراً", description: "جاري تحميل بيانات الخدمة، يرجى المحاولة بعد قليل.", variant: "destructive" });
+      return;
+    }
 
     if (isShamCash && !isShamValid) return;
 
     const amt = Number(dynamicAmount);
-    const finalPrice = isShamCash ? (amt * 1.02) : Number(targetProduct.customerPrice);
+    const finalPrice = isShamCash ? (amt * 1.02) : Number(targetProduct?.customerPrice || 0);
 
     if (userBalance < finalPrice) {
       toast({ title: "رصيد غير كافٍ", description: "يرجى شحن محفظتك أولاً لإتمام العملية.", variant: "destructive" });
       return;
     }
 
-    setOrdering(String(targetProduct?.id || "sham"));
+    const serviceId = targetProduct?.id;
+    const link = globalTargetId;
+    const quantity = isShamCash ? amt : 1;
+
+    console.log("SENDING ALRAGHEB PAYLOAD:", {
+      service: serviceId,
+      link: link,
+      quantity: quantity
+    });
+
+    setOrdering(String(serviceId || "ordering"));
     
     try {
       const response = await fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-              product_id: targetProduct?.id, // Mapping 'service'
-              playerId: globalTargetId, // Mapping 'link'
-              qty: isShamCash ? amt : 1, // Mapping 'quantity'
+              service: serviceId,
+              link: link,
+              quantity: quantity,
               order_uuid: crypto.randomUUID()
           })
       });
@@ -160,18 +162,17 @@ export function ProductSheet({
 
       if (result.success) {
           const isPending = result.status_type === 'pending';
-          // Wallet deduction uses finalPrice (multiplied), API uses amt (raw)
-          deductBalance(finalPrice, `${targetProduct?.name || 'شام كاش'} - الحساب: ${globalTargetId} (مبلغ: ${isShamCash ? amt : ''})`, isPending ? 'Pending' : 'Completed', result.order_id);
+          deductBalance(finalPrice, `${targetProduct?.name || 'شام كاش'} - الحساب: ${link} ${isShamCash ? '(مبلغ: ' + amt + ')' : ''}`, isPending ? 'Pending' : 'Completed', result.order_id);
           toast({ title: isPending ? "الطلب قيد الانتظار" : "تمت العملية", description: result.message });
           if (isShamCash) {
             setGlobalTargetId("");
             setDynamicAmount("");
           }
       } else {
-          toast({ title: "فشل الطلب", description: result.message, variant: "destructive" });
+          toast({ title: "فشل الطلب", description: result.message || "رفض المزود تنفيذ العملية.", variant: "destructive" });
       }
-    } catch (error) {
-      toast({ title: "خطأ", description: "تعذر الاتصال بسيرفر الشحن حالياً.", variant: "destructive" });
+    } catch (error: any) {
+      toast({ title: "خطأ اتصال", description: "تعذر الاتصال بسيرفر الشحن حالياً. يرجى مراجعة الإنترنت.", variant: "destructive" });
     } finally {
       setOrdering(null);
     }
@@ -239,7 +240,7 @@ export function ProductSheet({
 
                   <div className="pt-2">
                     <Button 
-                      onClick={() => handleOrder(shamCashBaseProduct)} 
+                      onClick={() => handleOrder(null)} 
                       disabled={!isShamValid || ordering !== null}
                       className={cn(
                         "w-full h-14 font-black text-lg rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2",
@@ -248,7 +249,7 @@ export function ProductSheet({
                           : "bg-gray-300 text-gray-500 cursor-not-allowed shadow-none"
                       )}
                     >
-                      {(ordering !== null || (isShamCash && fetching)) ? <Loader2 className="h-5 w-5 animate-spin" /> : "إرسال طلب الشحن"}
+                      {ordering !== null ? <Loader2 className="h-5 w-5 animate-spin" /> : "إرسال طلب الشحن"}
                     </Button>
                     <p className="text-center text-[10px] text-red-600 font-black mt-3 animate-pulse">
                       ⚠️ تنبيه: هذا المنتج يعمل بشكل يدوي.
