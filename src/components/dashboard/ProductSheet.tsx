@@ -54,12 +54,24 @@ export function ProductSheet({
     return filter.includes('mtn') || filter.includes('syriatel');
   }, [filterValue]);
 
-  // منطق حساب السعر النهائي للمنتجات العادية (غير شام كاش)
-  const calculateProductPrice = useCallback((originalPrice: number) => {
+  /**
+   * منطق حساب السعر النهائي المطور (V3)
+   * 1. الاتصالات: السعر الأصلي + (الرصيد الاسمي * 0.02)
+   * 2. الألعاب: السعر الأصلي + 2 ليرة ثابتة
+   */
+  const calculateProductPrice = useCallback((product: ProductItem) => {
+    const originalPrice = Number(product.price);
+    
     if (isTelecom) {
-      // قاعدة الاتصالات: السعر الأصلي * 1.07 (زيادة 7%)
-      return originalPrice * 1.07;
+      // استخراج الرصيد الاسمي من الاسم (مثلاً "MTN 50" يستخرج 50)
+      const matches = product.name.match(/\d+/);
+      const nominalCredit = matches ? Number(matches[0]) : (originalPrice > 10 ? Math.round(originalPrice / 1.05) : originalPrice);
+      
+      // المعادلة: إضافة 0.20 ليرة لكل 10 ليرة اسمي (أي 2% من القيمة الاسمية)
+      const markup = nominalCredit * 0.02;
+      return originalPrice + markup;
     }
+    
     // قاعدة الألعاب والتطبيقات: السعر الأصلي + 2 ليرة عمولة ثابتة
     return originalPrice + 2;
   }, [isTelecom]);
@@ -114,8 +126,8 @@ export function ProductSheet({
       quantity = amt;
     } else {
       if (!product) return;
-      // استخدام منطق الحساب الجديد بناءً على النوع
-      finalPrice = calculateProductPrice(Number(product.price));
+      // استخدام منطق الحساب الجديد بناءً على نوع المنتج واسمه
+      finalPrice = calculateProductPrice(product);
       serviceId = Number(product.id);
       link = globalTargetId;
       quantity = 1;
@@ -157,7 +169,7 @@ export function ProductSheet({
       if (result.success) {
           await deductBalance(
             finalPrice, 
-            `${serviceName} - الحساب: ${link} ${isShamCash ? '(مبلغ: ' + quantity + ')' : ''}`, 
+            `${serviceName} - ${!isShamCash ? product.name + ' - ' : ''}الحساب: ${link} ${isShamCash ? '(مبلغ: ' + quantity + ')' : ''}`, 
             'Pending', 
             result.order_id
           );
@@ -222,7 +234,7 @@ export function ProductSheet({
                        <User className="absolute right-3 top-3 h-4 w-4 text-primary opacity-50" />
                        <Input 
                          type="text"
-                         placeholder="أدخل رقم الحساب أو الـ Hash" 
+                         placeholder="أدخل رقم الحساب أو الـ ID" 
                          className="text-right h-11 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-primary font-bold" 
                          value={globalTargetId} 
                          onChange={(e) => setGlobalTargetId(e.target.value)} 
@@ -305,8 +317,8 @@ export function ProductSheet({
                           if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
                           return prodName.includes(searchKey);
                       }).map((product) => {
-                        // تطبيق منطق الحساب الجديد في العرض
-                        const finalPrice = calculateProductPrice(Number(product.price));
+                        // تطبيق منطق الحساب الجديد بناءً على نوع المنتج واسمه
+                        const finalPrice = calculateProductPrice(product);
                         return (
                           <Card key={product.id} className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-all">
                             <CardContent className="p-4 flex items-center justify-between gap-4">
