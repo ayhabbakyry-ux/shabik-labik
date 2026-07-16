@@ -55,7 +55,7 @@ export function ProductSheet({
   }, [filterValue]);
 
   /**
-   * منطق حساب السعر النهائي المطور (V4)
+   * منطق حساب السعر النهائي المطور
    * 1. الاتصالات: السعر الأصلي + (الرصيد الاسمي * 0.02)
    * 2. الألعاب: السعر الأصلي + 2 ليرة ثابتة
    */
@@ -129,7 +129,7 @@ export function ProductSheet({
     if (userBalance < finalPrice) {
       toast({ 
         title: "رصيد غير كافٍ", 
-        description: "يرجى شحن محفظتك أولاً لإتمام العملية.", 
+        description: `تحتاج إلى ${finalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ليرة لإتمام هذه العملية.`, 
         variant: "destructive" 
       });
       return;
@@ -269,10 +269,6 @@ export function ProductSheet({
                         >
                           {ordering !== null ? <Loader2 className="h-5 w-5 animate-spin" /> : "إرسال طلب الشحن"}
                         </Button>
-
-                        <p className="text-center text-[10px] text-red-600 font-black mt-3 animate-pulse">
-                          ⚠️ تنبيه: هذا المنتج يعمل بشكل يدوي.
-                        </p>
                       </div>
                    </div>
                  )}
@@ -320,7 +316,10 @@ export function ProductSheet({
                                 </div>
                                 <div className="text-right">
                                   <h4 className="font-bold text-foreground text-[13px] leading-tight">{product.name}</h4>
-                                  <p className="text-primary font-black text-sm mt-1">{finalPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} <span className="text-[9px] font-medium">ل.س</span></p>
+                                  <p className="text-primary font-black text-sm mt-1">
+                                    {finalPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} 
+                                    <span className="text-[9px] font-medium mr-1">ل.س</span>
+                                  </p>
                                 </div>
                               </div>
                               <Button 
