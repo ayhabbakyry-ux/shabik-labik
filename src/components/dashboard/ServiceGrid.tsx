@@ -55,7 +55,6 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
           bg: "bg-emerald-50",
           imageUrl: "https://i.postimg.cc/3JmhPXxg/Screenshot-20260716-213800.png"
         },
-        { id: "elux", name: "ELUX", filter: "ELUX", icon: SmartphoneNfc, color: "text-blue-600", bg: "bg-blue-50" },
       ]
     },
     {

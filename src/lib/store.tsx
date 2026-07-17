@@ -282,7 +282,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const res = await processAdminAction(id, action);
     if (res.success && tx.userPhone) {
       const title = action === 'approve' ? "✅ تم قبول الإيداع" : "❌ طلب مرفوض";
-      const body = action === 'approve' ? `تمت إضافة ${tx.amount.toLocaleString()} ل.س لرصيدك.` : "نعتذر، تم رفض طلب الإيداع.";
+      const body = action === 'approve' ? `تمت إضافة ${tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ل.س لرصيدك.` : "نعتذر، تم رفض طلب الإيداع.";
       triggerPushSilently(tx.userPhone, title, body, "/wallet");
     }
   };
@@ -332,7 +332,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       details: "طلب إيداع رصيد جديد",
       proofImage
     });
-    triggerPushSilently(ADMIN_PHONE, "💳 إيداع جديد وصل!", `قام ${userName} بإرسال ${amount.toLocaleString()} ل.س.`, "/admin");
+    triggerPushSilently(ADMIN_PHONE, "💳 إيداع جديد وصل!", `قام ${userName} بإرسال ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ل.س.`, "/admin");
   };
 
   const checkPendingOrders = async () => {
@@ -351,7 +351,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           else if (['reject', 'failed', 'رفض', 'مرفوض'].includes(remote)) final = 'Rejected';
           if (final) {
             await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
-            triggerPushSilently(order.userPhone || userPhone, final === 'Completed' ? "✨ شحن مكتمل" : "⚠️ فشل الشحن", "يرجى مراجعة سجل الطلبات.", "/history");
+            triggerPushSilently(order.userPhone || userPhone, final === 'Completed' ? "✨ شحن مكتمل" : "⚠️ فشل شحن", "يرجى مراجعة سجل الطلبات.", "/history");
           }
         }
       } catch (err) {}

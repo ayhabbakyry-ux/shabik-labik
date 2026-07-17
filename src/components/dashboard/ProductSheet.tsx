@@ -54,11 +54,6 @@ export function ProductSheet({
     return filter.includes('mtn') || filter.includes('syriatel');
   }, [filterValue]);
 
-  /**
-   * منطق حساب السعر النهائي المطور (V14)
-   * 1. الاتصالات: السعر الأصلي + (الرصيد الاسمي * 0.02) -> لضمان 21.40 و 53.50
-   * 2. الألعاب والتطبيقات: السعر الأصلي + 2 ليرة ثابتة
-   */
   const calculateProductPrice = useCallback((product: ProductItem) => {
     const originalPrice = Number(product.price);
     
@@ -69,7 +64,6 @@ export function ProductSheet({
       return originalPrice + markup;
     }
     
-    // الألعاب وتطبيقات الدردشة (بما فيها آزال لايف)
     return originalPrice + 2;
   }, [isTelecom]);
 
@@ -85,7 +79,7 @@ export function ProductSheet({
     const amount = Number(dynamicAmount);
     if (isNaN(amount)) return `0.00 ${currency}`;
     const cost = amount * 1.02;
-    return `${cost.toLocaleString('ar-SY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+    return `${cost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
   }, [isShamCash, dynamicAmount, currency]);
 
   const fetchProducts = useCallback(async () => {
@@ -130,7 +124,7 @@ export function ProductSheet({
     if (userBalance < finalPrice) {
       toast({ 
         title: "رصيد غير كافٍ", 
-        description: `تحتاج إلى ${finalPrice.toLocaleString('ar-SY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ليرة لإتمام هذه العملية.`, 
+        description: `تحتاج إلى ${finalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ليرة لإتمام هذه العملية.`, 
         variant: "destructive" 
       });
       return;
@@ -202,7 +196,6 @@ export function ProductSheet({
         if (prodName.includes("shamna") || prodName.includes("شامنا")) return false;
         if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
         if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
-        // دعم فلترة آزال لايف وغيرها من الخدمات
         return prodName.includes(searchKey);
     });
   }, [allProducts, filterValue]);
@@ -316,7 +309,7 @@ export function ProductSheet({
                                 <div className="text-right">
                                   <h4 className="font-bold text-foreground text-[13px] leading-tight">{product.name}</h4>
                                   <p className="text-primary font-black text-sm mt-1">
-                                    {finalPrice.toLocaleString('ar-SY', {minimumFractionDigits: 2, maximumFractionDigits: 2})} 
+                                    {finalPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} 
                                     <span className="text-[9px] font-medium mr-1">{currency}</span>
                                   </p>
                                 </div>

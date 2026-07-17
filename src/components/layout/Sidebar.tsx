@@ -184,7 +184,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <div className="mt-6 w-full bg-[#1c232d] p-4 rounded-2xl text-center border border-gray-800/50 shadow-inner">
              <p className="text-gray-400 text-[10px] font-bold mb-1 uppercase tracking-widest">الرصيد المتاح</p>
              <div className="text-primary font-black text-2xl">
-                {userBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[12px] font-medium">{currency}</span>
+                {userBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[12px] font-medium">{currency}</span>
              </div>
           </div>
         </div>

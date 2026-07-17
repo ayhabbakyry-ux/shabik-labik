@@ -79,7 +79,7 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
 
   const formatDate = (dateStr: string) => {
     try {
-      return new Date(dateStr).toLocaleString('ar-SY', {
+      return new Date(dateStr).toLocaleString('en-US', {
         year: 'numeric',
         month: 'numeric',
         day: 'numeric',
@@ -178,11 +178,11 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
                             <div className="mt-3 bg-black/30 p-2 rounded-xl border border-white/5 flex items-center gap-2 text-[10px] font-bold">
                               <Calculator className="h-3 w-3 text-gray-500" />
                               <span className="text-gray-400">الرصيد:</span>
-                              <span className="text-green-500">{(tx.balanceBefore).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              <span className="text-green-500">{(tx.balanceBefore).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                               <span className="text-gray-500">-</span>
-                              <span className="text-red-500">{(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              <span className="text-red-500">{(tx.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                               <span className="text-gray-500">=</span>
-                              <span className="text-primary">{(tx.balanceAfter ?? (tx.balanceBefore - tx.amount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              <span className="text-primary">{(tx.balanceAfter ?? (tx.balanceBefore - tx.amount)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                           )}
                         </div>
@@ -197,7 +197,7 @@ export default function Orders({ initialTab = 'orders' }: OrdersProps) {
                           <Hash className="h-3 w-3" /> {tx.id}
                         </div>
                         <p className="font-black text-lg">
-                          {tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[10px] font-medium">{currency}</span>
+                          {tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[10px] font-medium">{currency}</span>
                         </p>
                       </div>
                     </div>
