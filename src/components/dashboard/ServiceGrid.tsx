@@ -1,6 +1,6 @@
 "use client";
 
-import { Smartphone, SmartphoneNfc, Phone, Gamepad2, Zap, Radio, Sword, Landmark } from "lucide-react";
+import { Smartphone, SmartphoneNfc, Phone, Gamepad2, Zap, Radio, Sword, Landmark, MessageSquare } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ProductSheet } from "./ProductSheet";
 
@@ -97,6 +97,15 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
       colorClass: "text-pink-600",
       icon: SmartphoneNfc,
       items: [
+        { 
+          id: "azal_live", 
+          name: "آزال لايف", 
+          filter: "Azal", 
+          icon: MessageSquare, 
+          color: "text-blue-500", 
+          bg: "bg-blue-50",
+          imageUrl: "https://i.postimg.cc/nLRCSyHB/1784236005436.png"
+        },
         { 
           id: "tiktok", 
           name: "تيك توك", 

@@ -46,7 +46,7 @@ export function ProductSheet({
   const [dynamicAmount, setDynamicAmount] = useState<string>("");
 
   const { toast } = useToast();
-  const { userBalance, deductBalance } = useUser();
+  const { userBalance, deductBalance, currency } = useUser();
 
   const isShamCash = serviceName === "شام كاش" || filterValue === "Sham Cash";
   const isTelecom = useMemo(() => {
@@ -55,9 +55,9 @@ export function ProductSheet({
   }, [filterValue]);
 
   /**
-   * منطق حساب السعر النهائي المطور
-   * 1. الاتصالات: السعر الأصلي + (الرصيد الاسمي * 0.02)
-   * 2. الألعاب: السعر الأصلي + 2 ليرة ثابتة
+   * منطق حساب السعر النهائي المطور (V14)
+   * 1. الاتصالات: السعر الأصلي + (الرصيد الاسمي * 0.02) -> لضمان 21.40 و 53.50
+   * 2. الألعاب والتطبيقات: السعر الأصلي + 2 ليرة ثابتة
    */
   const calculateProductPrice = useCallback((product: ProductItem) => {
     const originalPrice = Number(product.price);
@@ -69,6 +69,7 @@ export function ProductSheet({
       return originalPrice + markup;
     }
     
+    // الألعاب وتطبيقات الدردشة (بما فيها آزال لايف)
     return originalPrice + 2;
   }, [isTelecom]);
 
@@ -80,12 +81,12 @@ export function ProductSheet({
   }, [globalTargetId, dynamicAmount]);
 
   const formattedShamPrice = useMemo(() => {
-    if (!isShamCash || !dynamicAmount) return "0.00 ل.س";
+    if (!isShamCash || !dynamicAmount) return `0.00 ${currency}`;
     const amount = Number(dynamicAmount);
-    if (isNaN(amount)) return "0.00 ل.س";
+    if (isNaN(amount)) return `0.00 ${currency}`;
     const cost = amount * 1.02;
-    return `${cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ل.س`;
-  }, [isShamCash, dynamicAmount]);
+    return `${cost.toLocaleString('ar-SY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+  }, [isShamCash, dynamicAmount, currency]);
 
   const fetchProducts = useCallback(async () => {
     setFetching(true);
@@ -129,7 +130,7 @@ export function ProductSheet({
     if (userBalance < finalPrice) {
       toast({ 
         title: "رصيد غير كافٍ", 
-        description: `تحتاج إلى ${finalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ليرة لإتمام هذه العملية.`, 
+        description: `تحتاج إلى ${finalPrice.toLocaleString('ar-SY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ليرة لإتمام هذه العملية.`, 
         variant: "destructive" 
       });
       return;
@@ -193,6 +194,18 @@ export function ProductSheet({
       setOrdering(null);
     }
   };
+
+  const filteredProductsList = useMemo(() => {
+    return allProducts.filter(p => {
+        const searchKey = filterValue.toLowerCase().trim();
+        const prodName = (p.name || "").toLowerCase();
+        if (prodName.includes("shamna") || prodName.includes("شامنا")) return false;
+        if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
+        if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
+        // دعم فلترة آزال لايف وغيرها من الخدمات
+        return prodName.includes(searchKey);
+    });
+  }, [allProducts, filterValue]);
 
   return (
     <Sheet onOpenChange={(open) => { if (open) fetchProducts(); }}>
@@ -290,22 +303,8 @@ export function ProductSheet({
                   </div>
                 ) : (
                   <div className="p-4 space-y-3">
-                    {allProducts.filter(p => {
-                        const searchKey = filterValue.toLowerCase().trim();
-                        const prodName = (p.name || "").toLowerCase();
-                        if (prodName.includes("shamna") || prodName.includes("شامنا")) return false;
-                        if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
-                        if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
-                        return prodName.includes(searchKey);
-                    }).length > 0 ? (
-                      allProducts.filter(p => {
-                          const searchKey = filterValue.toLowerCase().trim();
-                          const prodName = (p.name || "").toLowerCase();
-                          if (prodName.includes("shamna") || prodName.includes("شامنا")) return false;
-                          if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
-                          if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
-                          return prodName.includes(searchKey);
-                      }).map((product) => {
+                    {filteredProductsList.length > 0 ? (
+                      filteredProductsList.map((product) => {
                         const finalPrice = calculateProductPrice(product);
                         return (
                           <Card key={product.id} className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-all">
@@ -317,8 +316,8 @@ export function ProductSheet({
                                 <div className="text-right">
                                   <h4 className="font-bold text-foreground text-[13px] leading-tight">{product.name}</h4>
                                   <p className="text-primary font-black text-sm mt-1">
-                                    {finalPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} 
-                                    <span className="text-[9px] font-medium mr-1">ل.س</span>
+                                    {finalPrice.toLocaleString('ar-SY', {minimumFractionDigits: 2, maximumFractionDigits: 2})} 
+                                    <span className="text-[9px] font-medium mr-1">{currency}</span>
                                   </p>
                                 </div>
                               </div>
