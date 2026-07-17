@@ -75,7 +75,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [isAudioUnlocked, setIsAudioUnlocked] = useState(false);
   
   const isInitialLoad = useRef(true);
-  const currency = "ل.س";
+  const currency = "SYP";
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";

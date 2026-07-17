@@ -54,16 +54,20 @@ export function ProductSheet({
     return filter.includes('mtn') || filter.includes('syriatel');
   }, [filterValue]);
 
+  // منطق التسعير الدقيق حسب نوع الخدمة
   const calculateProductPrice = useCallback((product: ProductItem) => {
     const originalPrice = Number(product.price);
     
     if (isTelecom) {
+      // البحث عن الرقم في الاسم (مثال: MTN 20 -> 20)
       const matches = product.name.match(/\d+/);
       const nominalCredit = matches ? Number(matches[0]) : (originalPrice > 10 ? Math.round(originalPrice / 1.05) : originalPrice);
+      // العمولة: 0.20 لكل 10 ليرات (أي 2% من الرصيد الاسمي)
       const markup = nominalCredit * 0.02;
       return originalPrice + markup;
     }
     
+    // الألعاب وتطبيقات الدردشة: سعر المزود + 2 ليرة ثابتة
     return originalPrice + 2;
   }, [isTelecom]);
 
@@ -193,7 +197,11 @@ export function ProductSheet({
     return allProducts.filter(p => {
         const searchKey = filterValue.toLowerCase().trim();
         const prodName = (p.name || "").toLowerCase();
+        
+        // استثناء الفئات الوهمية أو العناوين غير الضرورية التي تظهر في الـ API
+        if (prodName === "azal live") return false;
         if (prodName.includes("shamna") || prodName.includes("شامنا")) return false;
+        
         if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
         if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
         return prodName.includes(searchKey);
