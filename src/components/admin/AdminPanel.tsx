@@ -3,7 +3,7 @@
 import { useUser } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Check, X, ShieldAlert, Phone, Trash2, KeyRound, Clock, UserPlus, Wallet, ImageIcon, Eye, BellRing, BellOff, Volume2, RefreshCw, Search, Plus, Minus, VolumeX, Sparkles, AlertCircle, Loader2 } from "lucide-react";
+import { Check, X, ShieldAlert, Phone, Trash2, KeyRound, Clock, UserPlus, Wallet, ImageIcon, Eye, BellRing, BellOff, Volume2, RefreshCw, Search, Plus, Minus, VolumeX, Sparkles, AlertCircle, Loader2, Circle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -241,8 +241,13 @@ export function AdminPanel() {
                       {filteredUsers.map((user) => (
                         <TableRow key={user.id}>
                           <TableCell className="text-right font-bold py-4">
-                            <p>{user.name}</p>
-                            <p className="text-[10px] text-muted-foreground font-mono">{user.phone}</p>
+                            <div className="flex items-center gap-2">
+                               {user.isOnline && <Circle className="h-2 w-2 fill-green-500 text-green-500 animate-pulse" />}
+                               <div>
+                                  <p>{user.name}</p>
+                                  <p className="text-[10px] text-muted-foreground font-mono">{user.phone}</p>
+                               </div>
+                            </div>
                           </TableCell>
                           <TableCell className="text-right font-black text-green-600">{(user.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                           <TableCell className="text-center">

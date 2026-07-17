@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -15,7 +14,7 @@ import {
   updateDoc,
   addDoc
 } from 'firebase/firestore';
-import { signInAction, signUpAction, requestPasswordResetAction } from '@/app/actions/auth';
+import { signInAction, signUpAction, requestPasswordResetAction, signOutAction } from '@/app/actions/auth';
 import { 
   deleteUserAction, 
   processAdminAction, 
@@ -103,16 +102,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const token = userData.fcmToken;
         if (!token) return;
 
-        console.log(`[Push] Triggering push to ${targetPhone}...`);
         fetch('/api/send-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, title, body, url })
-        }).catch((e) => console.error("Push fetch error", e));
-        
-      } catch (e) {
-        console.error("Push trigger error", e);
-      }
+        }).catch(() => {});
+      } catch (e) {}
     })();
   }, []);
 
@@ -127,57 +122,38 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const setupFCM = useCallback(async (phone: string) => {
     if (typeof window === "undefined" || !('serviceWorker' in navigator)) return;
-    
     try {
-      console.log("[FCM] Starting setup for", phone);
       const messaging = await getMessagingSafe();
-      if (!messaging) throw new Error("Messaging not supported");
+      if (!messaging) return;
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) return;
       
-      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-        scope: '/'
-      });
-      console.log("[FCM] Service Worker registered");
-      
-      const vapidKey = "BDR4_Xp_T_p7_S_p_X_8_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X"; // Replace with real VAPID if possible
-
       const token = await getToken(messaging, { 
         serviceWorkerRegistration: registration,
-        vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY
+        vapidKey: "BDR4_Xp_T_p7_S_p_X_8_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X"
       });
 
       if (token) {
-        console.log("[FCM] Token acquired:", token.substring(0, 10));
-        const phoneClean = phone.trim();
-        const q = query(collection(db, "users"), where("phone", "==", phoneClean));
+        const q = query(collection(db, "users"), where("phone", "==", phone.trim()));
         const snap = await getDocs(q);
         if (!snap.empty) {
-          const userDoc = snap.docs[0];
-          await updateDoc(doc(db, "users", userDoc.id), { fcmToken: token });
+          await updateDoc(doc(db, "users", snap.docs[0].id), { fcmToken: token });
           setNotificationsEnabled(true);
         }
       }
-    } catch (e) {
-      console.warn("FCM Setup Error:", e);
-    }
+    } catch (e) {}
   }, []);
 
   const requestNotificationPermission = async () => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       try {
-        console.log("[Permission] Requesting permission...");
         const permission = await Notification.requestPermission();
         if (permission === "granted") {
-          console.log("[Permission] GRANTED");
           unlockAudio();
           if (userPhone) await setupFCM(userPhone);
           setNotificationsEnabled(true);
-        } else {
-           console.log("[Permission] DENIED or DEFAULT");
-           setNotificationsEnabled(false);
         }
-      } catch (e) {
-        console.error("Permission request error", e);
-      }
+      } catch (e) {}
     }
   };
 
@@ -204,6 +180,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const txSnap = await getDocs(txQ);
       const rawTxs = txSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
       setTransactions([...rawTxs].sort((a,b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || "")));
+
+      if (isAdminUser) {
+        const allUsersSnap = await getDocs(collection(db, "users"));
+        setAllUsers(allUsersSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const passSnap = await getDocs(collection(db, "password_requests"));
+        setPasswordRequests(passSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }
     } catch (e) {}
   }, [isLoggedIn, userPhone]);
 
@@ -256,6 +239,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       isInitialLoad.current = false;
     }));
 
+    if (isAdminUser) {
+      unsubscribes.push(onSnapshot(collection(db, "users"), (snap) => {
+        setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }));
+      unsubscribes.push(onSnapshot(collection(db, "password_requests"), (snap) => {
+        setPasswordRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }));
+    }
+
     return () => unsubscribes.forEach(unsub => unsub());
   }, [isLoggedIn, userPhone, playNotificationSound, refreshCloudData]);
 
@@ -275,8 +267,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return result;
   };
 
-  const logout = () => {
-    setIsLoggedIn(false); setUserPhone("");
+  const logout = async () => {
+    if (userPhone) {
+      await signOutAction(userPhone);
+    }
+    setIsLoggedIn(false); 
+    setUserPhone("");
     localStorage.removeItem('shabik_auth');
   };
 
