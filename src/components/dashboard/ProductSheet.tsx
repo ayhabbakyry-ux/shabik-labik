@@ -137,7 +137,7 @@ export function ProductSheet({
     if (!link || link.trim().length === 0) {
       toast({ 
         title: "بيانات ناقصة", 
-        description: "يرجى إدخال رقم الحساب أو الـ ID المطلوب شحنه.", 
+        description: "يرجى إدخل رقم الحساب أو الـ ID المطلوب شحنه.", 
         variant: "destructive" 
       });
       return;
@@ -198,15 +198,21 @@ export function ProductSheet({
         const searchKey = filterValue.toLowerCase().trim();
         const prodName = (p.name || "").toLowerCase().trim();
         
-        // استثناء الفئات الوهمية أو العناوين غير الضرورية التي تظهر في الـ API
+        // استثناء العناوين الوهمية التي تظهر في الـ API كمنتجات بأسعار زهيدة (Headers)
         if (prodName === "azal live") return false;
         if (prodName.includes("shamna") || prodName.includes("شامنا")) return false;
         
-        // مسح الفئات الوهمية الثلاث المأشر عليها في الصورة لسيريتل
-        if (prodName === "سيريتل وحدات" || prodName === "سيريتل كاش" || prodName === "سيريتل فاتورة") return false;
+        // مسح الفئات الوهمية (الهيدرز) بدقة لضمان عدم حجب المنتجات الحقيقية
+        const illusoryHeaders = ["سيريتل وحدات", "سيريتل كاش", "سيريتل فاتورة", "ام تي ان وحدات", "ام تي ان كاش", "ام تي ان فاتورة"];
+        if (illusoryHeaders.includes(prodName)) return false;
         
-        if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
-        if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
+        if (searchKey === "syriatel") {
+            return prodName.includes("سيريتل") || prodName.includes("syriatel") || prodName.includes("سيرياتيل");
+        }
+        if (searchKey === "mtn") {
+            return prodName.includes("mtn") || prodName.includes("ام تي ان") || prodName.includes("إم تي إن");
+        }
+        
         return prodName.includes(searchKey);
     });
   }, [allProducts, filterValue]);
