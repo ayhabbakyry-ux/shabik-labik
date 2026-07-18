@@ -13,11 +13,8 @@ import {
   MessageSquare, 
   Castle, 
   Swords,
-  ChevronLeft,
   ArrowRight,
   LayoutGrid,
-  Trophy,
-  Globe,
   X
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -57,8 +54,8 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
   const sections: Section[] = [
     {
       id: "sham_cash_main",
-      title: "شام كاش (شحن فوري)",
-      description: "إرسال واستقبال الأموال عبر شام كاش",
+      title: "شام كاش",
+      description: "إرسال واستقبال الأموال",
       colorClass: "text-emerald-600",
       bgClass: "bg-emerald-50",
       icon: Landmark,
@@ -76,8 +73,8 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
     },
     {
       id: "telecom",
-      title: "شحن الخطوط (وحدات وفواتير)",
-      description: "سيريتل وإم تي إن - شحن رصيد مباشر",
+      title: "شحن الخطوط",
+      description: "سيريتل وإم تي إن",
       colorClass: "text-red-600",
       bgClass: "bg-red-50",
       icon: Phone,
@@ -104,10 +101,10 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
     },
     {
       id: "games",
-      title: "الألعاب العالمية والجواكر",
-      description: "ببجي، فري فاير، كلاش، وأقوى الألعاب",
-      colorClass: "text-green-600",
-      bgClass: "bg-green-50",
+      title: "الألعاب",
+      description: "ببجي، فري فاير، وكلاش",
+      colorClass: "text-blue-600",
+      bgClass: "bg-blue-50",
       icon: Gamepad2,
       items: [
         { 
@@ -168,8 +165,8 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
     },
     {
       id: "apps",
-      title: "تطبيقات البث المباشر",
-      description: "تيك توك، بيجو، والبرامج الترفيهية",
+      title: "التطبيقات",
+      description: "تيك توك، بيجو، لايكي",
       colorClass: "text-pink-600",
       bgClass: "bg-pink-50",
       icon: Radio,
@@ -260,25 +257,16 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
 
   return (
     <div className="space-y-8 pb-10">
-      <div className="grid grid-cols-1 gap-4" dir="rtl">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4" dir="rtl">
         {sections.map((section) => (
           <Sheet key={section.id}>
             <SheetTrigger asChild>
-              <Card className="hover:shadow-xl transition-all cursor-pointer group active:scale-[0.98] border-none bg-white overflow-hidden relative shadow-sm">
-                <div className={`absolute top-0 right-0 w-1.5 h-full ${section.colorClass.replace('text', 'bg')}`} />
-                <CardContent className="p-6 flex items-center justify-between">
-                  <div className="flex items-center gap-5">
-                    <div className={`w-16 h-16 rounded-[24px] ${section.bgClass} flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner`}>
-                      <section.icon className={`h-8 w-8 ${section.colorClass}`} />
-                    </div>
-                    <div className="text-right">
-                      <h3 className={`text-lg font-black font-headline ${section.colorClass}`}>{section.title}</h3>
-                      <p className="text-xs text-muted-foreground font-medium">{section.description}</p>
-                    </div>
+              <Card className="hover:shadow-xl transition-all cursor-pointer group active:scale-[0.98] border-none bg-white overflow-hidden relative shadow-sm h-full">
+                <CardContent className="p-5 flex flex-col items-center justify-center text-center space-y-3">
+                  <div className={`w-20 h-20 rounded-full ${section.bgClass} flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner overflow-hidden border border-white`}>
+                    <section.icon className={`h-10 w-10 ${section.colorClass}`} />
                   </div>
-                  <div className="bg-slate-50 p-2 rounded-full group-hover:bg-primary group-hover:text-white transition-colors">
-                    <ChevronLeft className="h-5 w-5" />
-                  </div>
+                  <p className="text-[14px] font-black leading-tight text-foreground group-hover:text-primary transition-colors">{section.title}</p>
                 </CardContent>
               </Card>
             </SheetTrigger>
