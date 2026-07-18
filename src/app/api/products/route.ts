@@ -4,12 +4,13 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * @fileOverview مسار جلب المنتجات المطور - مع نظام معالجة أخطاء متقدم ومهلة انتظار طويلة للشبكات الضعيفة.
- * تم تحديثه لضمان جلب كافة الفئات الـ 60+ عبر معالجة البيانات العميقة (Deep Data Mapping).
+ * @fileOverview مسار جلب المنتجات المطور - تم إضافة ?limit=500 لطلب كافة الفئات دفعة واحدة من سيرفر الراغب.
+ * مع نظام معالجة أخطاء متقدم ومهلة انتظار طويلة للشبكات الضعيفة.
  */
 export async function GET() {
     const API_TOKEN = process.env.ALRAGHEB_TOKEN;
-    const ENDPOINT = 'https://api.alragheb-store.com/client/api/products';
+    // إضافة limit=500 لضمان سحب الـ 60 فئة وكافة المنتجات الحقيقية
+    const ENDPOINT = 'https://api.alragheb-store.com/client/api/products?limit=500';
 
     if (!API_TOKEN) {
         return NextResponse.json({ success: false, error: "التوكن مفقود في إعدادات السيرفر" }, { status: 200 });
@@ -17,7 +18,7 @@ export async function GET() {
 
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // مهلة 30 ثانية لضمان جلب القائمة الضخمة
+        const timeoutId = setTimeout(() => controller.abort(), 35000); // زيادة المهلة لـ 35 ثانية لتحمل حجم البيانات الضخم
 
         const response = await fetch(ENDPOINT, {
             method: 'GET',
@@ -44,7 +45,6 @@ export async function GET() {
         if (Array.isArray(rawData)) {
             productsArray = rawData;
         } else if (rawData && typeof rawData === 'object') {
-            // فحص كافة المفاتيح المحتملة للمصفوفات (data هي الأساسية، والبقية كإجراء احتياطي)
             if (rawData.data && Array.isArray(rawData.data)) {
                 productsArray = rawData.data;
             } else if (rawData.products && Array.isArray(rawData.products)) {
@@ -52,7 +52,6 @@ export async function GET() {
             } else if (rawData.items && Array.isArray(rawData.items)) {
                 productsArray = rawData.items;
             } else {
-                // البحث التلقائي عن أول مفتاح يحتوي على مصفوفة (للمرونة المطلقة)
                 const possibleKey = Object.keys(rawData).find(key => Array.isArray(rawData[key]));
                 productsArray = possibleKey ? rawData[possibleKey] : [];
             }
@@ -63,8 +62,7 @@ export async function GET() {
             const name = prod.الاسم || prod.name || prod.title || prod.product_name || 'منتج غير مسمى';
             const price = prod.السعر || prod.price || prod.cost || 0;
             
-            // معالجة الفئة (Category) باستخدام Optional Chaining لضمان جلب الأقسام الـ 60 كاملة
-            // ندعم الاسم المباشر، أو الحقل المتداخل، أو مسميات بديلة مثل section و group
+            // معالجة الفئة (Category) باستخدام Optional Chaining لضمان سحب كافة الأقسام
             const categoryName = prod.اسم_الفئة || 
                                prod.category_name || 
                                prod.category?.name || 
@@ -90,7 +88,7 @@ export async function GET() {
             };
         });
 
-        console.log(`API_DEBUG -> Successfully mapped ${formattedProducts.length} products with category extraction.`);
+        console.log(`API_DEBUG -> Fetched ${formattedProducts.length} items with limit=500.`);
 
         return NextResponse.json(formattedProducts);
 
