@@ -54,7 +54,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
   const sections: Section[] = [
     {
       id: "sham_cash_main",
-      title: "شام كاش",
+      title: "قسم الشام كاش",
       description: "إرسال واستقبال الأموال",
       colorClass: "text-emerald-600",
       bgClass: "bg-emerald-50",
@@ -101,7 +101,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
     },
     {
       id: "games",
-      title: "الألعاب",
+      title: "قسم الألعاب",
       description: "ببجي، فري فاير، وكلاش",
       colorClass: "text-blue-600",
       bgClass: "bg-blue-50",
@@ -165,7 +165,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
     },
     {
       id: "apps",
-      title: "التطبيقات",
+      title: "قسم التطبيقات",
       description: "تيك توك، بيجو، لايكي",
       colorClass: "text-pink-600",
       bgClass: "bg-pink-50",
@@ -271,23 +271,23 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
               </Card>
             </SheetTrigger>
             
-            <SheetContent side="bottom" className="h-[75vh] rounded-t-[40px] bg-background border-none shadow-2xl p-0 overflow-hidden" dir="rtl">
+            <SheetContent side="bottom" className="h-full bg-background border-none shadow-none p-0 overflow-hidden" dir="rtl">
                <div className="h-full flex flex-col">
                   {/* Header with Back Button */}
-                  <div className="p-6 border-b bg-white/50 backdrop-blur-md sticky top-0 z-20 flex items-center justify-between">
+                  <div className="p-6 border-b bg-white/80 backdrop-blur-md sticky top-0 z-20 flex items-center justify-between">
                      <div className="flex items-center gap-4">
                         <div className={`p-3 rounded-2xl ${section.bgClass}`}>
                            <section.icon className={`h-6 w-6 ${section.colorClass}`} />
                         </div>
                         <div className="text-right">
                            <SheetTitle className={`text-xl font-black font-headline ${section.colorClass}`}>{section.title}</SheetTitle>
-                           <SheetDescription className="text-xs font-bold">اختر نوع الخدمة المطلوب شحنها</SheetDescription>
+                           <SheetDescription className="text-xs font-bold">تصفح كافة خدمات {section.title}</SheetDescription>
                         </div>
                      </div>
                      
                      <SheetClose asChild>
                         <Button variant="ghost" className="font-bold gap-2 text-primary hover:bg-primary/10 rounded-xl px-4 py-2">
-                           <ArrowRight className="h-5 w-5" /> رجوع
+                           <ArrowRight className="h-5 w-5" /> رجوع للرئيسية
                         </Button>
                      </SheetClose>
                   </div>
@@ -313,9 +313,9 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
                      </div>
                   </div>
                   
-                  <div className="p-6 bg-white border-t flex justify-center">
+                  <div className="p-6 bg-white border-t flex justify-center pb-10">
                       <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest flex items-center gap-2">
-                        <LayoutGrid className="h-3 w-3" /> قسم {section.title}
+                        <LayoutGrid className="h-3 w-3" /> شبك لبيك - {section.title}
                       </p>
                   </div>
                </div>
