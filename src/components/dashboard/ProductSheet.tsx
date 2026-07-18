@@ -157,25 +157,27 @@ export function ProductSheet({
         
         if (Number(p.price) < 2) return false;
 
-        // منطق الفلترة الذكي V40 - معالجة خطأ "CLAH" وسحب كافة الفئات
+        // منطق الفلترة الذكي V41 - معالجة كافة الأخطاء المطبعية للراغب (CLAH, ROYAIL)
         if (searchKey === "clash") {
             const matchesClash = 
               prodName.includes("clash") || 
-              prodName.includes("clah") || // معالجة الخطأ المطبعي في سيرفر الراغب
+              prodName.includes("clah") || // تصحيح CLAH OF CLANS
               prodName.includes("كلاش") || 
               catName.includes("clash") || 
               catName.includes("clah") || 
               catName.includes("كلاش");
             
             // استبعاد كلاش رويال من فقاعة كلاش اوف كلانس لضمان الدقة
-            return matchesClash && !prodName.includes("royale") && !prodName.includes("رويال");
+            return matchesClash && !prodName.includes("royale") && !prodName.includes("royail") && !prodName.includes("رويال");
         }
 
         if (searchKey === "royale") {
             return (
               prodName.includes("royale") || 
+              prodName.includes("royail") || // تصحيح CLASH ROYAIL
               prodName.includes("رويال") || 
               catName.includes("royale") || 
+              catName.includes("royail") || 
               catName.includes("رويال")
             );
         }
