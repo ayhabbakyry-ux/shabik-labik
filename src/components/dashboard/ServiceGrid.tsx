@@ -52,6 +52,7 @@ type Section = {
   items: ServiceItem[];
   colorClass: string;
   bgClass: string;
+  imageUrl?: string;
 };
 
 export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, searchQuery?: string }) {
@@ -65,6 +66,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
       colorClass: "text-emerald-600",
       bgClass: "bg-emerald-50",
       icon: Landmark,
+      imageUrl: "https://i.postimg.cc/3JmhPXxg/Screenshot-20260716-213800.png",
       items: [
         { 
           id: "sham_cash", 
@@ -84,6 +86,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
       colorClass: "text-red-600",
       bgClass: "bg-red-50",
       icon: Phone,
+      imageUrl: "https://i.postimg.cc/5yQ43qqy/file-00000000cb008246a724502ee0786cb1.png",
       items: [
         { 
           id: "mtn_units", 
@@ -280,7 +283,11 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
               <Card className="hover:shadow-xl transition-all cursor-pointer group active:scale-[0.98] border-none bg-white overflow-hidden relative shadow-sm h-full">
                 <CardContent className="p-5 flex flex-col items-center justify-center text-center space-y-3">
                   <div className={`w-20 h-20 rounded-full ${section.bgClass} flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner overflow-hidden border border-white`}>
-                    <section.icon className={`h-10 w-10 ${section.colorClass}`} />
+                    {section.imageUrl ? (
+                      <img src={section.imageUrl} alt={section.title} className="w-full h-full object-contain" />
+                    ) : (
+                      <section.icon className={`h-10 w-10 ${section.colorClass}`} />
+                    )}
                   </div>
                   <p className="text-[14px] font-black leading-tight text-foreground group-hover:text-primary transition-colors">{section.title}</p>
                 </CardContent>
@@ -298,8 +305,12 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
                           </Button>
                         ) : (
                           <>
-                            <div className={`p-3 rounded-2xl ${section.bgClass}`}>
-                               <section.icon className={`h-6 w-6 ${section.colorClass}`} />
+                            <div className={`p-3 rounded-2xl ${section.bgClass} w-12 h-12 flex items-center justify-center overflow-hidden border border-white/50 shadow-sm`}>
+                               {section.imageUrl ? (
+                                 <img src={section.imageUrl} alt={section.title} className="w-full h-full object-contain" />
+                               ) : (
+                                 <section.icon className={`h-6 w-6 ${section.colorClass}`} />
+                               )}
                             </div>
                             <div className="text-right">
                                <SheetTitle className={`text-xl font-black font-headline ${section.colorClass}`}>{section.title}</SheetTitle>
