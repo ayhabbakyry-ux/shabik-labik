@@ -7,7 +7,7 @@ export const revalidate = 0;
  * @fileOverview محرك "رادار شبيك لبيك" V30 - النسخة النهائية الصارمة.
  * يقوم بمسح ذري شامل لكافة طبقات الـ JSON القادمة من الراغب.
  * يسحب المنتجات، المنتجات الفرعية، الخيارات المنسدلة، والكميات العميقة.
- * يضمن ظهور الـ 60+ فئة كاملة عبر نظام التسطيح اللامتناهي.
+ * يضمن ظهور كافة الفئات كاملة عبر نظام التسطيح اللامتناهي.
  */
 export async function GET() {
     const API_TOKEN = process.env.ALRAGHEB_TOKEN;
@@ -33,10 +33,6 @@ export async function GET() {
         }
 
         const rawData = await response.json();
-        
-        // طباعة البيانات الخام في التيرمينال للمعاينة عند الحاجة
-        console.log("ALRAGHEB_RAW_SCAN_V30: Data Received");
-
         let allExtractedItems: any[] = [];
 
         /**
@@ -45,7 +41,7 @@ export async function GET() {
         function deepScan(obj: any, parentName = '', catInfo = { name: '', id: '' }) {
             if (!obj || typeof obj !== 'object') return;
 
-            // إذا كان كائناً يحتوي على سعر واسم، فهو منتج أو خيار شحن
+            // استخراج البيانات الأساسية
             const name = obj.الاسم || obj.name || obj.title || obj.product_name || obj.value || obj.label || '';
             const price = obj.السعر || obj.price || obj.cost || obj.amount || obj.rate || 0;
             const id = obj.id || obj.product_id || obj.service_id || obj.item_id;
@@ -59,9 +55,9 @@ export async function GET() {
                 currentCatId = obj.category_id || obj.category?.id || obj.section_id;
             }
 
-            // إذا وجدنا "معرف" وسعر حقيقي (أكبر من 2 ليرة)، نقوم بتخزينه
+            // إذا وجدنا "معرف" وسعر حقيقي (أكبر من 2 ليرة)، نقوم بتخزينه كمنتج
             if (id && Number(price) >= 2 && name) {
-                const fullName = parentName ? `${parentName} - ${name}` : name;
+                const fullName = parentName && !name.includes(parentName) ? `${parentName} - ${name}` : name;
                 allExtractedItems.push({
                     id: id,
                     name: String(fullName),
@@ -72,18 +68,16 @@ export async function GET() {
                 });
             }
 
-            // البحث عن مصفوفات فرعية (خيارات منسدلة أو فئات فرعية) والغوص داخلها
-            const keysToScan = ['variants', 'options', 'prices', 'sub_services', 'items', 'products', 'data', 'services', 'children'];
+            // البحث عن مصفوفات فرعية (خيارات منسدلة أو فئات فرعية) والغوص داخلها لفكها
+            const keysToScan = ['variants', 'options', 'prices', 'sub_services', 'items', 'products', 'data', 'services', 'children', 'quantities'];
             
-            // مسح المصفوفات المباشرة
             if (Array.isArray(obj)) {
                 obj.forEach(item => deepScan(item, parentName, { name: currentCatName, id: currentCatId }));
             } else {
-                // مسح المفاتيح المحتملة داخل الكائن
                 Object.keys(obj).forEach(key => {
                     const value = obj[key];
                     if (keysToScan.includes(key) && Array.isArray(value)) {
-                        // إذا كانت المصفوفة داخل منتج، نمرر اسم المنتج كـ parentName لتسمية الخيارات الفرعية
+                        // إذا كان لدينا اسم حالي، نمرره كأب للخيارات المكتشفة بالداخل
                         const newParentName = (id && name) ? name : parentName;
                         value.forEach(item => deepScan(item, newParentName, { name: currentCatName, id: currentCatId }));
                     } else if (typeof value === 'object') {
@@ -99,12 +93,12 @@ export async function GET() {
         // تنظيف البيانات: إزالة التكرار وضمان الجودة
         const uniqueProducts = Array.from(new Map(allExtractedItems.map(item => [String(item.id) + String(item.price), item])).values());
 
-        console.log(`API_DEBUG -> Atomic Scan V30: Extracted ${uniqueProducts.length} unique services/quantities.`);
+        console.log(`API_DEBUG -> Atomic Scan V30: Extracted ${uniqueProducts.length} unique items.`);
 
         return NextResponse.json(uniqueProducts);
 
     } catch (error: any) {
         console.error("Products API Critical Failure:", error.message);
-        return NextResponse.json({ success: false, error: "Internal Server Error during Deep Scan" }, { status: 200 });
+        return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 200 });
     }
 }

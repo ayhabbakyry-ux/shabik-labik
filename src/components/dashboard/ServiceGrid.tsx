@@ -1,6 +1,6 @@
 "use client";
 
-import { Smartphone, SmartphoneNfc, Phone, Gamepad2, Zap, Radio, Sword, Landmark, MessageSquare, Castle, Swords } from "lucide-react";
+import { Smartphone, Phone, Gamepad2, Zap, Radio, Sword, Landmark, MessageSquare, Castle, Swords } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ProductSheet } from "./ProductSheet";
 
@@ -83,7 +83,7 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
         { 
           id: "coc", 
           name: "كلاش اوف كلانس", 
-          filter: "Clash of Clans", 
+          filter: "Clash", 
           icon: Castle, 
           color: "text-blue-600", 
           bg: "bg-blue-50",
@@ -92,7 +92,7 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
         { 
           id: "clash_royale", 
           name: "كلاش رويال", 
-          filter: "Clash Royale", 
+          filter: "Royale", 
           icon: Swords, 
           color: "text-red-600", 
           bg: "bg-red-50",
@@ -112,7 +112,7 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
     {
       title: "تطبيقات البث المباشر (أكاديمية)",
       colorClass: "text-pink-600",
-      icon: SmartphoneNfc,
+      icon: Smartphone,
       items: [
         { 
           id: "azal_live", 
@@ -127,7 +127,7 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
           id: "tiktok", 
           name: "تيك توك", 
           filter: "TikTok", 
-          icon: SmartphoneNfc, 
+          icon: Smartphone, 
           color: "text-pink-600", 
           bg: "bg-pink-50",
           imageUrl: "https://i.postimg.cc/J0vR6523/Screenshot-20260712-224351.png"
@@ -145,7 +145,7 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
           id: "likee", 
           name: "لايكي", 
           filter: "Likee", 
-          icon: SmartphoneNfc, 
+          icon: Smartphone, 
           color: "text-purple-600", 
           bg: "bg-purple-50",
           imageUrl: "https://i.postimg.cc/j2FjVbL5/Screenshot-20260712-224255.png"
@@ -160,7 +160,7 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
         <div key={idx} className="space-y-4">
           <h3 className={`font-bold text-lg border-r-4 border-current pr-3 flex items-center gap-2 ${section.colorClass} justify-end`}>
             {section.title}
-            <section.icon className="h-5 v-5" />
+            <section.icon className="h-5 w-5" />
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4" dir="rtl">
             {section.items.map((service) => (
