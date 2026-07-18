@@ -161,7 +161,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
           icon: Castle, 
           color: "text-blue-600", 
           bg: "bg-blue-50",
-          imageUrl: "https://i.postimg.cc/fbYd630T/coc.png"
+          imageUrl: "https://i.postimg.cc/P5CqrH8Q/Screenshot-20260718-100947.png"
         },
         { 
           id: "clash_royale", 
