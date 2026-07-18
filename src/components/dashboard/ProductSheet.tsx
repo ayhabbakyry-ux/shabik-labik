@@ -196,11 +196,14 @@ export function ProductSheet({
   const filteredProductsList = useMemo(() => {
     return allProducts.filter(p => {
         const searchKey = filterValue.toLowerCase().trim();
-        const prodName = (p.name || "").toLowerCase();
+        const prodName = (p.name || "").toLowerCase().trim();
         
         // استثناء الفئات الوهمية أو العناوين غير الضرورية التي تظهر في الـ API
         if (prodName === "azal live") return false;
         if (prodName.includes("shamna") || prodName.includes("شامنا")) return false;
+        
+        // مسح الفئات الوهمية الثلاث المأشر عليها في الصورة لسيريتل
+        if (prodName === "سيريتل وحدات" || prodName === "سيريتل كاش" || prodName === "سيريتل فاتورة") return false;
         
         if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
         if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
