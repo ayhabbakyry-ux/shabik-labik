@@ -177,11 +177,11 @@ export function ProductSheet({
 
         if (searchKey === "tiktok") {
             const matchesTikTok = 
-              prodName.includes("tiktok") || 
               prodName.includes("tik tok") || 
+              prodName.includes("tiktok") || 
               prodName.includes("تيك توك") ||
-              catName.includes("tiktok") || 
               catName.includes("tik tok") || 
+              catName.includes("tiktok") || 
               catName.includes("تيك توك");
             return matchesTikTok;
         }
@@ -217,16 +217,13 @@ export function ProductSheet({
             );
         }
 
+        // فلترة بلياردو 8 - حصرياً بمسميات الراغب العربية
         if (searchKey === "pool coins") {
-            const isPool = prodName.includes("8 ball") || prodName.includes("pool") || prodName.includes("بلياردو");
-            const isCoins = prodName.includes("coin") || prodName.includes("عملات") || prodName.includes("ذهب");
-            return isPool && isCoins;
+            return prodName.includes("العملات الذهبية") || catName.includes("العملات الذهبية");
         }
 
         if (searchKey === "pool cash") {
-            const isPool = prodName.includes("8 ball") || prodName.includes("pool") || prodName.includes("بلياردو");
-            const isCash = prodName.includes("cash") || prodName.includes("كاش") || prodName.includes("ورق");
-            return isPool && isCash;
+            return prodName.includes("العملات الورقية") || catName.includes("العملات الورقية");
         }
 
         if (searchKey === "syriatel") {
