@@ -157,17 +157,16 @@ export function ProductSheet({
         
         if (Number(p.price) < 2) return false;
 
-        // منطق الفلترة الذكي V42 - فصل كلاش اوف كلانس عن كلاش رويال بدقة
+        // منطق الفلترة الذكي V43 - دعم التيك توك (TIK TOK) وفصل كلاش بدقة
         if (searchKey === "clash") {
             const matchesClash = 
               prodName.includes("clash") || 
-              prodName.includes("clah") || // تصحيح CLAH OF CLANS
+              prodName.includes("clah") || 
               prodName.includes("كلاش") || 
               catName.includes("clash") || 
               catName.includes("clah") || 
               catName.includes("كلاش");
             
-            // استبعاد كلاش رويال من فقاعة كلاش اوف كلانس لضمان الدقة
             const matchesRoyale = 
               prodName.includes("royale") || 
               prodName.includes("royail") || 
@@ -182,11 +181,23 @@ export function ProductSheet({
         if (searchKey === "royale") {
             return (
               prodName.includes("royale") || 
-              prodName.includes("royail") || // تصحيح CLASH ROYAIL
+              prodName.includes("royail") || 
               prodName.includes("رويال") || 
               catName.includes("royale") || 
               catName.includes("royail") || 
               catName.includes("رويال")
+            );
+        }
+
+        // معالجة مسمى تيك توك الخاص بالمزود (TIK TOK)
+        if (searchKey === "tiktok") {
+            return (
+              prodName.includes("tiktok") || 
+              prodName.includes("tik tok") || 
+              prodName.includes("تيك توك") ||
+              catName.includes("tiktok") || 
+              catName.includes("tik tok") || 
+              catName.includes("تيك توك")
             );
         }
 
