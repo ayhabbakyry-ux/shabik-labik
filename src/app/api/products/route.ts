@@ -4,12 +4,12 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * @fileOverview مسار جلب المنتجات المطور - تم إضافة ?limit=500 لطلب كافة الفئات دفعة واحدة من سيرفر الراغب.
- * مع نظام معالجة أخطاء متقدم ومهلة انتظار طويلة للشبكات الضعيفة.
+ * @fileOverview مسار جلب المنتجات المطور V22 - محرك "الربط العميق".
+ * يقوم بتمشيط كافة طبقات الـ JSON لسحب المنتجات من المصفوفات المتداخلة والأقسام.
+ * يضمن ظهور كافة الكميات (مثل 12، 15، 25 ليرة) عبر تسطيح البيانات (Flattening).
  */
 export async function GET() {
     const API_TOKEN = process.env.ALRAGHEB_TOKEN;
-    // إضافة limit=500 لضمان سحب الـ 60 فئة وكافة المنتجات الحقيقية
     const ENDPOINT = 'https://api.alragheb-store.com/client/api/products?limit=500';
 
     if (!API_TOKEN) {
@@ -18,7 +18,7 @@ export async function GET() {
 
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 35000); // زيادة المهلة لـ 35 ثانية لتحمل حجم البيانات الضخم
+        const timeoutId = setTimeout(() => controller.abort(), 35000);
 
         const response = await fetch(ENDPOINT, {
             method: 'GET',
@@ -39,38 +39,87 @@ export async function GET() {
 
         const rawData = await response.json();
         
-        // منطق ذكي لاستخراج مصفوفة المنتجات مهما كان عمقها أو تسميتها في الـ API
-        let productsArray: any[] = [];
-        
-        if (Array.isArray(rawData)) {
-            productsArray = rawData;
-        } else if (rawData && typeof rawData === 'object') {
-            if (rawData.data && Array.isArray(rawData.data)) {
-                productsArray = rawData.data;
-            } else if (rawData.products && Array.isArray(rawData.products)) {
-                productsArray = rawData.products;
-            } else if (rawData.items && Array.isArray(rawData.items)) {
-                productsArray = rawData.items;
-            } else {
-                const possibleKey = Object.keys(rawData).find(key => Array.isArray(rawData[key]));
-                productsArray = possibleKey ? rawData[possibleKey] : [];
+        // --- محرك الاستخراج العميق (Deep Extraction Engine) ---
+        let allItems: any[] = [];
+
+        /**
+         * دالة ذكية لتسطيح البيانات: تبحث عن أي مصفوفة منتجات مهما كان عمقها
+         */
+        const extractProductsRecursively = (obj: any, parentCategoryName = '', parentCategoryId = '') => {
+            if (!obj || typeof obj !== 'object') return;
+
+            // إذا وجدنا مصفوفة، نفحص محتواها
+            if (Array.isArray(obj)) {
+                obj.forEach(item => {
+                    if (item && typeof item === 'object') {
+                        // إذا كان العنصر يبدو كمنتج (يحتوي على اسم وسعر أو ID)
+                        if (item.id || item.product_id || item.service_id) {
+                            // إضافة بيانات الفئة من الأب إذا لم تكن موجودة في العنصر نفسه
+                            const formattedItem = {
+                                ...item,
+                                inherited_category_name: parentCategoryName,
+                                inherited_category_id: parentCategoryId
+                            };
+                            allItems.push(formattedItem);
+                        } else {
+                            // إذا كانت مصفوفة من فئات، نغوص داخلها
+                            extractProductsRecursively(item, parentCategoryName, parentCategoryId);
+                        }
+                    }
+                });
+                return;
+            }
+
+            // إذا كان كائناً (Object)، نبحث في مفاتيحه
+            Object.keys(obj).forEach(key => {
+                const value = obj[key];
+                
+                // تحديث اسم الفئة إذا كنا نمر عبر حقل فئة
+                let currentCatName = parentCategoryName;
+                let currentCatId = parentCategoryId;
+
+                if (key === 'category' || key === 'section' || key === 'group') {
+                    currentCatName = value?.name || value?.title || currentCatName;
+                    currentCatId = value?.id || currentCatId;
+                }
+
+                // غوص عميق في القيمة
+                if (typeof value === 'object') {
+                    extractProductsRecursively(value, currentCatName, currentCatId);
+                }
+            });
+        };
+
+        // بدء عملية المسح الشامل للبيانات الخام
+        extractProductsRecursively(rawData);
+
+        // إذا فشل المسح الشامل، نحاول الطريقة التقليدية كخطة بديلة
+        if (allItems.length === 0) {
+            const possibleArrays = [rawData.data, rawData.products, rawData.items, rawData.services];
+            for (const arr of possibleArrays) {
+                if (Array.isArray(arr)) {
+                    allItems = arr;
+                    break;
+                }
             }
         }
 
-        // تحويل البيانات الخام إلى الشكل الذي تحتاجه الواجهة مع حماية كاملة وفحص عميق للفئات
-        const formattedProducts = productsArray.map((prod: any) => {
+        // تحويل وتنسيق البيانات للواجهة مع حماية Optional Chaining
+        const formattedProducts = allItems.map((prod: any) => {
             const name = prod.الاسم || prod.name || prod.title || prod.product_name || 'منتج غير مسمى';
             const price = prod.السعر || prod.price || prod.cost || 0;
             
-            // معالجة الفئة (Category) باستخدام Optional Chaining لضمان سحب كافة الأقسام
-            const categoryName = prod.اسم_الفئة || 
+            // استخراج اسم الفئة بأعلى دقة ممكنة (دعم طلب أيهم الصارم للـ Optional Chaining)
+            const categoryName = prod.inherited_category_name || 
+                               prod.اسم_الفئة || 
                                prod.category_name || 
                                prod.category?.name || 
                                prod.section?.name || 
                                prod.group_name || 
                                '';
                                
-            const categoryId = prod.category_id || 
+            const categoryId = prod.inherited_category_id ||
+                             prod.category_id || 
                              prod.parent_id || 
                              prod.category?.id || 
                              prod.section_id || 
@@ -79,7 +128,7 @@ export async function GET() {
             const image = prod.image || prod.img || prod.thumbnail || '';
             
             return {
-                id: prod.id,
+                id: prod.id || prod.product_id || prod.service_id,
                 name: String(name),
                 price: Number(price),
                 category_name: String(categoryName),
@@ -88,15 +137,18 @@ export async function GET() {
             };
         });
 
-        console.log(`API_DEBUG -> Fetched ${formattedProducts.length} items with limit=500.`);
+        // إزالة التكرار (في حال سحبنا نفس المنتج من مكانين مختلفين)
+        const uniqueProducts = Array.from(new Map(formattedProducts.map(item => [item.id, item])).values());
 
-        return NextResponse.json(formattedProducts);
+        console.log(`API_DEBUG -> Successfully Flattened ${uniqueProducts.length} unique items.`);
+
+        return NextResponse.json(uniqueProducts);
 
     } catch (error: any) {
-        console.error("Products API Error:", error.message);
+        console.error("Products API Critical Error:", error.message);
         return NextResponse.json({ 
             success: false, 
-            error: error.name === 'AbortError' ? "انتهت مهلة الاتصال بالرغم من الانتظار" : "تعذر الوصول للسيرفر حالياً" 
+            error: error.name === 'AbortError' ? "انتهت مهلة الاتصال" : "تعذر استلام كافة الفئات حالياً" 
         }, { status: 200 });
     }
 }
