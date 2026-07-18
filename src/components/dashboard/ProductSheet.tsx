@@ -157,7 +157,7 @@ export function ProductSheet({
         
         if (Number(p.price) < 2) return false;
 
-        // منطق الفلترة الذكي V41 - معالجة كافة الأخطاء المطبعية للراغب (CLAH, ROYAIL)
+        // منطق الفلترة الذكي V42 - فصل كلاش اوف كلانس عن كلاش رويال بدقة
         if (searchKey === "clash") {
             const matchesClash = 
               prodName.includes("clash") || 
@@ -168,7 +168,15 @@ export function ProductSheet({
               catName.includes("كلاش");
             
             // استبعاد كلاش رويال من فقاعة كلاش اوف كلانس لضمان الدقة
-            return matchesClash && !prodName.includes("royale") && !prodName.includes("royail") && !prodName.includes("رويال");
+            const matchesRoyale = 
+              prodName.includes("royale") || 
+              prodName.includes("royail") || 
+              prodName.includes("رويال") || 
+              catName.includes("royale") || 
+              catName.includes("royail") || 
+              catName.includes("رويال");
+
+            return matchesClash && !matchesRoyale;
         }
 
         if (searchKey === "royale") {
