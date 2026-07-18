@@ -157,7 +157,19 @@ export function ProductSheet({
         
         if (Number(p.price) < 2) return false;
 
-        // منطق الفلترة الذكي V44 - دعم تيك توك بمسافة (TIK TOK)
+        if (searchKey === "pubg tr") {
+            return (
+                prodName.includes("tr") || 
+                prodName.includes("turkey") || 
+                prodName.includes("تركي") || 
+                prodName.includes("تركيا") ||
+                catName.includes("tr") || 
+                catName.includes("turkey") || 
+                catName.includes("تركي") || 
+                catName.includes("تركيا")
+            );
+        }
+
         if (searchKey === "tiktok") {
             const matchesTikTok = 
               prodName.includes("tiktok") || 

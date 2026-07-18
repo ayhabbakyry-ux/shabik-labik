@@ -72,6 +72,15 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
           imageUrl: "https://i.postimg.cc/Kz7cYTjq/Screenshot-20260712-221644.png"
         },
         { 
+          id: "pubg_tr", 
+          name: "ببجي تركي", 
+          filter: "PUBG TR", 
+          icon: Gamepad2, 
+          color: "text-red-600", 
+          bg: "bg-red-50",
+          imageUrl: "https://i.postimg.cc/Kz7cYTjq/Screenshot-20260712-221644.png"
+        },
+        { 
           id: "freefire", 
           name: "فري فاير", 
           filter: "Free Fire", 
