@@ -157,16 +157,20 @@ export function ProductSheet({
         
         if (Number(p.price) < 2) return false;
 
+        // فلترة ببجي العالمية (استبعاد التركي)
+        if (searchKey === "pubg") {
+            const isPubg = prodName.includes("pubg") || catName.includes("pubg") || prodName.includes("ببجي") || catName.includes("ببجي");
+            const isTR = prodName.includes("tr") || prodName.includes("turkey") || prodName.includes("تركي") || catName.includes("tr") || catName.includes("turkey");
+            return isPubg && !isTR;
+        }
+
+        // فلترة ببجي تركي حصراً
         if (searchKey === "pubg tr") {
             return (
-                prodName.includes("tr") || 
-                prodName.includes("turkey") || 
-                prodName.includes("تركي") || 
-                prodName.includes("تركيا") ||
-                catName.includes("tr") || 
-                catName.includes("turkey") || 
-                catName.includes("تركي") || 
-                catName.includes("تركيا")
+                prodName.includes("pubg tr") || 
+                prodName.includes("pubg-tr") ||
+                catName.includes("pubg tr") ||
+                (prodName.includes("pubg") && (prodName.includes("tr") || prodName.includes("turkey")))
             );
         }
 
