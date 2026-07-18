@@ -60,9 +60,9 @@ export async function POST(request: Request) {
             // معالجة الأخطاء الذكية (خاصة رصيد المزود)
             let errorMsg = rawData.message || rawData.error || 'رفض السيرفر تنفيذ الطلب';
             
-            // إذا كان الخطأ بسبب الرصيد عند المزود (كود 100 أو رسالة واضحة)
+            // إذا كان الخطأ بسبب الرصيد عند المزود (كود 100 أو رسالة واضحة تحتوي كلمات رصيد أو balance)
             if (rawData.code === 100 || errorMsg.toLowerCase().includes('balance') || errorMsg.includes('رصيد')) {
-                errorMsg = "عذراً، الرصيد المتاح عند المزود غير كافٍ حالياً. لم يتم خصم أي مبلغ من حسابك، يرجى المحاولة لاحقاً.";
+                errorMsg = "عذراً، يرجى المحاولة بعد قليل.";
             }
             
             return NextResponse.json({ 
