@@ -301,6 +301,12 @@ export function ProductSheet({
                       <Button onClick={() => handleOrder(null)} disabled={!isShamValid || ordering !== null} className="w-full h-14 font-black text-lg rounded-2xl bg-[#8b5cf6] hover:bg-[#7c3aed] text-white shadow-xl shadow-purple-200">
                         {ordering !== null ? <Loader2 className="h-5 w-5 animate-spin" /> : "إرسال طلب الشحن"}
                       </Button>
+                      
+                      {/* تنبيه المنتج اليدوي */}
+                      <div className="flex items-center gap-2 justify-center mt-2 bg-amber-50 border border-amber-100 p-3 rounded-xl animate-pulse">
+                        <AlertCircle className="h-4 w-4 text-amber-600" />
+                        <p className="text-[11px] font-bold text-amber-700">تنبيه: هذا المنتج يعمل بشكل يدوي</p>
+                      </div>
                    </div>
                  )}
               </div>
