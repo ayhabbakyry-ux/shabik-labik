@@ -157,16 +157,33 @@ export function ProductSheet({
         
         if (Number(p.price) < 2) return false;
 
-        // منطق الفلترة الذكي لدعم كافة اللغات والألعاب
+        // منطق الفلترة الذكي V40 - معالجة خطأ "CLAH" وسحب كافة الفئات
         if (searchKey === "clash") {
-            return prodName.includes("clash") || prodName.includes("كلاش") || catName.includes("clash") || catName.includes("كلاش");
+            const matchesClash = 
+              prodName.includes("clash") || 
+              prodName.includes("clah") || // معالجة الخطأ المطبعي في سيرفر الراغب
+              prodName.includes("كلاش") || 
+              catName.includes("clash") || 
+              catName.includes("clah") || 
+              catName.includes("كلاش");
+            
+            // استبعاد كلاش رويال من فقاعة كلاش اوف كلانس لضمان الدقة
+            return matchesClash && !prodName.includes("royale") && !prodName.includes("رويال");
         }
+
         if (searchKey === "royale") {
-            return prodName.includes("royale") || prodName.includes("رويال") || catName.includes("royale") || catName.includes("رويال");
+            return (
+              prodName.includes("royale") || 
+              prodName.includes("رويال") || 
+              catName.includes("royale") || 
+              catName.includes("رويال")
+            );
         }
+
         if (searchKey === "syriatel") {
             return prodName.includes("سيريتل") || prodName.includes("syriatel") || catName.includes("سيريتل") || catName.includes("syriatel");
         }
+
         if (searchKey === "mtn") {
             return prodName.includes("mtn") || prodName.includes("ام تي ان") || catName.includes("mtn") || catName.includes("ام تي ان");
         }
