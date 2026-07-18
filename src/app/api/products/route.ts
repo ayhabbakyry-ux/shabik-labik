@@ -53,7 +53,7 @@ export async function GET() {
             const name = prod.الاسم || prod.name || prod.title || prod.product_name || 'منتج غير مسمى';
             const price = prod.السعر || prod.price || prod.cost || 0;
             const categoryName = prod.اسم_الفئة || prod.category_name || prod.category?.name || '';
-            const categoryId = prod.category_id || prod.parent_id || '';
+            const categoryId = prod.category_id || prod.parent_id || prod.category?.id || '';
             const image = prod.image || prod.img || '';
             
             return {
