@@ -156,7 +156,8 @@ export function ProductSheet({
         const prodName = (p.name || "").toLowerCase();
         const catName = (p.category_name || "").toLowerCase();
         
-        if (Number(p.price) < 2) return false;
+        // نظام الفلترة الصارم V31: استبعاد المنتجات الوهمية (أقل من 10 ليرات)
+        if (Number(p.price) < 10) return false;
 
         // فلترة ببجي العالمية (استبعاد التركي)
         if (searchKey === "pubg") {
@@ -217,7 +218,7 @@ export function ProductSheet({
             );
         }
 
-        // فلترة بلياردو 8 - حصرياً بمسميات الراغب العربية
+        // فلترة بلياردو 8 - حصرياً بمسميات الراغب العربية الصارمة
         if (searchKey === "pool coins") {
             return prodName.includes("العملات الذهبية") || catName.includes("العملات الذهبية");
         }
@@ -302,7 +303,6 @@ export function ProductSheet({
                         {ordering !== null ? <Loader2 className="h-5 w-5 animate-spin" /> : "إرسال طلب الشحن"}
                       </Button>
                       
-                      {/* تنبيه المنتج اليدوي */}
                       <div className="flex items-center gap-2 justify-center mt-2 bg-amber-50 border border-amber-100 p-3 rounded-xl animate-pulse">
                         <AlertCircle className="h-4 w-4 text-amber-600" />
                         <p className="text-[11px] font-bold text-amber-700">تنبيه: هذا المنتج يعمل بشكل يدوي</p>

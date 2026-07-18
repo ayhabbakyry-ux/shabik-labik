@@ -4,10 +4,8 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * @fileOverview محرك "رادار شبيك لبيك" V30 - النسخة النهائية الصارمة.
- * يقوم بمسح ذري شامل لكافة طبقات الـ JSON القادمة من الراغب.
- * يسحب المنتجات، المنتجات الفرعية، الخيارات المنسدلة، والكميات العميقة.
- * يضمن ظهور كافة الفئات كاملة عبر نظام التسطيح اللامتناهي.
+ * @fileOverview محرك "رادار شبيك لبيك" V31 - النسخة الصارمة لتنظيف الفئات الوهمية.
+ * يقوم بمسح ذري شامل ويستبعد أي فئة سعرها أقل من 10 ليرات لضمان جودة البيانات.
  */
 export async function GET() {
     const API_TOKEN = process.env.ALRAGHEB_TOKEN;
@@ -55,8 +53,8 @@ export async function GET() {
                 currentCatId = obj.category_id || obj.category?.id || obj.section_id;
             }
 
-            // إذا وجدنا "معرف" وسعر حقيقي (أكبر من 2 ليرة)، نقوم بتخزينه كمنتج
-            if (id && Number(price) >= 2 && name) {
+            // نظام الفلترة الصارم V31: استبعاد المنتجات الوهمية (أقل من 10 ليرات)
+            if (id && Number(price) >= 10 && name) {
                 const fullName = parentName && !name.includes(parentName) ? `${parentName} - ${name}` : name;
                 allExtractedItems.push({
                     id: id,
@@ -77,7 +75,6 @@ export async function GET() {
                 Object.keys(obj).forEach(key => {
                     const value = obj[key];
                     if (keysToScan.includes(key) && Array.isArray(value)) {
-                        // إذا كان لدينا اسم حالي، نمرره كأب للخيارات المكتشفة بالداخل
                         const newParentName = (id && name) ? name : parentName;
                         value.forEach(item => deepScan(item, newParentName, { name: currentCatName, id: currentCatId }));
                     } else if (typeof value === 'object') {
@@ -87,13 +84,12 @@ export async function GET() {
             }
         }
 
-        // بدء عملية التنقيب الشاملة
         deepScan(rawData);
 
         // تنظيف البيانات: إزالة التكرار وضمان الجودة
         const uniqueProducts = Array.from(new Map(allExtractedItems.map(item => [String(item.id) + String(item.price), item])).values());
 
-        console.log(`API_DEBUG -> Atomic Scan V30: Extracted ${uniqueProducts.length} unique items.`);
+        console.log(`API_DEBUG -> Atomic Scan V31: Extracted ${uniqueProducts.length} unique real products.`);
 
         return NextResponse.json(uniqueProducts);
 
