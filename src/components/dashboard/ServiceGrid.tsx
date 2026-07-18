@@ -170,7 +170,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
           icon: Swords, 
           color: "text-red-600", 
           bg: "bg-red-50",
-          imageUrl: "https://i.postimg.cc/mD363z07/royale.png"
+          imageUrl: "https://i.postimg.cc/mkkvNL4M/Screenshot-20260718-101357.png"
         },
         { 
           id: "jawaker", 
