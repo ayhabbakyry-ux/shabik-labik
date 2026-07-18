@@ -21,7 +21,7 @@ type Section = {
   colorClass: string;
 };
 
-export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
+export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, searchQuery?: string }) {
   const sections: Section[] = [
     {
       title: "قسم شحن الخطوط (وحدات وفواتير)",
@@ -154,40 +154,54 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
     }
   ];
 
+  const filteredSections = sections.map(section => ({
+    ...section,
+    items: section.items.filter(item => 
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      item.filter.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  })).filter(section => section.items.length > 0);
+
   return (
     <div className="space-y-12 pb-10">
-      {sections.map((section, idx) => (
-        <div key={idx} className="space-y-4">
-          <h3 className={`font-bold text-lg border-r-4 border-current pr-3 flex items-center gap-2 ${section.colorClass} justify-end`}>
-            {section.title}
-            <section.icon className="h-5 w-5" />
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4" dir="rtl">
-            {section.items.map((service) => (
-              <ProductSheet 
-                key={service.id} 
-                serviceName={service.name} 
-                filterValue={service.filter}
-              >
-                <Card className="hover:shadow-md transition-all cursor-pointer group active:scale-95 border-none bg-white overflow-hidden">
-                  <CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-3">
-                    <div className={`w-20 h-20 rounded-full ${service.bg} flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner overflow-hidden`}>
-                      {service.imageUrl ? (
-                        <img src={service.imageUrl} alt={service.name} className="w-full h-full object-contain" />
-                      ) : (
-                        <service.icon className={`h-10 w-10 ${service.color}`} />
-                      )}
-                    </div>
-                    <p className="text-[13px] font-bold leading-tight text-foreground group-hover:text-primary transition-colors">
-                      {service.name}
-                    </p>
-                  </CardContent>
-                </Card>
-              </ProductSheet>
-            ))}
-          </div>
+      {filteredSections.length === 0 ? (
+        <div className="text-center py-20 bg-muted/20 rounded-[32px] border-2 border-dashed">
+          <p className="font-bold text-muted-foreground">عذراً، لم يتم العثور على أي خدمة بهذا الاسم.</p>
         </div>
-      ))}
+      ) : (
+        filteredSections.map((section, idx) => (
+          <div key={idx} className="space-y-4">
+            <h3 className={`font-bold text-lg border-r-4 border-current pr-3 flex items-center gap-2 ${section.colorClass} justify-end`}>
+              {section.title}
+              <section.icon className="h-5 w-5" />
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4" dir="rtl">
+              {section.items.map((service) => (
+                <ProductSheet 
+                  key={service.id} 
+                  serviceName={service.name} 
+                  filterValue={service.filter}
+                >
+                  <Card className="hover:shadow-md transition-all cursor-pointer group active:scale-95 border-none bg-white overflow-hidden">
+                    <CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-3">
+                      <div className={`w-20 h-20 rounded-full ${service.bg} flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner overflow-hidden`}>
+                        {service.imageUrl ? (
+                          <img src={service.imageUrl} alt={service.name} className="w-full h-full object-contain" />
+                        ) : (
+                          <service.icon className={`h-10 w-10 ${service.color}`} />
+                        )}
+                      </div>
+                      <p className="text-[13px] font-bold leading-tight text-foreground group-hover:text-primary transition-colors">
+                        {service.name}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </ProductSheet>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 }

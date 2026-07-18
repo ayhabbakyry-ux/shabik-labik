@@ -1,4 +1,3 @@
-
 "use client";
 
 import { WalletCard } from "@/components/dashboard/WalletCard";
@@ -18,6 +17,7 @@ export default function DashboardPage() {
     isNotificationSupported, requestNotificationPermission, userName 
   } = useUser();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const router = useRouter();
 
   useEffect(() => {
@@ -115,10 +115,15 @@ export default function DashboardPage() {
           
           <div className="relative">
             <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input className="pr-10 bg-white border-none shadow-sm h-12 text-right rounded-2xl" placeholder="البحث عن الخدمات المتاحة..." />
+            <Input 
+              className="pr-10 bg-white border-none shadow-sm h-12 text-right rounded-2xl" 
+              placeholder="البحث عن الخدمات المتاحة..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
 
-          <ServiceGrid isAdmin={isAdmin} />
+          <ServiceGrid isAdmin={isAdmin} searchQuery={searchQuery} />
         </div>
       </main>
 
