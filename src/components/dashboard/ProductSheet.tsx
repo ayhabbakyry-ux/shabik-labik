@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState, useCallback } from 'react';
@@ -54,20 +55,17 @@ export function ProductSheet({
     return filter.includes('mtn') || filter.includes('syriatel');
   }, [filterValue]);
 
-  // منطق التسعير الدقيق حسب نوع الخدمة
+  // منطق التسعير الدقيق للاتصالات: زيادة 0.20 ليرة لكل 10 ليرات رصيد اسمي
   const calculateProductPrice = useCallback((product: ProductItem) => {
     const originalPrice = Number(product.price);
     
     if (isTelecom) {
-      // البحث عن الرقم في الاسم (مثال: MTN 20 -> 20)
       const matches = product.name.match(/\d+/);
       const nominalCredit = matches ? Number(matches[0]) : (originalPrice > 10 ? Math.round(originalPrice / 1.05) : originalPrice);
-      // العمولة: 0.20 لكل 10 ليرات (أي 2% من الرصيد الاسمي)
       const markup = nominalCredit * 0.02;
       return originalPrice + markup;
     }
     
-    // الألعاب وتطبيقات الدردشة: سعر المزود + 2 ليرة ثابتة
     return originalPrice + 2;
   }, [isTelecom]);
 
@@ -83,7 +81,7 @@ export function ProductSheet({
     const amount = Number(dynamicAmount);
     if (isNaN(amount)) return `0.00 ${currency}`;
     const cost = amount * 1.02;
-    return `${cost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+    return cost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ` ${currency}`;
   }, [isShamCash, dynamicAmount, currency]);
 
   const fetchProducts = useCallback(async () => {
@@ -196,24 +194,23 @@ export function ProductSheet({
   const filteredProductsList = useMemo(() => {
     return allProducts.filter(p => {
         const searchKey = filterValue.toLowerCase().trim();
-        const prodName = (p.name || "").toLowerCase().trim();
+        const prodName = (p.name || "").toLowerCase();
+        const catName = (p.category_name || "").toLowerCase();
         
-        // استثناء العناوين الوهمية التي تظهر في الـ API كمنتجات بأسعار زهيدة (Headers)
-        if (prodName === "azal live") return false;
-        if (prodName.includes("shamna") || prodName.includes("شامنا")) return false;
-        
-        // مسح الفئات الوهمية (الهيدرز) بدقة لضمان عدم حجب المنتجات الحقيقية
-        const illusoryHeaders = ["سيريتل وحدات", "سيريتل كاش", "سيريتل فاتورة", "ام تي ان وحدات", "ام تي ان كاش", "ام تي ان فاتورة"];
-        if (illusoryHeaders.includes(prodName)) return false;
-        
+        // استثناء العناوين الوهمية التي تكون أسعارها رمزية جداً (أقل من 2 ليرة)
+        if (Number(p.price) < 2) return false;
+
+        // البحث في اسم المنتج واسم الفئة لضمان جلب كافة الفئات الـ 30+
         if (searchKey === "syriatel") {
-            return prodName.includes("سيريتل") || prodName.includes("syriatel") || prodName.includes("سيرياتيل");
+            return prodName.includes("سيريتل") || prodName.includes("syriatel") || prodName.includes("سيرياتيل") || 
+                   catName.includes("سيريتل") || catName.includes("syriatel") || catName.includes("سيرياتيل");
         }
         if (searchKey === "mtn") {
-            return prodName.includes("mtn") || prodName.includes("ام تي ان") || prodName.includes("إم تي إن");
+            return prodName.includes("mtn") || prodName.includes("ام تي ان") || prodName.includes("إم تي إن") ||
+                   catName.includes("mtn") || catName.includes("ام تي ان") || catName.includes("إم تي إن");
         }
         
-        return prodName.includes(searchKey);
+        return prodName.includes(searchKey) || catName.includes(searchKey);
     });
   }, [allProducts, filterValue]);
 
