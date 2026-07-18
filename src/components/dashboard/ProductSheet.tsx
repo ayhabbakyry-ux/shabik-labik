@@ -141,7 +141,12 @@ export function ProductSheet({
           toast({ title: "تم إرسال الطلب", description: "جاري المعالجة من قبل المزود." });
           if (isShamCash) { setGlobalTargetId(""); setDynamicAmount(""); }
       } else {
-          toast({ title: "فشل الطلب", description: result.message || "رفض المزود تنفيذ العملية.", variant: "destructive" });
+          // عرض رسالة الخطأ القادمة من السيرفر (مثل تنبيه رصيد المزود)
+          toast({ 
+            title: "فشل الطلب", 
+            description: result.message || "رفض المزود تنفيذ العملية.", 
+            variant: "destructive" 
+          });
       }
     } catch (error: any) {
       toast({ title: "خطأ اتصال", description: "تعذر الاتصال بسيرفر الشحن.", variant: "destructive" });
@@ -156,17 +161,14 @@ export function ProductSheet({
         const prodName = (p.name || "").toLowerCase();
         const catName = (p.category_name || "").toLowerCase();
         
-        // نظام الفلترة الصارم V31: استبعاد المنتجات الوهمية (أقل من 10 ليرات)
         if (Number(p.price) < 10) return false;
 
-        // فلترة ببجي العالمية (استبعاد التركي)
         if (searchKey === "pubg") {
             const isPubg = prodName.includes("pubg") || catName.includes("pubg") || prodName.includes("ببجي") || catName.includes("ببجي");
             const isTR = prodName.includes("tr") || prodName.includes("turkey") || prodName.includes("تركي") || catName.includes("tr") || catName.includes("turkey");
             return isPubg && !isTR;
         }
 
-        // فلترة ببجي تركي حصراً
         if (searchKey === "pubg tr") {
             return (
                 prodName.includes("pubg tr") || 
@@ -218,7 +220,6 @@ export function ProductSheet({
             );
         }
 
-        // فلترة بلياردو 8 - حصرياً بمسميات الراغب العربية الصارمة
         if (searchKey === "pool coins") {
             return prodName.includes("العملات الذهبية") || catName.includes("العملات الذهبية");
         }

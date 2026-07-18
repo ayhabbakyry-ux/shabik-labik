@@ -48,7 +48,6 @@ export async function POST(request: Request) {
         console.log('API_DEBUG -> Alragheb Raw Response:', JSON.stringify(rawData));
 
         // تحليل استجابة السيرفر بناءً على حالة النجاح
-        // سيرفر الراغب يرجع "status": "OK" عند نجاح استلام الطلب
         if (rawData.status === "OK" || rawData.success === true || rawData["الحالة"] === "قبول") {
             const orderId = rawData.data?.order_id || rawData.order_id || rawData.data?.['رقم_الطلب'] || "";
             return NextResponse.json({ 
@@ -58,9 +57,13 @@ export async function POST(request: Request) {
                 order_id: orderId 
             });
         } else {
-            // معالجة الأخطاء (مثل كود 100 للرصيد، أو رسالة صريحة)
+            // معالجة الأخطاء الذكية (خاصة رصيد المزود)
             let errorMsg = rawData.message || rawData.error || 'رفض السيرفر تنفيذ الطلب';
-            if (rawData.code === 100) errorMsg = "عذراً، الرصيد غير كافٍ في حساب المزود حالياً.";
+            
+            // إذا كان الخطأ بسبب الرصيد عند المزود (كود 100 أو رسالة واضحة)
+            if (rawData.code === 100 || errorMsg.toLowerCase().includes('balance') || errorMsg.includes('رصيد')) {
+                errorMsg = "عذراً، الرصيد المتاح عند المزود غير كافٍ حالياً. لم يتم خصم أي مبلغ من حسابك، يرجى المحاولة لاحقاً.";
+            }
             
             return NextResponse.json({ 
                 success: false, 
