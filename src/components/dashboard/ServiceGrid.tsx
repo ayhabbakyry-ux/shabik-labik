@@ -344,7 +344,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
                   <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
                      {activeSubGroup === 'pool' && section.id === 'games' ? (
                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-left-4">
-                          <ProductSheet serviceName="العملات الذهبية" filterValue="pool coins">
+                          <ProductSheet serviceName="العملات الذهبية" filterValue="العملات الذهبية">
                               <Card className="hover:shadow-md transition-all cursor-pointer group active:scale-95 border-none bg-white overflow-hidden shadow-sm">
                                  <CardContent className="p-5 flex flex-col items-center justify-center text-center space-y-3">
                                     <div className={`w-20 h-20 rounded-full bg-yellow-50 flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner overflow-hidden border border-white`}>
@@ -354,7 +354,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
                                  </CardContent>
                               </Card>
                           </ProductSheet>
-                          <ProductSheet serviceName="العملات الورقية" filterValue="pool cash">
+                          <ProductSheet serviceName="العملات الورقية" filterValue="العملات الورقية">
                               <Card className="hover:shadow-md transition-all cursor-pointer group active:scale-95 border-none bg-white overflow-hidden shadow-sm">
                                  <CardContent className="p-5 flex flex-col items-center justify-center text-center space-y-3">
                                     <div className={`w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner overflow-hidden border border-white`}>
@@ -411,16 +411,6 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
             </SheetContent>
           </Sheet>
         ))}
-      </div>
-
-      <div className="bg-primary/5 p-6 rounded-[32px] border border-primary/10 flex items-center justify-between">
-         <div className="text-right">
-            <h4 className="font-black text-primary text-sm">برنامج المكافآت</h4>
-            <p className="text-[10px] text-muted-foreground font-medium">شارك كودك واربح رصيد مجاني عن كل صديق</p>
-         </div>
-         <Button onClick={() => window.location.href='/referral'} size="sm" className="rounded-2xl font-bold gap-2">
-            اكتشف المزيد <ArrowRight className="h-4 w-4 rotate-180" />
-         </Button>
       </div>
     </div>
   );
