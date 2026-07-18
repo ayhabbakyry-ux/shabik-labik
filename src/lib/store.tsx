@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -297,9 +298,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const deductBalance = async (amount: number, productDetails: string, initialStatus: 'Pending' | 'Completed' = 'Completed', externalId?: string) => {
     const before = userBalance;
     const newBal = Math.max(0, userBalance - amount);
+    
+    // تحديث الحالة المحلية فوراً لتجربة مستخدم سريعة
     setUserBalance(newBal);
+
     try {
+      const phoneClean = userPhone.trim();
+      const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
+      const userSnap = await getDocs(userQ);
+      
+      if (!userSnap.empty) {
+        const userDocRef = doc(db, "users", userSnap.docs[0].id);
+        // التحديث الفعلي في السيرفر لخصم الرصيد من حساب الزبون (حجز الرصيد)
+        await updateDoc(userDocRef, { balance: newBal });
+      }
+
       const now = new Date().toISOString();
+      // تسجيل المعاملة في السجل لضمان الشفافية
       await addDoc(collection(db, "transactions"), {
         external_order_id: externalId || "",
         type: 'طلب شحن',
@@ -308,14 +323,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         date: now,
         createdAt: now,
         userName,
-        userPhone: userPhone.trim(),
+        userPhone: phoneClean,
         details: productDetails,
         balanceBefore: before,
         balanceAfter: newBal
       });
+      
       triggerPushSilently(ADMIN_PHONE, "🚀 طلب شحن جديد", `قام ${userName} بطلب شحن جديد.`, "/admin");
     } catch (e) {
+      console.error("Critical: Failed to persist deduction in Firestore", e);
+      // التراجع عن التحديث المحلي في حال فشل السيرفر لضمان دقة البيانات
       setUserBalance(before);
+      throw e;
     }
   };
 
