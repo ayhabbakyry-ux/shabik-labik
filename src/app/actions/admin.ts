@@ -1,4 +1,3 @@
-
 'use server';
 
 import { db } from '@/lib/firebase-config';
@@ -10,12 +9,12 @@ import {
   doc, 
   updateDoc, 
   deleteDoc, 
-  getDoc
+  getDoc,
+  increment
 } from 'firebase/firestore';
-import { Transaction } from '@/lib/types';
 
 /**
- * @fileOverview أفعال الإدارة السحابية - مع جلب شامل للبيانات لضمان عدم ضياع أي إيداع زبون.
+ * @fileOverview أفعال الإدارة السحابية - تم تحديث نظام تحديث الرصيد ليكون ذرياً (Atomic) للأمان.
  */
 
 export async function getAllUsersAction() {
@@ -64,8 +63,10 @@ export async function processAdminAction(txId: string, action: 'approve' | 'reje
       const userSnap = await getDocs(userQ);
       if (!userSnap.empty) {
         const userDoc = userSnap.docs[0];
-        const currentBalance = Number(userDoc.data().balance || 0);
-        await updateDoc(doc(db, "users", userDoc.id), { balance: currentBalance + Number(txData.amount) });
+        // استخدام increment لإضافة الرصيد بأمان
+        await updateDoc(doc(db, "users", userDoc.id), { 
+          balance: increment(Number(txData.amount)) 
+        });
       }
       await updateDoc(txRef, { status: 'Completed' });
     } else {
@@ -87,8 +88,10 @@ export async function updateTransactionStatusServer(orderId: string, status: 'Co
       const userSnap = await getDocs(userQ);
       if (!userSnap.empty) {
         const userDoc = userSnap.docs[0];
-        const currentBal = Number(userDoc.data().balance || 0);
-        await updateDoc(doc(db, "users", userDoc.id), { balance: currentBal + amount });
+        // إعادة الرصيد "المحجوز" في حال الرفض باستخدام increment
+        await updateDoc(doc(db, "users", userDoc.id), { 
+          balance: increment(amount) 
+        });
       }
     }
     return { success: true };
@@ -139,9 +142,11 @@ export async function updateUserBalanceDirectlyAction(phone: string, amount: num
     const userSnap = await getDocs(userQ);
     if (!userSnap.empty) {
       const userDoc = userSnap.docs[0];
-      const currentBalance = Number(userDoc.data().balance || 0);
-      const newBalance = operation === 'add' ? currentBalance + amount : Math.max(0, currentBalance - amount);
-      await updateDoc(doc(db, "users", userDoc.id), { balance: newBalance });
+      const adjAmount = operation === 'add' ? amount : -amount;
+      // تعديل الرصيد يدوياً من لوحة الإدارة بأمان ذري
+      await updateDoc(doc(db, "users", userDoc.id), { 
+        balance: increment(adjAmount) 
+      });
       return { success: true };
     }
     return { success: false };

@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -13,7 +12,8 @@ import {
   enableNetwork,
   doc,
   updateDoc,
-  addDoc
+  addDoc,
+  increment
 } from 'firebase/firestore';
 import { signInAction, signUpAction, requestPasswordResetAction, signOutAction } from '@/app/actions/auth';
 import { 
@@ -309,8 +309,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       
       if (!userSnap.empty) {
         const userDocRef = doc(db, "users", userSnap.docs[0].id);
-        // التحديث الفعلي في السيرفر لخصم الرصيد من حساب الزبون (حجز الرصيد)
-        await updateDoc(userDocRef, { balance: newBal });
+        // التحديث الفعلي في السيرفر لخصم الرصيد (حجز الرصيد فوراً بنظام الـ increment السالب)
+        // هذا يضمن أن المبلغ يُطرح من قاعدة البيانات حتى لو كان الطلب "Pending"
+        await updateDoc(userDocRef, { 
+          balance: increment(-amount) 
+        });
       }
 
       const now = new Date().toISOString();
