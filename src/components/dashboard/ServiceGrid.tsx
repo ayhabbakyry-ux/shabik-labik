@@ -17,7 +17,8 @@ import {
   LayoutGrid,
   X,
   CircleDollarSign,
-  Banknote
+  Banknote,
+  ChevronLeft
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ProductSheet } from "./ProductSheet";
@@ -40,6 +41,7 @@ type ServiceItem = {
   color: string;
   bg: string;
   imageUrl?: string;
+  isGroup?: boolean;
 };
 
 type Section = {
@@ -53,6 +55,8 @@ type Section = {
 };
 
 export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, searchQuery?: string }) {
+  const [activeSubGroup, setActiveSubGroup] = useState<string | null>(null);
+
   const sections: Section[] = [
     {
       id: "sham_cash_main",
@@ -137,21 +141,13 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
           imageUrl: "https://i.postimg.cc/HWPRyx5d/Screenshot-20260712-221757.png"
         },
         { 
-          id: "pool_gold", 
-          name: "بلياردو 8 - ذهب", 
-          filter: "pool coins", 
-          icon: CircleDollarSign, 
-          color: "text-yellow-500", 
-          bg: "bg-yellow-50",
-          imageUrl: "https://i.postimg.cc/G2SRtjrQ/Screenshot-20260712-224536.png"
-        },
-        { 
-          id: "pool_cash", 
-          name: "بلياردو 8 - كاش", 
-          filter: "pool cash", 
-          icon: Banknote, 
-          color: "text-emerald-600", 
-          bg: "bg-emerald-50",
+          id: "pool_main_group", 
+          name: "BALL POOL 8", 
+          filter: "pool", 
+          icon: Gamepad2, 
+          color: "text-indigo-600", 
+          bg: "bg-indigo-50",
+          isGroup: true,
           imageUrl: "https://i.postimg.cc/G2SRtjrQ/Screenshot-20260712-224536.png"
         },
         { 
@@ -236,8 +232,8 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
     const flatItems: ServiceItem[] = [];
     sections.forEach(s => {
       s.items.forEach(item => {
-        if (item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-            item.filter.toLowerCase().includes(searchQuery.toLowerCase())) {
+        if (!item.isGroup && (item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            item.filter.toLowerCase().includes(searchQuery.toLowerCase()))) {
           flatItems.push(item);
         }
       });
@@ -279,7 +275,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
     <div className="space-y-8 pb-10">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4" dir="rtl">
         {sections.map((section) => (
-          <Sheet key={section.id}>
+          <Sheet key={section.id} onOpenChange={(open) => { if(!open) setActiveSubGroup(null); }}>
             <SheetTrigger asChild>
               <Card className="hover:shadow-xl transition-all cursor-pointer group active:scale-[0.98] border-none bg-white overflow-hidden relative shadow-sm h-full">
                 <CardContent className="p-5 flex flex-col items-center justify-center text-center space-y-3">
@@ -296,41 +292,89 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
                   {/* Header with Back Button */}
                   <div className="p-6 border-b bg-white/80 backdrop-blur-md sticky top-0 z-20 flex items-center justify-between">
                      <div className="flex items-center gap-4">
-                        <div className={`p-3 rounded-2xl ${section.bgClass}`}>
-                           <section.icon className={`h-6 w-6 ${section.colorClass}`} />
-                        </div>
-                        <div className="text-right">
-                           <SheetTitle className={`text-xl font-black font-headline ${section.colorClass}`}>{section.title}</SheetTitle>
-                           <SheetDescription className="text-xs font-bold">تصفح كافة خدمات {section.title}</SheetDescription>
-                        </div>
+                        {activeSubGroup === 'pool' ? (
+                          <Button variant="ghost" onClick={() => setActiveSubGroup(null)} className="font-bold gap-2 text-primary bg-primary/10 rounded-xl px-4 py-2">
+                             <ChevronLeft className="h-5 w-5" /> رجوع لقائمة الألعاب
+                          </Button>
+                        ) : (
+                          <>
+                            <div className={`p-3 rounded-2xl ${section.bgClass}`}>
+                               <section.icon className={`h-6 w-6 ${section.colorClass}`} />
+                            </div>
+                            <div className="text-right">
+                               <SheetTitle className={`text-xl font-black font-headline ${section.colorClass}`}>{section.title}</SheetTitle>
+                               <SheetDescription className="text-xs font-bold">تصفح كافة خدمات {section.title}</SheetDescription>
+                            </div>
+                          </>
+                        )}
                      </div>
                      
                      <SheetClose asChild>
                         <Button variant="ghost" className="font-bold gap-2 text-primary hover:bg-primary/10 rounded-xl px-4 py-2">
-                           <ArrowRight className="h-5 w-5" /> رجوع للرئيسية
+                           <ArrowRight className="h-5 w-5" /> إغلاق
                         </Button>
                      </SheetClose>
                   </div>
                   
                   <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
-                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {section.items.map((service) => (
-                           <ProductSheet key={service.id} serviceName={service.name} filterValue={service.filter}>
+                     {activeSubGroup === 'pool' && section.id === 'games' ? (
+                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-left-4">
+                          <ProductSheet serviceName="العملات الذهبية" filterValue="pool coins">
                               <Card className="hover:shadow-md transition-all cursor-pointer group active:scale-95 border-none bg-white overflow-hidden shadow-sm">
                                  <CardContent className="p-5 flex flex-col items-center justify-center text-center space-y-3">
-                                    <div className={`w-20 h-20 rounded-full ${service.bg} flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner overflow-hidden border border-white`}>
-                                       {service.imageUrl ? (
-                                          <img src={service.imageUrl} alt={service.name} className="w-full h-full object-contain" />
-                                       ) : (
-                                          <service.icon className={`h-10 w-10 ${service.color}`} />
-                                       )}
+                                    <div className={`w-20 h-20 rounded-full bg-yellow-50 flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner overflow-hidden border border-white`}>
+                                       <CircleDollarSign className="h-10 w-10 text-yellow-600" />
                                     </div>
-                                    <p className="text-[14px] font-black leading-tight text-foreground group-hover:text-primary transition-colors">{service.name}</p>
+                                    <p className="text-[14px] font-black leading-tight text-foreground group-hover:text-primary transition-colors">العملات الذهبية</p>
                                  </CardContent>
                               </Card>
-                           </ProductSheet>
+                          </ProductSheet>
+                          <ProductSheet serviceName="العملات الورقية" filterValue="pool cash">
+                              <Card className="hover:shadow-md transition-all cursor-pointer group active:scale-95 border-none bg-white overflow-hidden shadow-sm">
+                                 <CardContent className="p-5 flex flex-col items-center justify-center text-center space-y-3">
+                                    <div className={`w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner overflow-hidden border border-white`}>
+                                       <Banknote className="h-10 w-10 text-emerald-600" />
+                                    </div>
+                                    <p className="text-[14px] font-black leading-tight text-foreground group-hover:text-primary transition-colors">العملات الورقية</p>
+                                 </CardContent>
+                              </Card>
+                          </ProductSheet>
+                       </div>
+                     ) : (
+                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-in fade-in">
+                        {section.items.map((service) => (
+                           service.isGroup ? (
+                            <Card key={service.id} onClick={() => setActiveSubGroup('pool')} className="hover:shadow-md transition-all cursor-pointer group active:scale-95 border-none bg-white overflow-hidden shadow-sm">
+                               <CardContent className="p-5 flex flex-col items-center justify-center text-center space-y-3">
+                                  <div className={`w-20 h-20 rounded-full ${service.bg} flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner overflow-hidden border border-white`}>
+                                     {service.imageUrl ? (
+                                        <img src={service.imageUrl} alt={service.name} className="w-full h-full object-contain" />
+                                     ) : (
+                                        <service.icon className={`h-10 w-10 ${service.color}`} />
+                                     )}
+                                  </div>
+                                  <p className="text-[14px] font-black leading-tight text-foreground group-hover:text-primary transition-colors">{service.name}</p>
+                               </CardContent>
+                            </Card>
+                           ) : (
+                            <ProductSheet key={service.id} serviceName={service.name} filterValue={service.filter}>
+                                <Card className="hover:shadow-md transition-all cursor-pointer group active:scale-95 border-none bg-white overflow-hidden shadow-sm">
+                                   <CardContent className="p-5 flex flex-col items-center justify-center text-center space-y-3">
+                                      <div className={`w-20 h-20 rounded-full ${service.bg} flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner overflow-hidden border border-white`}>
+                                         {service.imageUrl ? (
+                                            <img src={service.imageUrl} alt={service.name} className="w-full h-full object-contain" />
+                                         ) : (
+                                            <service.icon className={`h-10 w-10 ${service.color}`} />
+                                         )}
+                                      </div>
+                                      <p className="text-[14px] font-black leading-tight text-foreground group-hover:text-primary transition-colors">{service.name}</p>
+                                   </CardContent>
+                                </Card>
+                             </ProductSheet>
+                           )
                         ))}
-                     </div>
+                       </div>
+                     )}
                   </div>
                   
                   <div className="p-6 bg-white border-t flex justify-center pb-10">

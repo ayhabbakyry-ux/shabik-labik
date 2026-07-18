@@ -218,13 +218,13 @@ export function ProductSheet({
         }
 
         if (searchKey === "pool coins") {
-            const isPool = prodName.includes("8 ball") || prodName.includes("بلياردو");
+            const isPool = prodName.includes("8 ball") || prodName.includes("pool") || prodName.includes("بلياردو");
             const isCoins = prodName.includes("coin") || prodName.includes("عملات") || prodName.includes("ذهب");
             return isPool && isCoins;
         }
 
         if (searchKey === "pool cash") {
-            const isPool = prodName.includes("8 ball") || prodName.includes("بلياردو");
+            const isPool = prodName.includes("8 ball") || prodName.includes("pool") || prodName.includes("بلياردو");
             const isCash = prodName.includes("cash") || prodName.includes("كاش") || prodName.includes("ورق");
             return isPool && isCash;
         }
@@ -260,7 +260,6 @@ export function ProductSheet({
                   </Button>
                 </div>
                 <div className="text-right">
-                  <SheetTitle className="text-xl font-bold font-headline text-primary">{serviceName}</SheetTitle>
                   <SheetTitle className="text-xl font-bold font-headline text-primary">{serviceName}</SheetTitle>
                   <SheetDescription className="text-xs">
                     {isShamCash ? "أدخل رقم الحساب والمبلغ المطلوب شحنه" : "أدخل المعرف (ID) ثم اختر الباقة"}
