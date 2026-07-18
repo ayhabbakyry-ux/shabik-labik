@@ -298,13 +298,14 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
             
             <SheetContent side="bottom" className="h-full bg-background border-none shadow-none p-0 overflow-hidden" dir="rtl">
                <div className="h-full flex flex-col">
-                  {/* Header with Back Button */}
+                  {/* Header with Intelligent Back Button */}
                   <div className="p-6 border-b bg-white/80 backdrop-blur-md sticky top-0 z-20 flex items-center justify-between">
                      <div className="flex items-center gap-4">
                         {activeSubGroup === 'pool' ? (
-                          <Button variant="ghost" onClick={() => setActiveSubGroup(null)} className="font-bold gap-2 text-primary bg-primary/10 rounded-xl px-4 py-2">
-                             <ChevronLeft className="h-5 w-5" /> رجوع لقائمة الألعاب
-                          </Button>
+                          <div className="text-right">
+                             <SheetTitle className="text-xl font-black font-headline text-indigo-600">BALL POOL 8</SheetTitle>
+                             <SheetDescription className="text-xs font-bold">اختر نوع العملات المطلوبة</SheetDescription>
+                          </div>
                         ) : (
                           <>
                             <div className={`p-3 rounded-2xl ${section.bgClass} w-12 h-12 flex items-center justify-center overflow-hidden border border-white/50 shadow-sm`}>
@@ -322,11 +323,22 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
                         )}
                      </div>
                      
-                     <SheetClose asChild>
-                        <Button variant="ghost" className="font-bold gap-2 text-primary hover:bg-primary/10 rounded-xl px-4 py-2">
-                           <ArrowRight className="h-5 w-5" /> إغلاق
+                     {/* Intelligent Back/Close logic */}
+                     {activeSubGroup ? (
+                        <Button 
+                          variant="ghost" 
+                          onClick={() => setActiveSubGroup(null)} 
+                          className="font-bold gap-2 text-primary hover:bg-primary/10 rounded-xl px-4 py-2"
+                        >
+                           <ArrowRight className="h-5 w-5" /> رجوع
                         </Button>
-                     </SheetClose>
+                     ) : (
+                        <SheetClose asChild>
+                           <Button variant="ghost" className="font-bold gap-2 text-primary hover:bg-primary/10 rounded-xl px-4 py-2">
+                              <ArrowRight className="h-5 w-5" /> رجوع
+                           </Button>
+                        </SheetClose>
+                     )}
                   </div>
                   
                   <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
@@ -406,7 +418,6 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
             <h4 className="font-black text-primary text-sm">برنامج المكافآت</h4>
             <p className="text-[10px] text-muted-foreground font-medium">شارك كودك واربح رصيد مجاني عن كل صديق</p>
          </div>
-         <link href='/referral' />
          <Button onClick={() => window.location.href='/referral'} size="sm" className="rounded-2xl font-bold gap-2">
             اكتشف المزيد <ArrowRight className="h-4 w-4 rotate-180" />
          </Button>
@@ -414,4 +425,3 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
     </div>
   );
 }
-
