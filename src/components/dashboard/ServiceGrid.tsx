@@ -217,7 +217,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
           icon: MessageSquare, 
           color: "text-blue-500", 
           bg: "bg-blue-50",
-          imageUrl: "https://i.postimg.cc/nLRCSyHB/1784236005436.png"
+          imageUrl: "https://i.postimg.cc/5y8wrvfH/Screenshot-20260718-094134.png"
         },
         { 
           id: "likee", 
