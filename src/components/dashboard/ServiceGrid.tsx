@@ -189,6 +189,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
       colorClass: "text-pink-600",
       bgClass: "bg-pink-50",
       icon: Radio,
+      imageUrl: "https://i.postimg.cc/bvn43CKq/file-00000000a75481f4a661b3f2f65c898c.png",
       items: [
         { 
           id: "tiktok", 
