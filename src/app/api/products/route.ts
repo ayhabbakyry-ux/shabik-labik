@@ -7,6 +7,7 @@ export const revalidate = 0;
  * @fileOverview مسار جلب المنتجات المطور V22 - محرك "الربط العميق".
  * يقوم بتمشيط كافة طبقات الـ JSON لسحب المنتجات من المصفوفات المتداخلة والأقسام.
  * يضمن ظهور كافة الكميات (مثل 12، 15، 25 ليرة) عبر تسطيح البيانات (Flattening).
+ * تم إضافة console.log بناءً على طلب المدير لمعاينة البيانات الخام.
  */
 export async function GET() {
     const API_TOKEN = process.env.ALRAGHEB_TOKEN;
@@ -38,6 +39,9 @@ export async function GET() {
         }
 
         const rawData = await response.json();
+        
+        // --- سطر التصحيح المطلوب من أيهم ---
+        console.log("ALRAGHEB_DATA:", JSON.stringify(rawData, null, 2));
         
         // --- محرك الاستخراج العميق (Deep Extraction Engine) ---
         let allItems: any[] = [];
