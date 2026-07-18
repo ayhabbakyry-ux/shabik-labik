@@ -157,7 +157,18 @@ export function ProductSheet({
         
         if (Number(p.price) < 2) return false;
 
-        // منطق الفلترة الذكي V43 - دعم التيك توك (TIK TOK) وفصل كلاش بدقة
+        // منطق الفلترة الذكي V44 - دعم تيك توك بمسافة (TIK TOK)
+        if (searchKey === "tiktok") {
+            const matchesTikTok = 
+              prodName.includes("tiktok") || 
+              prodName.includes("tik tok") || 
+              prodName.includes("تيك توك") ||
+              catName.includes("tiktok") || 
+              catName.includes("tik tok") || 
+              catName.includes("تيك توك");
+            return matchesTikTok;
+        }
+
         if (searchKey === "clash") {
             const matchesClash = 
               prodName.includes("clash") || 
@@ -186,18 +197,6 @@ export function ProductSheet({
               catName.includes("royale") || 
               catName.includes("royail") || 
               catName.includes("رويال")
-            );
-        }
-
-        // معالجة مسمى تيك توك الخاص بالمزود (TIK TOK)
-        if (searchKey === "tiktok") {
-            return (
-              prodName.includes("tiktok") || 
-              prodName.includes("tik tok") || 
-              prodName.includes("تيك توك") ||
-              catName.includes("tiktok") || 
-              catName.includes("tik tok") || 
-              catName.includes("تيك توك")
             );
         }
 
