@@ -17,7 +17,8 @@ import {
   ArrowRight,
   LayoutGrid,
   Trophy,
-  Globe
+  Globe,
+  X
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ProductSheet } from "./ProductSheet";
@@ -27,7 +28,8 @@ import {
   SheetHeader, 
   SheetTitle, 
   SheetDescription,
-  SheetTrigger
+  SheetTrigger,
+  SheetClose
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 
@@ -52,13 +54,30 @@ type Section = {
 };
 
 export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, searchQuery?: string }) {
-  const [openSectionId, setOpenSectionId] = useState<string | null>(null);
-
   const sections: Section[] = [
+    {
+      id: "sham_cash_main",
+      title: "شام كاش (شحن فوري)",
+      description: "إرسال واستقبال الأموال عبر شام كاش",
+      colorClass: "text-emerald-600",
+      bgClass: "bg-emerald-50",
+      icon: Landmark,
+      items: [
+        { 
+          id: "sham_cash", 
+          name: "شام كاش", 
+          filter: "Sham Cash", 
+          icon: Landmark, 
+          color: "text-emerald-600", 
+          bg: "bg-emerald-50",
+          imageUrl: "https://i.postimg.cc/3JmhPXxg/Screenshot-20260716-213800.png"
+        },
+      ]
+    },
     {
       id: "telecom",
       title: "شحن الخطوط (وحدات وفواتير)",
-      description: "سيريتل، إم تي إن، وخدمات شام كاش",
+      description: "سيريتل وإم تي إن - شحن رصيد مباشر",
       colorClass: "text-red-600",
       bgClass: "bg-red-50",
       icon: Phone,
@@ -80,15 +99,6 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
           color: "text-red-600", 
           bg: "bg-red-50",
           imageUrl: "https://i.postimg.cc/9MwTgJxR/Screenshot-20260712-221408.png"
-        },
-        { 
-          id: "sham_cash", 
-          name: "شام كاش", 
-          filter: "Sham Cash", 
-          icon: Landmark, 
-          color: "text-emerald-600", 
-          bg: "bg-emerald-50",
-          imageUrl: "https://i.postimg.cc/3JmhPXxg/Screenshot-20260716-213800.png"
         },
       ]
     },
@@ -204,7 +214,6 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
     }
   ];
 
-  // منطق البحث: إذا وجدنا نصاً، نعرض كافة الخدمات المطابقة مباشرة
   const searchResults = useMemo(() => {
     if (!searchQuery) return null;
     const flatItems: ServiceItem[] = [];
@@ -219,7 +228,6 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
     return flatItems;
   }, [searchQuery, sections]);
 
-  // إذا كان هناك بحث، نعرض النتائج مباشرة دون أقسام
   if (searchResults) {
     return (
       <div className="space-y-6">
@@ -228,7 +236,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
           {searchResults.length > 0 ? (
             searchResults.map((service) => (
               <ProductSheet key={service.id} serviceName={service.name} filterValue={service.filter}>
-                <Card className="hover:shadow-md transition-all cursor-pointer group active:scale-95 border-none bg-white overflow-hidden">
+                <Card className="hover:shadow-md transition-all cursor-pointer group active:scale-95 border-none bg-white overflow-hidden shadow-sm">
                   <CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-3">
                     <div className={`w-20 h-20 rounded-full ${service.bg} flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner overflow-hidden`}>
                       {service.imageUrl ? (
@@ -277,16 +285,23 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
             
             <SheetContent side="bottom" className="h-[75vh] rounded-t-[40px] bg-background border-none shadow-2xl p-0 overflow-hidden" dir="rtl">
                <div className="h-full flex flex-col">
-                  <div className="p-6 border-b bg-white/50 backdrop-blur-md sticky top-0 z-20">
-                     <SheetHeader className="text-right flex flex-row items-center gap-4">
+                  {/* Header with Back Button */}
+                  <div className="p-6 border-b bg-white/50 backdrop-blur-md sticky top-0 z-20 flex items-center justify-between">
+                     <div className="flex items-center gap-4">
                         <div className={`p-3 rounded-2xl ${section.bgClass}`}>
                            <section.icon className={`h-6 w-6 ${section.colorClass}`} />
                         </div>
-                        <div>
+                        <div className="text-right">
                            <SheetTitle className={`text-xl font-black font-headline ${section.colorClass}`}>{section.title}</SheetTitle>
                            <SheetDescription className="text-xs font-bold">اختر نوع الخدمة المطلوب شحنها</SheetDescription>
                         </div>
-                     </SheetHeader>
+                     </div>
+                     
+                     <SheetClose asChild>
+                        <Button variant="ghost" className="font-bold gap-2 text-primary hover:bg-primary/10 rounded-xl px-4 py-2">
+                           <ArrowRight className="h-5 w-5" /> رجوع
+                        </Button>
+                     </SheetClose>
                   </div>
                   
                   <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
