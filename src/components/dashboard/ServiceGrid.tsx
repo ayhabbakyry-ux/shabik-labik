@@ -1,6 +1,6 @@
 "use client";
 
-import { Smartphone, SmartphoneNfc, Phone, Gamepad2, Zap, Radio, Sword, Landmark, MessageSquare } from "lucide-react";
+import { Smartphone, SmartphoneNfc, Phone, Gamepad2, Zap, Radio, Sword, Landmark, MessageSquare, Castle, Swords } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ProductSheet } from "./ProductSheet";
 
@@ -79,6 +79,24 @@ export function ServiceGrid({ isAdmin }: { isAdmin?: boolean }) {
           color: "text-orange-600", 
           bg: "bg-orange-50",
           imageUrl: "https://i.postimg.cc/HWPRyx5d/Screenshot-20260712-221757.png"
+        },
+        { 
+          id: "coc", 
+          name: "كلاش اوف كلانس", 
+          filter: "Clash of Clans", 
+          icon: Castle, 
+          color: "text-blue-600", 
+          bg: "bg-blue-50",
+          imageUrl: "https://i.postimg.cc/fbYd630T/coc.png"
+        },
+        { 
+          id: "clash_royale", 
+          name: "كلاش رويال", 
+          filter: "Clash Royale", 
+          icon: Swords, 
+          color: "text-red-600", 
+          bg: "bg-red-50",
+          imageUrl: "https://i.postimg.cc/mD363z07/royale.png"
         },
         { 
           id: "jawaker", 
