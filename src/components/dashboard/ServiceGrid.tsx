@@ -115,6 +115,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
       colorClass: "text-blue-600",
       bgClass: "bg-blue-50",
       icon: Gamepad2,
+      imageUrl: "https://i.postimg.cc/wB9DG3rB/file-00000000d73481f48215504fda7bec65.png",
       items: [
         { 
           id: "pubg", 
@@ -255,7 +256,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
               <ProductSheet key={service.id} serviceName={service.name} filterValue={service.filter}>
                 <Card className="hover:shadow-md transition-all cursor-pointer group active:scale-95 border-none bg-white overflow-hidden shadow-sm">
                   <CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-3">
-                    <div className={`w-20 h-20 rounded-full ${service.bg} flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner overflow-hidden`}>
+                    <div className={`w-20 h-20 rounded-full ${service.bg} flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner overflow-hidden border border-white`}>
                       {service.imageUrl ? (
                         <img src={service.imageUrl} alt={service.name} className="w-full h-full object-contain" />
                       ) : (
