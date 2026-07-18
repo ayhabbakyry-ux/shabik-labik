@@ -152,7 +152,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
           color: "text-indigo-600", 
           bg: "bg-indigo-50",
           isGroup: true,
-          imageUrl: "https://i.postimg.cc/G2SRtjrQ/Screenshot-20260712-224536.png"
+          imageUrl: "https://i.postimg.cc/59Fd0tPw/Screenshot-20260718-101854.png"
         },
         { 
           id: "coc", 
@@ -336,7 +336,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
                               <Card className="hover:shadow-md transition-all cursor-pointer group active:scale-95 border-none bg-white overflow-hidden shadow-sm">
                                  <CardContent className="p-5 flex flex-col items-center justify-center text-center space-y-3">
                                     <div className={`w-20 h-20 rounded-full bg-yellow-50 flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner overflow-hidden border border-white`}>
-                                       <CircleDollarSign className="h-10 w-10 text-yellow-600" />
+                                       <img src="https://i.postimg.cc/59Fd0tPw/Screenshot-20260718-101854.png" alt="العملات الذهبية" className="w-full h-full object-contain" />
                                     </div>
                                     <p className="text-[14px] font-black leading-tight text-foreground group-hover:text-primary transition-colors">العملات الذهبية</p>
                                  </CardContent>
@@ -346,7 +346,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
                               <Card className="hover:shadow-md transition-all cursor-pointer group active:scale-95 border-none bg-white overflow-hidden shadow-sm">
                                  <CardContent className="p-5 flex flex-col items-center justify-center text-center space-y-3">
                                     <div className={`w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner overflow-hidden border border-white`}>
-                                       <Banknote className="h-10 w-10 text-emerald-600" />
+                                       <img src="https://i.postimg.cc/59Fd0tPw/Screenshot-20260718-101854.png" alt="العملات الورقية" className="w-full h-full object-contain" />
                                     </div>
                                     <p className="text-[14px] font-black leading-tight text-foreground group-hover:text-primary transition-colors">العملات الورقية</p>
                                  </CardContent>
@@ -406,6 +406,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
             <h4 className="font-black text-primary text-sm">برنامج المكافآت</h4>
             <p className="text-[10px] text-muted-foreground font-medium">شارك كودك واربح رصيد مجاني عن كل صديق</p>
          </div>
+         <link href='/referral' />
          <Button onClick={() => window.location.href='/referral'} size="sm" className="rounded-2xl font-bold gap-2">
             اكتشف المزيد <ArrowRight className="h-4 w-4 rotate-180" />
          </Button>
@@ -413,3 +414,4 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
     </div>
   );
 }
+
