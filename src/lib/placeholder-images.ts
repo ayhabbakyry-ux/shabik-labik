@@ -1,4 +1,8 @@
-import data from './placeholder-images.json';
+import data from '@/app/lib/placeholder-images.json';
+
+/**
+ * @fileOverview فهرس الصور - تم تصحيح المسار لجلب البيانات الحقيقية ومنع أخطاء الـ SSR.
+ */
 
 export type ImagePlaceholder = {
   id: string;

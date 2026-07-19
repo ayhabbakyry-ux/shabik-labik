@@ -1,12 +1,10 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { initializeFirestore, getFirestore, Firestore } from "firebase/firestore";
+import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getMessaging, isSupported } from "firebase/messaging";
 
 /**
- * @fileOverview إعدادات الفايربيز النهائية (حقن مباشر للمفاتيح V20).
- * تم حقن الـ API Keys مباشرة لضمان العمل على Vercel بدون ملفات .env.
- * تم تفعيل Long Polling لحل مشكلة انقطاع اتصال Firestore في الشبكات الضعيفة.
+ * @fileOverview إعدادات الفايربيز المستقرة - نسخة التوافق العالي للسيرفر والعميل.
  */
 
 const firebaseConfig = {
@@ -18,39 +16,17 @@ const firebaseConfig = {
   appId: "1:723678552538:web:579e6791a1211c7998e0e3"
 };
 
-// تهيئة التطبيق الأساسي
+// تهيئة التطبيق الأساسي مع ضمان عدم التكرار SSR
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-let db: Firestore;
+// تهيئة قاعدة البيانات بشكل قياسي
+export const db = getFirestore(app);
+export const auth = getAuth(app);
 
-// معرف قاعدة البيانات الافتراضي (default)
-const DATABASE_ID = "(default)";
-
-// الحل الجذري لمشاكل الاتصال في الموبايل (Long Polling)
-if (typeof window !== "undefined") {
-    try {
-        // فرض الإعدادات المتقدمة لضمان استقرار البث المباشر للبيانات
-        db = initializeFirestore(app, {
-            experimentalForceLongPolling: true,
-        }, DATABASE_ID);
-        console.log("🚀 Firebase: Connected with Stability Protocol (Long Polling)");
-    } catch (e) {
-        // في حال كان المحرك قد بدأ بالفعل
-        db = getFirestore(app, DATABASE_ID);
-    }
-} else {
-    // بيئة السيرفر
-    db = getFirestore(app, DATABASE_ID);
-}
-
-const auth = getAuth(app);
-
-// جلب Messaging بأمان
+// جلب Messaging بأمان للتوافق مع المتصفحات فقط
 export const getMessagingSafe = async () => {
     if (typeof window !== "undefined" && await isSupported()) {
         return getMessaging(app);
     }
     return null;
 };
-
-export { db, auth, firebaseConfig };
