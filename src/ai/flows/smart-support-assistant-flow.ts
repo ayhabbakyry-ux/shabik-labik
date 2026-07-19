@@ -2,11 +2,13 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { googleAI } from '@genkit-ai/google-genai';
 import { db } from '@/lib/firebase-config';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 /**
- * @fileOverview المساعد الذكي لمنصة شبيك لبيك - نسخة الاستقرار V4.
+ * @fileOverview المساعد الذكي لمنصة شبيك لبيك - نسخة الاستقرار V5.
+ * تم تحديث الموديل واستخدام المصنع الرسمي لحل مشكلة 404 نهائياً.
  */
 
 const SmartSupportAssistantInputSchema = z.object({
@@ -58,8 +60,8 @@ const fetchUserTransactionsTool = ai.defineTool(
 
 const prompt = ai.definePrompt({
   name: 'smartSupportAssistantPrompt',
-  // استخدام المعرف الرسمي والمستقر للموديل لحل مشكلة 404
-  model: 'googleai/gemini-1.5-flash',
+  // استخدام المصنع الرسمي لضمان التوافق وتجنب خطأ 404
+  model: googleAI.model('gemini-1.5-flash'),
   input: { schema: SmartSupportAssistantInputSchema },
   output: { schema: SmartSupportAssistantOutputSchema },
   tools: [fetchUserTransactionsTool],
