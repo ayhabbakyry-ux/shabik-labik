@@ -23,8 +23,8 @@ export function AIChat() {
     { 
       role: 'assistant', 
       content: isAdmin 
-        ? `مرحباً بك يا مدير أيهم. أنا مساعدك الشخصي. اسألني عن أي مستخدم لآتيك ببياناته فوراً.` 
-        : `أهلاً بك ${userName || 'في شبيك لبيك'}. أنا المساعد الذكي، كيف يمكنني خدمتك اليوم؟` 
+        ? `أهلاً بك يا مدير أيهم. أنا المساعد شبيك لبيك بين إيديك، أمرتني ولبيت إن شاء الله. جاهز لمساعدتك في إدارة المنصة.` 
+        : `أهلاً بك ${userName || 'يا غالي'}. أنا المساعد شبيك لبيك بين إيديك، أمرتني ولبيت إن شاء الله. كيف بقدر اخدمك اليوم؟` 
     }
   ]);
   const [input, setInput] = useState("");
@@ -32,7 +32,7 @@ export function AIChat() {
   const [lastMessageTime, setLastMessageTime] = useState<number>(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const COOLDOWN_SECONDS = 30; // زيادة وقت الانتظار لحماية الحصة (Quota)
+  const COOLDOWN_SECONDS = 15; // وقت انتظار معتدل
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -49,10 +49,9 @@ export function AIChat() {
     const now = Date.now();
     const timeDiff = (now - lastMessageTime) / 1000;
 
-    // فحص وقت الانتظار (Cooldown) لغير المدير
     if (!isAdmin && lastMessageTime !== 0 && timeDiff < COOLDOWN_SECONDS) {
       const remaining = Math.ceil(COOLDOWN_SECONDS - timeDiff);
-      const waitMessage = `حقك على راسي ياغالي بس صار عندي ضغط شوي يا ريت تسألني بعد ${remaining} ثانية.`;
+      const waitMessage = `حقك على راسي ياغالي بس صار عندي ضغط اتصالات، يا ريت تسألني بعد ${remaining} ثانية.`;
       setMessages(prev => [...prev, 
         { role: 'user', content: input },
         { role: 'assistant', content: waitMessage, isCooldown: true }
@@ -79,17 +78,16 @@ export function AIChat() {
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       
-      // معالجة ذكية لخطأ تجاوز الحصة (429 / Quota)
       if (errorMessage.includes("429") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("quota")) {
-        const quotaMsg = `حقك على راسي ياغالي، عم بمر بفترة ضغط اتصالات هائلة حالياً. ياريت تعطيني دقيقة بس لأرتاح وأرجع أجاوبك بكل حب.`;
+        const quotaMsg = `حقك على راسي يا غالي، عم بمر بفترة ضغط هائلة حالياً. عطيني دقيقة بس ليرتاح المصباح السحري وأرجع جاوبك بكل حب.`;
         setMessages(prev => [...prev, { role: 'assistant', content: quotaMsg, isCooldown: true }]);
-        setLastMessageTime(Date.now()); // تفعيل الكول داون تلقائياً
+        setLastMessageTime(Date.now());
       } else {
-        let cleanError = `⚠️ تنبيه تقني (أيهم): حدثت مشكلة في الصلاحيات.\n\n`;
-        if (errorMessage.includes("403") || errorMessage.includes("blocked")) {
-          cleanError += `السبب: مفتاح API محظور أو الخدمة غير مفعلة.`;
+        let cleanError = `⚠️ تنبيه تقني (أيهم): حدثت مشكلة في الاتصال بالمصباح السحري.\n\n`;
+        if (errorMessage.includes("404") || errorMessage.includes("not found")) {
+          cleanError += `السبب: الموديل الذكي غير متاح حالياً (404). يرجى التأكد من التحديث.`;
         } else {
-          cleanError += `تفاصيل الخطأ:\n${errorMessage}`;
+          cleanError += `تفاصيل: ${errorMessage}`;
         }
         setMessages(prev => [...prev, { role: 'assistant', content: cleanError, isError: true }]);
       }
@@ -110,7 +108,7 @@ export function AIChat() {
                <p className="text-lg font-black font-headline leading-tight">مساعد شبيك لبيك</p>
                <p className="text-[10px] opacity-70 font-bold flex items-center gap-1">
                  <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
-                 متصل الآن لخدمتك
+                 جاهز لخدمتك يا غالي
                </p>
              </div>
           </div>
@@ -162,7 +160,7 @@ export function AIChat() {
             className="flex gap-2 items-center bg-white p-1.5 rounded-2xl border shadow-lg border-primary/10"
           >
             <Input 
-              placeholder="اكتب سؤالك هنا..."
+              placeholder="اكتب سؤالك هنا يا غالي..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
               className="bg-transparent border-none text-right focus-visible:ring-0 shadow-none h-12 text-sm"

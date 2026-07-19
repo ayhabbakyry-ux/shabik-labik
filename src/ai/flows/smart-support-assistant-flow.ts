@@ -7,13 +7,13 @@ import { db } from '@/lib/firebase-config';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 /**
- * @fileOverview المساعد الذكي لمنصة شبيك لبيك - نسخة الاستقرار القصوى V7.
- * تم استخدام gemini-flash-latest لحل مشكلة 404 نهائياً.
+ * @fileOverview المساعد الذكي لمنصة شبيك لبيك - نسخة الاستقرار V8.
+ * التحديث الجديد: دمج الجملة الترحيبية المطلوبة من أيهم.
  */
 
 const SmartSupportAssistantInputSchema = z.object({
   userQuery: z.string().describe("استفسار المستخدم باللغة العربية."),
-  userBalance: z.number().describe("الرصية الحالي للمستخدم."),
+  userBalance: z.number().describe("الرصيد الحالي للمستخدم."),
   userPhone: z.string().describe("رقم هاتف المستخدم."),
   isAdmin: z.boolean().optional().describe("هل المستخدم هو المدير؟")
 });
@@ -60,7 +60,6 @@ const fetchUserTransactionsTool = ai.defineTool(
 
 const prompt = ai.definePrompt({
   name: 'smartSupportAssistantPrompt',
-  // استخدام الاسم المستعار الرسمي لحل مشكلة 404
   model: googleAI.model('gemini-flash-latest'),
   input: { schema: SmartSupportAssistantInputSchema },
   output: { schema: SmartSupportAssistantOutputSchema },
@@ -70,17 +69,18 @@ const prompt = ai.definePrompt({
   },
   prompt: `أنت "المساعد الذكي لمنصة شبيك لبيك الرقمية".
 شخصيتك: مرح، لبق جداً، وتتحدث بلهجة شامية محببة.
+جملتك الافتتاحية الدائمة: "أنا المساعد شبيك لبيك بين إيديك، أمرتني ولبيت إن شاء الله".
 
 تعليمات هامة:
-1. **السرية**: ممنوع ذكر "الراغب". نحن "شبيك لبيك".
+1. **السرية**: ممنوع ذكر "الراغب" أو أي سيرفرات خارجية. نحن "شبيك لبيك".
 2. **الشحن**: وجه الزبون لصفحة المحفظة (سيريتل كاش: 0939549573، إم تي إن كاش: 0943899403).
-3. **تفسير الرفض**: قل إن السبب "خطأ في بيانات ID" أو "تحديثات سيرفر اللعبة".
-4. **الدردشة**: اضحك الزبون بكلمات مثل "على راسي يا غالي"، "تكرم شواربك".
+3. **تفسير الرفض**: قل إن السبب "خطأ في بيانات ID" أو "تحديثات تقنية من سيرفر اللعبة".
+4. **الدردشة**: اضحك الزبون بكلمات مثل "على راسي يا غالي"، "تكرم شواربك"، "ما منقصر معك".
 
-بيانات الجلسة:
+بيانات الجلسة الحالية:
 - الهاتف: {{{userPhone}}}
 - الرصيد: {{{userBalance}}} ل.س.
-- المدير؟: {{#if isAdmin}}نعم (أيهم){{else}}لا{{/if}}
+- المدير؟: {{#if isAdmin}}نعم (أيهم - المدير العام){{else}}لا{{/if}}
 
 سؤال المستخدم: {{{userQuery}}}`
 });
