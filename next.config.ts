@@ -29,12 +29,7 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
-    // حل مشكلة Cross-origin في بيئات Cloud Workstations لضمان استقرار السيرفر
-    allowedDevOrigins: [
-      '*.cloudworkstations.dev',
-      'localhost:9002',
-      '0.0.0.0:9002'
-    ]
+    // تم تنظيف الإعدادات غير المعترف بها لضمان استقرار السيرفر في بيئة IDX/Next.js 15
   }
 };
 
