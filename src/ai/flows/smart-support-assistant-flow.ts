@@ -7,13 +7,13 @@ import { db } from '@/lib/firebase-config';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 /**
- * @fileOverview المساعد الذكي لمنصة شبيك لبيك - نسخة الاستقرار القصوى V6.
- * تم استخدام الموديل الأكثر توافقاً لحل مشكلة 404 نهائياً.
+ * @fileOverview المساعد الذكي لمنصة شبيك لبيك - نسخة الاستقرار القصوى V7.
+ * تم استخدام gemini-flash-latest لحل مشكلة 404 نهائياً.
  */
 
 const SmartSupportAssistantInputSchema = z.object({
   userQuery: z.string().describe("استفسار المستخدم باللغة العربية."),
-  userBalance: z.number().describe("الرصيد الحالي للمستخدم."),
+  userBalance: z.number().describe("الرصية الحالي للمستخدم."),
   userPhone: z.string().describe("رقم هاتف المستخدم."),
   isAdmin: z.boolean().optional().describe("هل المستخدم هو المدير؟")
 });
@@ -60,15 +60,13 @@ const fetchUserTransactionsTool = ai.defineTool(
 
 const prompt = ai.definePrompt({
   name: 'smartSupportAssistantPrompt',
-  // استخدام التسمية الرسمية الأكثر استقراراً لتجنب خطأ 404 في v1beta
-  model: googleAI.model('gemini-1.5-flash'),
+  // استخدام الاسم المستعار الرسمي لحل مشكلة 404
+  model: googleAI.model('gemini-flash-latest'),
   input: { schema: SmartSupportAssistantInputSchema },
   output: { schema: SmartSupportAssistantOutputSchema },
   tools: [fetchUserTransactionsTool],
   config: { 
     temperature: 0.8,
-    topP: 0.95,
-    topK: 40
   },
   prompt: `أنت "المساعد الذكي لمنصة شبيك لبيك الرقمية".
 شخصيتك: مرح، لبق جداً، وتتحدث بلهجة شامية محببة.
