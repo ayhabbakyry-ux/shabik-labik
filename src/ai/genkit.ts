@@ -2,29 +2,17 @@ import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 
 /**
- * @fileOverview محرك "شبيك لبيك" المطور - نسخة الأمان القصوى (V4).
- * تم منع تخزين المفاتيح داخل الكود أو ملفات الـ .env نهائياً.
- * يعتمد النظام الآن حصراً على متغير البيئة GEMINI_API_KEY المرفوع في Secrets.
+ * @fileOverview محرك "شبيك لبيك" المطور - نسخة الأمان المطلق (V7).
+ * تم تحسين التهيئة لمنع انهيار السيرفر (Internal Server Error) في حال غياب المفتاح.
  */
 
-const getSecureApiKey = () => {
-  const key = process.env.GEMINI_API_KEY;
-  
-  if (!key) {
-    // إشعار للمطور في لوحة التحكم بدون إظهار بيانات حساسة
-    console.error("[Security] 🛡️ تنبيه أمني: مفتاح API مفقود من متغيرات البيئة. يرجى إضافته في إعدادات Secrets.");
-    return "NOT_CONFIGURED";
-  }
-  
-  return key;
-};
+// جلب المفتاح بأمان - يدعم GEMINI_API_KEY أو GOOGLE_GENAI_API_KEY تلقائياً
+const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY || "";
 
 export const ai = genkit({
   plugins: [
-    googleAI({
-      apiKey: getSecureApiKey()
-    })
+    googleAI(apiKey ? { apiKey } : {})
   ],
-  // استخدام المعرف الرمزي الأكثر استقراراً وتوافقاً مع مكتبة 1.29
+  // استخدام الموديل المستقر والأكثر توافقاً
   model: googleAI.model('gemini-flash-latest'),
 });

@@ -1,4 +1,9 @@
 import { config } from 'dotenv';
+// تحميل متغيرات البيئة في بيئة التطوير فقط
 config();
 
-import '@/ai/flows/smart-support-assistant-flow.ts';
+import './index';
+
+/**
+ * @fileOverview ملف التشغيل الخاص ببيئة التطوير.
+ */

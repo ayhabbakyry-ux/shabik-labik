@@ -1,7 +1,6 @@
-import './genkit.js';
-import './flows/smart-support-assistant-flow.ts';
+import './genkit';
+import './flows/smart-support-assistant-flow';
 
 /**
- * @fileOverview الفهرس العالمي لمحرك Genkit في تطبيق شبيك لبيك.
- * تم تسجيل كافة الـ Flows والـ Tools لتعمل فورياً في التطبيق.
+ * @fileOverview الفهرس العالمي - تم تصحيح المسارات لضمان استقرار Next.js.
  */
