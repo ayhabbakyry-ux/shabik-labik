@@ -6,7 +6,7 @@ import { db } from '@/lib/firebase-config';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 /**
- * @fileOverview المساعد الذكي لمنصة شبيك لبيك - نسخة الاستقرار.
+ * @fileOverview المساعد الذكي لمنصة شبيك لبيك - نسخة الاستقرار V4.
  */
 
 const SmartSupportAssistantInputSchema = z.object({
@@ -58,8 +58,8 @@ const fetchUserTransactionsTool = ai.defineTool(
 
 const prompt = ai.definePrompt({
   name: 'smartSupportAssistantPrompt',
-  // تحديث الموديل للاسم الأكثر استقراراً وتوافقاً
-  model: 'googleai/gemini-1.5-flash-latest',
+  // استخدام المعرف الرسمي والمستقر للموديل لحل مشكلة 404
+  model: 'googleai/gemini-1.5-flash',
   input: { schema: SmartSupportAssistantInputSchema },
   output: { schema: SmartSupportAssistantOutputSchema },
   tools: [fetchUserTransactionsTool],
