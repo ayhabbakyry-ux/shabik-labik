@@ -7,8 +7,8 @@ import { db } from '@/lib/firebase-config';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 /**
- * @fileOverview المساعد الذكي لمنصة شبيك لبيك - نسخة الاستقرار V5.
- * تم تحديث الموديل واستخدام المصنع الرسمي لحل مشكلة 404 نهائياً.
+ * @fileOverview المساعد الذكي لمنصة شبيك لبيك - نسخة الاستقرار القصوى V6.
+ * تم استخدام الموديل الأكثر توافقاً لحل مشكلة 404 نهائياً.
  */
 
 const SmartSupportAssistantInputSchema = z.object({
@@ -60,12 +60,16 @@ const fetchUserTransactionsTool = ai.defineTool(
 
 const prompt = ai.definePrompt({
   name: 'smartSupportAssistantPrompt',
-  // استخدام المصنع الرسمي لضمان التوافق وتجنب خطأ 404
+  // استخدام التسمية الرسمية الأكثر استقراراً لتجنب خطأ 404 في v1beta
   model: googleAI.model('gemini-1.5-flash'),
   input: { schema: SmartSupportAssistantInputSchema },
   output: { schema: SmartSupportAssistantOutputSchema },
   tools: [fetchUserTransactionsTool],
-  config: { temperature: 0.8 },
+  config: { 
+    temperature: 0.8,
+    topP: 0.95,
+    topK: 40
+  },
   prompt: `أنت "المساعد الذكي لمنصة شبيك لبيك الرقمية".
 شخصيتك: مرح، لبق جداً، وتتحدث بلهجة شامية محببة.
 
@@ -92,7 +96,7 @@ export const smartSupportAssistantFlow = ai.defineFlow(
   async (input) => {
     try {
       const { output } = await prompt(input);
-      if (!output) throw new Error("فشل الذكاء الاصطناعي.");
+      if (!output) throw new Error("فشل الذكاء الاصطناعي في توليد رد.");
       return output;
     } catch (error: any) {
       console.error("AI Flow Error:", error);
