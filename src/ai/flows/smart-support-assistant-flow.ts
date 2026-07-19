@@ -3,10 +3,11 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { db } from '@/lib/firebase-config';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
+import { googleAI } from '@genkit-ai/google-genai';
 
 /**
- * @fileOverview مساعد الدعم الذكي - مجيب شامل على استفسارات المستخدمين مع حماية الخصوصية.
+ * @fileOverview المساعد الذكي المطور لمنصة شبيك لبيك - النسخة المتكاملة مع صلاحيات السجلات والدردشة اللطيفة.
  */
 
 const SmartSupportAssistantInputSchema = z.object({
@@ -17,13 +18,14 @@ const SmartSupportAssistantInputSchema = z.object({
 });
 
 const SmartSupportAssistantOutputSchema = z.object({
-  assistantResponse: z.string().describe("رد المساعد باللغة العربية الفصحى وبشكل مهني."),
+  assistantResponse: z.string().describe("رد المساعد باللغة العربية بأسلوب لبق وفكاهي عند الطلب."),
 });
 
+// أداة البحث عن مستخدم (للمدير)
 const searchUserTool = ai.defineTool(
   {
     name: 'searchUserTool',
-    description: 'يبحث عن معلومات المستخدم للمدير فقط.',
+    description: 'يبحث عن معلومات المستخدم الأساسية ورصيده. للمدير فقط.',
     inputSchema: z.object({
       phone: z.string().describe('رقم هاتف المستخدم للبحث عنه.'),
     }),
@@ -37,64 +39,114 @@ const searchUserTool = ai.defineTool(
   async (input) => {
     try {
       const phoneClean = input.phone.trim();
-      const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
+      const userQ = query(collection(db, "users"), where("phone", "==", phoneClean), limit(1));
       const userSnap = await getDocs(userQ);
-      if (userSnap.empty) return { found: false, currentBalance: 0, message: "غير موجود." };
+      
+      if (userSnap.empty) {
+        return { found: false, currentBalance: 0, message: "عذراً، لم يتم العثور على مستخدم بهذا الرقم." };
+      }
+
       const userData = userSnap.docs[0].data();
       return {
         found: true,
-        userName: userData.name || phoneClean,
+        userName: userData.name || "مستخدم",
         currentBalance: Number(userData.balance || 0),
-        message: `المستخدم ${userData.name || phoneClean} رصيده ${userData.balance} ليرة.`
+        message: `تم العثور على ${userData.name}. رصيده: ${userData.balance} ل.س.`
       };
     } catch (e) {
-      return { found: false, currentBalance: 0, message: "خطأ فني." };
+      return { found: false, currentBalance: 0, message: "خطأ في الاتصال بقاعدة البيانات." };
+    }
+  }
+);
+
+// أداة جلب سجل العمليات (للمدير والزبون)
+const fetchUserTransactionsTool = ai.defineTool(
+  {
+    name: 'fetchUserTransactionsTool',
+    description: 'يجلب سجل آخر 10 عمليات (شحن، إيداع، مرفوضة) للمستخدم ليتمكن المساعد من تحليل سبب الرفض.',
+    inputSchema: z.object({
+      phone: z.string().describe('رقم الهاتف المراد جلب سجل عملياته.'),
+    }),
+    outputSchema: z.object({
+      found: z.boolean(),
+      transactions: z.array(z.any()),
+      message: z.string(),
+    }),
+  },
+  async (input) => {
+    try {
+      const phoneClean = input.phone.trim();
+      // جلب آخر العمليات
+      const txQ = query(
+        collection(db, "transactions"), 
+        where("userPhone", "==", phoneClean),
+        limit(10)
+      );
+      const snap = await getDocs(txQ);
+      
+      if (snap.empty) {
+        return { found: false, transactions: [], message: "لا يوجد سجل عمليات لهذا الرقم." };
+      }
+
+      const txs = snap.docs.map(d => ({
+        type: d.data().type,
+        amount: d.data().amount,
+        status: d.data().status,
+        details: d.data().details || "",
+        date: d.data().createdAt || d.data().date || "",
+      }));
+
+      return {
+        found: true,
+        transactions: txs,
+        message: `تم العثور على ${txs.length} عمليات مؤخراً.`
+      };
+    } catch (e) {
+      return { found: false, transactions: [], message: "خطأ في قراءة السجلات." };
     }
   }
 );
 
 const prompt = ai.definePrompt({
   name: 'smartSupportAssistantPrompt',
-  model: 'googleai/gemini-1.5-flash',
+  model: googleAI.model('gemini-flash-latest'),
   input: { schema: SmartSupportAssistantInputSchema },
   output: { schema: SmartSupportAssistantOutputSchema },
-  tools: [searchUserTool],
+  tools: [searchUserTool, fetchUserTransactionsTool],
   config: {
-    safetySettings: [
-      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-    ]
+    temperature: 0.8, // زيادة التلقائية للفكاهة والدردشة
   },
-  prompt: `أنت "المساعد الذكي لتطبيق شبيك لبيك". تتحدث بالعربية الفصحى بأسلوب مهذب وشامل.
+  prompt: `أنت "المساعد الذكي لمنصة شبيك لبيك الرقمية".
+شخصيتك: مرح، ذكي، لبق جداً، وتحب المزاح اللطيف بلهجة شامية محببة إذا طلب منك الزبون ذلك.
 
-مهمتك: الإجابة على كل أسئلة المستخدم حول حسابه، الرصيد، الإيداع، والشحن.
+تعليمات هامة جداً:
+1. **السرية المطلقة**: ممنوع منعاً باتاً ذكر كلمة "الراغب" أو أي مزود خدمة خارجي. نحن "شبيك لبيك" ونحن من يدير وننفذ كافة العمليات.
+2. **طريقة شحن الرصيد**: إذا سألك الزبون كيف يشحن رصيده، وجهه للذهاب لصفحة "المحفظة" ثم الضغط على "إيداع رصيد جديد". أخبره أن الأرقام المعتمدة هي (سيريتل كاش: 0939549573، إم تي إن كاش: 0943899403). بعد التحويل، يجب عليه رفع صورة الإشعار في التطبيق ليتم تفعيل رصيده فوراً.
+3. **تفسير الرفض**: إذا وجدت في سجل العمليات (عبر أداة fetchUserTransactionsTool) عمليات مرفوضة (Rejected)، أخبر الزبون بلطف أن السبب غالباً هو "خطأ في بيانات الـ ID المدخلة" أو "تحديثات مؤقتة في سيرفرات اللعبة العالمية". اطلب منه مراجعة بياناته والمحاولة مرة أخرى.
+4. **الدردشة والفكاهة**: إذا طلب الزبون "نكته" أو "دردشة"، اضحكه بكلمات لطيفة (مثلاً: رصيدك قليل بس هيبتك كبيرة!). استخدم عبارات مثل "على راسي يا غالي"، "من عيوني"، "تكرم شواربك".
+5. **المدير أيهم**: إذا كان المستخدم هو المدير (isAdmin=true)، كن في غاية الاحترام ونفذ أوامره في البحث عن أي رقم فوراً.
 
-قواعد صارمة جداً (أوامر المدير أيهم):
-1. أجب على كل شيء يسأله المستخدم بلباقة.
-2. إذا سألك المستخدم عن رصيده أو حسابه، استخدم البيانات التالية: رقم هاتفك هو {{{userPhone}}} ورصيدك الحالي هو {{{userBalance}}} ليرة سورية.
-3. طرق الإيداع المتاحة: (سيريتل كاش: 0939549573)، (إم تي إن كاش: 0943899403)، (شام كاش: 5d093f196b8cd72873f06d5dbbfb2d43). يتم الإيداع عبر قسم "المحفظة" ثم إرسال صورة الإشعار.
-4. طريقة الشحن: يتم الشحن تلقائياً عبر قسم "الخدمات الرقمية" في اللوحة الرئيسية باختيار اللعبة أو الشركة المطلوبة وإدخال الـ ID.
-5. **ممنوع منعاً باتاً** إخبار المستخدم من هو المدير أو كشف هويته (أيهم). قل فقط أنك "مساعد منصة شبيك لبيك".
-6. **ممنوع منعاً باتاً** إعطاء معلومات عن مستخدمين آخرين لأي شخص باستثناء المدير (isAdmin = true).
-7. إذا كان المستخدم هو المدير (isAdmin = true)، يمكنك استخدام searchUserTool للبحث عن المستخدمين الآخرين.
+بيانات الجلسة الحالية:
+- رقم هاتف المستخدم الحالي: {{{userPhone}}}
+- رصيده الحالي: {{{userBalance}}} ليرة سورية.
+- هل المستخدم هو المدير العام؟: {{#if isAdmin}}نعم (أيهم - المدير العام){{else}}لا (زبون محترم){{/if}}
 
-سياق المستخدم:
-- الهاتف: {{{userPhone}}}
-- الرصيد: {{{userBalance}}}
-- هل هو المدير: {{#if isAdmin}}نعم (أيهم){{else}}لا (عميل){{/if}}
-
-استفسار المستخدم: {{{userQuery}}}`
+سؤال المستخدم: {{{userQuery}}}`
 });
 
-export async function smartSupportAssistant(input: z.infer<typeof SmartSupportAssistantInputSchema>) {
-  try {
+export const smartSupportAssistantFlow = ai.defineFlow(
+  {
+    name: 'smartSupportAssistantFlow',
+    inputSchema: SmartSupportAssistantInputSchema,
+    outputSchema: SmartSupportAssistantOutputSchema,
+  },
+  async (input) => {
     const { output } = await prompt(input);
-    if (!output || !output.assistantResponse) throw new Error("AI Empty");
+    if (!output) throw new Error("فشل الذكاء الاصطناعي في الرد.");
     return output;
-  } catch (error: any) {
-    console.error("AI Error Details:", error);
-    return { assistantResponse: "أهلاً بك. أنا المساعد الذكي، حالياً أقوم بتحديث بياناتي لخدمتك بشكل أفضل. يرجى المحاولة بعد قليل أو التواصل مع الدعم الفني المباشر." };
   }
+);
+
+export async function smartSupportAssistant(input: z.infer<typeof SmartSupportAssistantInputSchema>) {
+  return smartSupportAssistantFlow(input);
 }
