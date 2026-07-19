@@ -58,7 +58,8 @@ const fetchUserTransactionsTool = ai.defineTool(
 
 const prompt = ai.definePrompt({
   name: 'smartSupportAssistantPrompt',
-  model: 'googleai/gemini-1.5-flash',
+  // تحديث الموديل للاسم الأكثر استقراراً وتوافقاً
+  model: 'googleai/gemini-1.5-flash-latest',
   input: { schema: SmartSupportAssistantInputSchema },
   output: { schema: SmartSupportAssistantOutputSchema },
   tools: [fetchUserTransactionsTool],
