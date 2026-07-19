@@ -1,7 +1,7 @@
 import data from '@/app/lib/placeholder-images.json';
 
 /**
- * @fileOverview فهرس الصور - تم تصحيح المسار لجلب البيانات الحقيقية ومنع أخطاء الـ SSR.
+ * @fileOverview فهرس الصور - نسخة الاستقرار.
  */
 
 export type ImagePlaceholder = {
@@ -11,4 +11,4 @@ export type ImagePlaceholder = {
   imageHint: string;
 };
 
-export const PlaceHolderImages: ImagePlaceholder[] = data.placeholderImages;
+export const PlaceHolderImages: ImagePlaceholder[] = (data as any).placeholderImages || [];

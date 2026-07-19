@@ -1,6 +1,5 @@
-import './genkit';
-import './flows/smart-support-assistant-flow';
-
 /**
- * @fileOverview الفهرس العالمي - تم تصحيح المسارات لضمان استقرار Next.js.
+ * @fileOverview الفهرس العالمي للذكاء الاصطناعي.
  */
+export * from './genkit';
+export * from './flows/smart-support-assistant-flow';
