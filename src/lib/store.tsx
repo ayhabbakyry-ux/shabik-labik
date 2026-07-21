@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -104,12 +103,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const token = userData.fcmToken;
         if (!token) return;
 
-        console.log(`[Store] Sending Push to ${phoneClean}...`);
         fetch('/api/send-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, title, body, url })
-        }).catch((e) => console.error("Push Fetch Error:", e));
+        }).catch((e) => console.error("Push Error:", e));
       } catch (e) {}
     })();
   }, []);
@@ -126,17 +124,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const setupFCM = useCallback(async (phone: string) => {
     if (typeof window === "undefined" || !('serviceWorker' in navigator)) return;
     
-    // فحص استباقي لمنع الانهيار في حال حظر الإشعارات
-    if (Notification.permission !== 'granted') {
-      console.log("[Store] Notification permission not granted, skipping FCM token setup.");
-      return;
-    }
+    if (Notification.permission !== 'granted') return;
 
     try {
       const messaging = await getMessagingSafe();
       if (!messaging) return;
       
-      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+        scope: '/'
+      });
       
       const token = await getToken(messaging, { 
         serviceWorkerRegistration: registration,
@@ -144,7 +140,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (token) {
-        console.log("[Store] FCM Token:", token);
         const q = query(collection(db, "users"), where("phone", "==", phone.trim()));
         const snap = await getDocs(q);
         if (!snap.empty) {
@@ -152,9 +147,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           setNotificationsEnabled(true);
         }
       }
-    } catch (e) {
-      console.warn("[Store] FCM Setup failed or blocked:", e);
-    }
+    } catch (e) {}
   }, []);
 
   const requestNotificationPermission = async () => {
@@ -224,7 +217,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
-    refreshCloudData();
     
     const unsubscribes: (() => void)[] = [];
     const phoneClean = userPhone.trim();
@@ -265,7 +257,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
 
     return () => unsubscribes.forEach(unsub => unsub());
-  }, [isLoggedIn, userPhone, playNotificationSound, refreshCloudData]);
+  }, [isLoggedIn, userPhone, playNotificationSound]);
 
   const login = async (phone: string, password: string) => {
     const phoneClean = phone.trim();
@@ -300,7 +292,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const res = await processAdminAction(id, action);
     if (res.success && tx.userPhone) {
       const title = action === 'approve' ? "✅ تم قبول الإيداع" : "❌ طلب مرفوض";
-      const body = action === 'approve' ? `تمت إضافة ${tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ل.س لرصيدك.` : "نعتذر، تم رفض طلب الإيداع.";
+      const body = action === 'approve' ? `تمت إضافة ${tx.amount.toLocaleString()} ل.س لرصيدك.` : "نعتذر، تم رفض طلب الإيداع.";
       triggerPushSilently(tx.userPhone, title, body, "/wallet");
     }
   };
@@ -362,7 +354,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       details: "طلب إيداع رصيد جديد",
       proofImage
     });
-    triggerPushSilently(ADMIN_PHONE, "💳 إيداع جديد وصل!", `قام ${userName} بإرسال ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ل.س.`, "/admin");
+    triggerPushSilently(ADMIN_PHONE, "💳 إيداع جديد وصل!", `قام ${userName} بإرسال ${amount.toLocaleString()} ل.س.`, "/admin");
   };
 
   const checkPendingOrders = async () => {
@@ -385,7 +377,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           if (final) {
             await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
             
-            // استخراج اسم المنتج والمعرف من التفاصيل
             const details = order.details || "";
             const accountPart = details.includes("الحساب:") ? details.split("الحساب:")[1] : "---";
             const productPart = details.split("-")[0] || order.type;
@@ -396,9 +387,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             triggerPushSilently(order.userPhone || userPhone, pushTitle, pushBody, "/history");
           }
         }
-      } catch (err) {
-        console.error("Check Pending Error:", err);
-      }
+      } catch (err) {}
     }
     setIsCheckingOrders(false);
   };
@@ -417,6 +406,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
 export function useUser() {
   const context = useContext(UserContext);
-  if (context === undefined) throw new Error('useUser context is missing');
+  if (context === undefined) throw new Error('useUser context missing');
   return context;
 }

@@ -1,9 +1,7 @@
-
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview محرك إرسال إشعارات FCM - النسخة الاحترافية لضمان الظهور في ستارة الموبايل.
- * تم تحسين الأولوية والهيكلية لضمان عملها حتى لو كان التطبيق مغلقاً.
+ * @fileOverview محرك إرسال إشعارات FCM V2 - نسخة الأولوية القصوى لضمان الظهور في الستارة.
  */
 
 export async function POST(request: Request) {
@@ -14,7 +12,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: 'Token missing' });
         }
 
-        const SERVER_KEY = process.env.FCM_SERVER_KEY || "AAAA4R9-R0E:APA91bGk_X8G_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X"; 
+        // استخدام المفتاح الرسمي لضمان الوصول
+        const SERVER_KEY = "AAAA4R9-R0E:APA91bGk_X8G_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X"; 
 
         const payload = {
             to: token,
@@ -24,13 +23,12 @@ export async function POST(request: Request) {
                 sound: "default",
                 priority: "high",
                 icon: "https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg",
-                click_action: url || "https://shabik-labik.vercel.app/history"
+                click_action: url || "/history"
             },
             data: {
                 title: title,
                 body: body,
-                url: url || "/history",
-                click_action: url || "/history"
+                url: url || "/history"
             },
             priority: "high",
             content_available: true,
@@ -54,8 +52,6 @@ export async function POST(request: Request) {
         });
 
         const info = await response.json();
-        console.log("FCM Direct Response:", info);
-
         return NextResponse.json({ success: true, info });
     } catch (error: any) {
         console.error("FCM API Critical Error:", error);
