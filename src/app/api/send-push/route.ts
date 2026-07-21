@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 
 /**
@@ -23,7 +24,8 @@ export async function POST(request: Request) {
                 sound: "default",
                 icon: "https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg",
                 click_action: url || "/history",
-                android_channel_id: "shabik_labik_high_priority"
+                android_channel_id: "shabik_labik_high_priority",
+                tag: "shabik_labik_app"
             },
             data: {
                 title: title,

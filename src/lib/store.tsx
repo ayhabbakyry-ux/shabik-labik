@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -137,14 +138,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const messaging = await getMessagingSafe();
       if (!messaging) return;
 
-      // تسجيل صريح للـ Service Worker لضمان المسار الصحيح
-      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-        scope: '/'
-      });
-
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      
       const token = await getToken(messaging, { 
         serviceWorkerRegistration: registration,
-        vapidKey: "BDR4_Xp_T_p7_S_p_X_8_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X" 
+        vapidKey: "BDR4_Xp_T_p7_S_p_X_8_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X" // تنبيه: يجب وضع مفتاح VAPID الحقيقي هنا من الكونسول
       });
 
       if (token) {
@@ -154,7 +152,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setNotificationsEnabled(true);
       }
     } catch (e) {
-      console.warn("[FCM] Registration failed - possibly blocked by network/region.");
+      console.warn("[FCM] Registration Error:", e);
     }
   }, []);
 
@@ -255,7 +253,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const res = await processAdminAction(id, action);
     if (res.success && tx.userPhone) {
       const title = action === 'approve' ? "✅ تم قبول الإيداع" : "❌ طلب مرفوض";
-      const body = action === 'approve' ? `مبروك! تمت إضافة ${tx.amount.toLocaleString()} ل.س لرصيدك.` : "نعتذر، تم رفض طلب الإيداع.";
+      const body = action === 'approve' ? `مبروك! تمت إضافة ${tx.amount.toLocaleString()} ل.س لرصيدك.` : "نعتذر، تم رفض طلب الإيداع وعاد الرصيد.";
       triggerPushSilently(tx.userPhone, title, body, "/wallet");
     }
   };
@@ -319,13 +317,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           let final: 'Completed' | 'Rejected' | null = null;
           if (['accept', 'موافق', 'success', 'completed', 'مكتمل', 'قبول'].includes(remote)) final = 'Completed';
           else if (['reject', 'failed', 'رفض', 'مرفوض'].includes(remote)) final = 'Rejected';
+          
           if (final) {
             await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
+            
+            // استخراج تفاصيل المنتج والرقم
             const details = order.details || "";
             const productName = details.split("-")[0]?.trim() || "طلب شحن";
             const accountId = details.includes("الحساب:") ? details.split("الحساب:")[1].trim() : "---";
-            const pushTitle = final === 'Completed' ? "✨ تم تنفيذ طلبك" : "⚠️ نعتذر، تم رفض الطلب";
-            const pushBody = `المنتج: ${productName}\nالرقم/ID: ${accountId}\nالحالة: ${final === 'Completed' ? 'مكتمل بنجاح' : 'مرفوض من المزود'}`;
+            
+            const pushTitle = final === 'Completed' ? "✨ تم تنفيذ طلبك بنجاح" : "⚠️ نعتذر، تم رفض الطلب";
+            const pushBody = `المنتج: ${productName}\nالرقم/ID: ${accountId}\nالحالة: ${final === 'Completed' ? 'مكتمل' : 'مرفوض وعاد الرصيد'}`;
+            
             triggerPushSilently(order.userPhone || userPhone, pushTitle, pushBody, "/history");
           }
         }
