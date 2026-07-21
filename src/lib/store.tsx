@@ -10,12 +10,10 @@ import {
   where, 
   onSnapshot, 
   getDocs,
-  enableNetwork,
   doc,
   updateDoc,
   addDoc,
-  increment,
-  getDoc
+  increment
 } from 'firebase/firestore';
 import { signInAction, signUpAction, requestPasswordResetAction, signOutAction } from '@/app/actions/auth';
 import { 
@@ -139,8 +137,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const messaging = await getMessagingSafe();
       if (!messaging) return;
       const registration = await navigator.serviceWorker.getRegistration('/');
-      if (!registration) await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
-      const token = await getToken(messaging, { vapidKey: "BDR4_Xp_T_p7_S_p_X_8_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X" });
+      const token = await getToken(messaging, { 
+        vapidKey: "BDR4_Xp_T_p7_S_p_X_8_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X" 
+      });
       if (token) {
         const q = query(collection(db, "users"), where("phone", "==", phone.trim()));
         const snap = await getDocs(q);
@@ -163,41 +162,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // حذفنا الطلبات المتكررة هنا لتقليل الازدحام والاعتماد كلياً على onSnapshot مع Persistence
   const refreshCloudData = useCallback(async () => {
-    if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
-    try {
-      const phoneClean = userPhone.trim();
-      const isAdminUser = phoneClean === ADMIN_PHONE;
-      await enableNetwork(db).catch(() => {});
-
-      // جلب متوازي فائق السرعة
-      const [userRes, txRes] = await Promise.all([
-        getDocs(query(collection(db, "users"), where("phone", "==", phoneClean))),
-        getDocs(isAdminUser ? query(collection(db, "transactions")) : query(collection(db, "transactions"), where("userPhone", "==", phoneClean)))
-      ]);
-
-      if (!userRes.empty) {
-        const data = userRes.docs[0].data();
-        setUserBalance(Number(data.balance || 0));
-        setProfileImage(data.profileImage || null);
-      }
-
-      const rawTxs = txRes.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
-      setTransactions([...rawTxs].sort((a,b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || "")));
-
-      if (isAdminUser) {
-        const [usersRes, passRes] = await Promise.all([
-          getDocs(collection(db, "users")),
-          getDocs(collection(db, "password_requests"))
-        ]);
-        setAllUsers(usersRes.docs.map(d => ({ id: d.id, ...d.data() })));
-        setPasswordRequests(passRes.docs.map(d => ({ id: d.id, ...d.data() })));
-      }
-      setIsDataReady(true);
-    } catch (e) {
-      console.error("Critical Fetch Error:", e);
-    }
-  }, [isLoggedIn, userPhone]);
+    setIsDataReady(true); // البيانات رح تجي من الكاش فوراً
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -220,11 +188,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const phoneClean = userPhone.trim();
     const isAdminUser = phoneClean === ADMIN_PHONE;
 
+    // الاستماع الذكي: بقرأ من ذاكرة الجهاز أولاً ثم بحدث من النت
     unsubscribes.push(onSnapshot(query(collection(db, "users"), where("phone", "==", phoneClean)), (snap) => {
       if (!snap.empty) {
         const data = snap.docs[0].data();
         setUserBalance(Number(data.balance || 0));
         setProfileImage(data.profileImage || null);
+        setIsDataReady(true);
       }
     }));
 
@@ -241,13 +211,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }));
 
     if (isAdminUser) {
-      unsubscribes.push(onSnapshot(collection(db, "users"), (snap) => setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })))));
-      unsubscribes.push(onSnapshot(collection(db, "password_requests"), (snap) => setPasswordRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })))));
+      unsubscribes.push(onSnapshot(collection(db, "users"), (snap) => setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() }))) ));
+      unsubscribes.push(onSnapshot(collection(db, "password_requests"), (snap) => setPasswordRequests(snap.docs.map(d => ({ id: d.id, ...d.data() }))) ));
     }
     
-    refreshCloudData();
     return () => unsubscribes.forEach(unsub => unsub());
-  }, [isLoggedIn, userPhone, playNotificationSound, refreshCloudData]);
+  }, [isLoggedIn, userPhone, playNotificationSound]);
 
   const login = async (phone: string, password: string) => {
     const phoneClean = phone.trim();
@@ -256,14 +225,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const data = { phone: phoneClean, name: "المدير العام" };
       setIsLoggedIn(true); setUserPhone(phoneClean); setUserName(data.name);
       localStorage.setItem('shabik_auth', JSON.stringify(data));
-      await refreshCloudData();
       return { success: true, message: "مرحباً بك يا مدير أيهم." };
     }
     const result = await signInAction(phoneClean, password, fingerprint);
     if (result.success && result.user) {
       setIsLoggedIn(true); setUserPhone(result.user.phone); setUserName(result.user.name);
       localStorage.setItem('shabik_auth', JSON.stringify(result.user));
-      await refreshCloudData();
     }
     return result;
   };
@@ -348,8 +315,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           if (final) {
             await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
             const details = order.details || "";
-            const parts = details.split("-");
-            const productName = parts[0] ? parts[0].trim() : "طلب شحن";
+            const productName = details.split("-")[0]?.trim() || "طلب شحن";
             const accountId = details.includes("الحساب:") ? details.split("الحساب:")[1].trim() : "---";
             const pushTitle = final === 'Completed' ? "✨ تم تنفيذ طلبك" : "⚠️ نعتذر، تم رفض الطلب";
             const pushBody = `المنتج: ${productName}\nالرقم/ID: ${accountId}\nالحالة: ${final === 'Completed' ? 'مكتمل بنجاح' : 'مرفوض من المزود'}`;

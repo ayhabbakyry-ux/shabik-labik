@@ -1,10 +1,11 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getMessaging, isSupported } from "firebase/messaging";
 
 /**
- * @fileOverview إعدادات الفايربيز المستقرة - نسخة التوافق العالي للسيرفر والعميل.
+ * @fileOverview إعدادات الفايربيز المسرعة - نسخة "الذاكرة الحديدية" V10.
+ * تفعيل التخزين المحلي لضمان ظهور البيانات فوراً حتى في أضعف شبكات الإنترنت (سوريا).
  */
 
 const firebaseConfig = {
@@ -16,14 +17,15 @@ const firebaseConfig = {
   appId: "1:723678552538:web:579e6791a1211c7998e0e3"
 };
 
-// تهيئة التطبيق الأساسي مع ضمان عدم التكرار SSR
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// تهيئة قاعدة البيانات بشكل قياسي
-export const db = getFirestore(app);
+// تفعيل التخزين المحلي الذكي: هذا يمنع ظهور الأصفار ويجعل البيانات تظهر بلمحة بصر
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});
+
 export const auth = getAuth(app);
 
-// جلب Messaging بأمان للتوافق مع المتصفحات فقط
 export const getMessagingSafe = async () => {
     if (typeof window !== "undefined" && await isSupported()) {
         return getMessaging(app);
