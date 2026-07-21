@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { formatWhatsAppNumber } from "@/lib/utils";
 import {
@@ -25,45 +25,38 @@ export function AdminPanel() {
   const { 
     transactions, adminAction, currency, allUsers = [], deleteUser, 
     passwordRequests = [], adminResetPassword, notificationsEnabled, requestNotificationPermission,
-    updateBalanceAdmin, refreshCloudData, isAudioUnlocked, unlockAudio
+    updateBalanceAdmin, refreshCloudData, isAudioUnlocked, unlockAudio, isDataReady
   } = useUser();
   const { toast } = useToast();
 
   const [userSearch, setUserSearch] = useState("");
   const [balanceAdjustments, setBalanceAdjustments] = useState<Record<string, string>>({});
-  const [isLoadingData, setIsLoadingData] = useState(false);
-  const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // تحديث البيانات فور فتح الصفحة وبشكل دوري سريع
   useEffect(() => {
-    const initFetch = async () => {
-      setIsLoadingData(true);
-      await refreshCloudData();
-      setIsLoadingData(false);
-      setIsFirstLoad(false);
-    };
-    
-    initFetch();
-
-    const pollInterval = setInterval(() => {
+    if (!isDataReady) {
       refreshCloudData();
-    }, 15000); // تحديث كل 15 ثانية لضمان دقة البيانات
-    
-    return () => clearInterval(pollInterval);
-  }, [refreshCloudData]);
+    }
+  }, [isDataReady, refreshCloudData]);
 
   const handleManualRefresh = async () => {
-    setIsLoadingData(true);
+    setIsRefreshing(true);
     await refreshCloudData();
-    setIsLoadingData(false);
-    toast({ title: "تم تحديث البيانات بلمحة بصر ✅" });
+    setIsRefreshing(false);
+    toast({ title: "تم التحديث بلمحة بصر ✅" });
   };
 
-  const pendingTxs = transactions?.filter(t => t.status === 'Pending' && (t.type === 'إيداع محفظة' || t.type === 'طلب إيداع')) || [];
+  const pendingTxs = useMemo(() => 
+    transactions?.filter(t => t.status === 'Pending' && (t.type === 'إيداع محفظة' || t.type === 'طلب إيداع')) || [],
+    [transactions]
+  );
 
-  const filteredUsers = (allUsers || []).filter(u => 
-    (u.name || "").toLowerCase().includes(userSearch.toLowerCase()) || 
-    (u.phone || "").includes(userSearch)
+  const filteredUsers = useMemo(() => 
+    (allUsers || []).filter(u => 
+      (u.name || "").toLowerCase().includes(userSearch.toLowerCase()) || 
+      (u.phone || "").includes(userSearch)
+    ),
+    [allUsers, userSearch]
   );
 
   const toggleNotifications = () => {
@@ -122,10 +115,10 @@ export function AdminPanel() {
           <Button 
             onClick={handleManualRefresh}
             variant="outline"
-            disabled={isLoadingData}
+            disabled={isRefreshing}
             className="rounded-2xl gap-2 font-bold shadow-sm h-12 px-6 border-primary/20 hover:bg-primary/5 transition-all"
           >
-            <RefreshCw className={`h-5 w-5 text-primary ${isLoadingData ? 'animate-spin' : ''}`} /> 
+            <RefreshCw className={`h-5 w-5 text-primary ${isRefreshing ? 'animate-spin' : ''}`} /> 
             <span className="hidden sm:inline">تحديث فوري</span>
           </Button>
           
@@ -158,7 +151,7 @@ export function AdminPanel() {
           </div>
           <CardContent className="p-8 flex flex-col items-start justify-center relative z-10">
             <p className="text-xs opacity-80 font-black mb-1 tracking-widest">إجمالي المستخدمين</p>
-            {isFirstLoad ? <Loader2 className="h-8 w-8 animate-spin" /> : <p className="text-5xl font-black">{allUsers?.length || 0}</p>}
+            {!isDataReady && allUsers.length === 0 ? <Loader2 className="h-8 w-8 animate-spin" /> : <p className="text-5xl font-black">{allUsers.length}</p>}
           </CardContent>
         </Card>
 
@@ -168,7 +161,7 @@ export function AdminPanel() {
           </div>
           <CardContent className="p-8 flex flex-col items-start justify-center relative z-10">
             <p className="text-xs opacity-80 font-black mb-1 tracking-widest">إيداعات معلقة</p>
-            {isFirstLoad ? <Loader2 className="h-8 w-8 animate-spin" /> : <p className="text-5xl font-black">{pendingTxs.length}</p>}
+            {!isDataReady && pendingTxs.length === 0 ? <Loader2 className="h-8 w-8 animate-spin" /> : <p className="text-5xl font-black">{pendingTxs.length}</p>}
           </CardContent>
         </Card>
 
@@ -178,7 +171,7 @@ export function AdminPanel() {
           </div>
           <CardContent className="p-8 flex flex-col items-start justify-center relative z-10">
             <p className="text-xs opacity-80 font-black mb-1 tracking-widest">طلبات استعادة</p>
-            {isFirstLoad ? <Loader2 className="h-8 w-8 animate-spin" /> : <p className="text-5xl font-black">{passwordRequests?.length || 0}</p>}
+            {!isDataReady && passwordRequests.length === 0 ? <Loader2 className="h-8 w-8 animate-spin" /> : <p className="text-5xl font-black">{passwordRequests.length}</p>}
           </CardContent>
         </Card>
       </div>
@@ -303,7 +296,7 @@ export function AdminPanel() {
         </TabsContent>
 
         <TabsContent value="passwords" className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          {passwordRequests?.length === 0 ? (
+          {passwordRequests.length === 0 ? (
             <div className="py-32 text-center bg-white border-2 border-dashed border-slate-100 rounded-[40px] flex flex-col items-center gap-4">
                <div className="bg-slate-50 p-6 rounded-full">
                   <ShieldAlert className="h-12 w-12 text-slate-200" />
@@ -311,7 +304,7 @@ export function AdminPanel() {
                <p className="text-slate-400 font-bold text-lg">لا يوجد طلبات استعادة كلمة مرور حالياً.</p>
             </div>
           ) : (
-            passwordRequests?.map((req) => (
+            passwordRequests.map((req) => (
               <Card key={req.id} className="border-none shadow-sm rounded-[32px] bg-white overflow-hidden border-r-8 border-r-emerald-500">
                 <CardContent className="p-8 flex flex-col md:flex-row items-center justify-between gap-6">
                   <div className="text-right space-y-1">

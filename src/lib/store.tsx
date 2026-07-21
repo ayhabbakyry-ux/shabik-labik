@@ -68,6 +68,7 @@ type UserContextType = {
   isAudioUnlocked: boolean;
   unlockAudio: () => void;
   triggerPushSilently: (targetPhone: string, title: string, body: string, url?: string) => void;
+  isDataReady: boolean;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -86,6 +87,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [isNotificationSupported, setIsNotificationSupported] = useState(false);
   const [isAudioUnlocked, setIsAudioUnlocked] = useState(false);
+  const [isDataReady, setIsDataReady] = useState(false);
   
   const isInitialLoad = useRef(true);
   const currency = "SYP";
@@ -185,17 +187,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // دالة تحديث سحابية فائقة السرعة تستهدف جلب البيانات بلمحة بصر
   const refreshCloudData = useCallback(async () => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     try {
       const phoneClean = userPhone.trim();
       const isAdminUser = phoneClean === ADMIN_PHONE;
       
-      // ضمان اتصال الشبكة
       await enableNetwork(db).catch(() => {});
 
-      // جلب بيانات المستخدم الحالية (رصيد، صورة)
       const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
       const userRes = await getDocs(userQ);
       if (!userRes.empty) {
@@ -204,7 +203,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setProfileImage(data.profileImage || null);
       }
 
-      // جلب المعاملات (المستخدم أو الكل للمدير) بطلب موازي سريع
       const txQ = isAdminUser 
         ? query(collection(db, "transactions"))
         : query(collection(db, "transactions"), where("userPhone", "==", phoneClean));
@@ -213,7 +211,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const rawTxs = txRes.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
       setTransactions([...rawTxs].sort((a,b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || "")));
 
-      // في حال كان المدير، نجلب باقي البيانات بلمحة بصر
       if (isAdminUser) {
         const [usersRes, passRes] = await Promise.all([
           getDocs(collection(db, "users")),
@@ -223,6 +220,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setAllUsers(usersRes.docs.map(d => ({ id: d.id, ...d.data() })));
         setPasswordRequests(passRes.docs.map(d => ({ id: d.id, ...d.data() })));
       }
+      setIsDataReady(true);
     } catch (e) {
       console.error("Fast Fetch Failed:", e);
     }
@@ -245,14 +243,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [setupFCM]);
 
-  // تشغيل المزامنة الحية (Real-time) مع ضمان الأداء العالي
   useEffect(() => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     const unsubscribes: (() => void)[] = [];
     const phoneClean = userPhone.trim();
     const isAdminUser = phoneClean === ADMIN_PHONE;
 
-    // مزامنة المستخدم
     unsubscribes.push(onSnapshot(query(collection(db, "users"), where("phone", "==", phoneClean)), (snap) => {
       if (!snap.empty) {
         const data = snap.docs[0].data();
@@ -261,7 +257,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
     }));
 
-    // مزامنة المعاملات (فوري للمدير وللمستخدم)
     const txQuery = isAdminUser 
       ? query(collection(db, "transactions"))
       : query(collection(db, "transactions"), where("userPhone", "==", phoneClean));
@@ -277,10 +272,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
       setTransactions([...rawTxs].sort((a,b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || "")));
       isInitialLoad.current = false;
+      setIsDataReady(true);
     }));
 
     if (isAdminUser) {
-      // مزامنة المستخدمين وطلبات الاستعادة للمدير (حية)
       unsubscribes.push(onSnapshot(collection(db, "users"), (snap) => {
         setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       }));
@@ -289,7 +284,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }));
     }
     
-    // تشغيل الجلب الفوري عند أول اتصال لضمان السرعة
     refreshCloudData();
 
     return () => unsubscribes.forEach(unsub => unsub());
@@ -305,7 +299,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('shabik_auth', JSON.stringify(data));
       addLoginNotification("تم دخول المدير بنجاح ✅");
       if (Notification.permission === 'granted') await setupFCM(phoneClean);
-      await refreshCloudData(); // جلب البيانات فوراً بعد دخول المدير
+      await refreshCloudData();
       return { success: true, message: "مرحباً بك يا مدير أيهم." };
     }
 
@@ -420,7 +414,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       isLoggedIn, isAdmin: userPhone.trim() === ADMIN_PHONE, userPhone, userName, userBalance, profileImage, transactions, allUsers, passwordRequests, loginNotifications,
       login, register: signUpAction, logout, deductBalance, requestDeposit, adminAction, updateBalanceAdmin, deleteUser: deleteUserAction, requestReset: requestPasswordResetAction, adminResetPassword: completePasswordResetAction,
       changePassword: changePasswordAction, updateProfileImage: updateProfileImageAction, currency, checkPendingOrders, notificationsEnabled, isNotificationSupported, requestNotificationPermission, refreshCloudData,
-      isAudioUnlocked, unlockAudio, triggerPushSilently
+      isAudioUnlocked, unlockAudio, triggerPushSilently, isDataReady
     }}>
       {children}
     </UserContext.Provider>
