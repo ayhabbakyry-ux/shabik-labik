@@ -1,4 +1,3 @@
-
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
@@ -13,7 +12,7 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// استقبال الإشعارات في الخلفية (والتطبيق مغلق)
+// معالجة الإشعارات في الخلفية (عندما يكون التطبيق مغلقاً)
 messaging.onBackgroundMessage((payload) => {
   console.log('[sw.js] Received background message ', payload);
   const notificationTitle = payload.notification.title;
@@ -22,11 +21,10 @@ messaging.onBackgroundMessage((payload) => {
     icon: payload.notification.icon || 'https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg',
     data: payload.data,
     badge: 'https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg',
-    tag: 'shabik-labik-notif',
-    renotify: true
+    vibrate: [200, 100, 200]
   };
 
-  return self.registration.showNotification(notificationTitle, notificationOptions);
+  self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
 // التعامل مع النقر على الإشعار

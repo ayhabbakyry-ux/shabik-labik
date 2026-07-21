@@ -4,8 +4,8 @@ import { getAuth } from "firebase/auth";
 import { getMessaging, isSupported } from "firebase/messaging";
 
 /**
- * @fileOverview إعدادات الفايربيز المسرعة - نسخة "الذاكرة الحديدية" V10.
- * تفعيل التخزين المحلي لضمان ظهور البيانات فوراً حتى في أضعف شبكات الإنترنت (سوريا).
+ * @fileOverview إعدادات الفايربيز المسرعة - نسخة الاستقرار العالي V11.
+ * تفعيل Long Polling لضمان عمل الإيداع في أجهزة السامسونج والانفينكس دون تضارب مع الإشعارات.
  */
 
 const firebaseConfig = {
@@ -19,9 +19,10 @@ const firebaseConfig = {
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// تفعيل التخزين المحلي الذكي: هذا يمنع ظهور الأصفار ويجعل البيانات تظهر بلمحة بصر
+// تفعيل التخزين المحلي مع Long Polling لحل مشكلة السامسونج نهائياً
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  experimentalForceLongPolling: true // حل مشكلة تعليق الإيداع في أجهزة Samsung و Infinix
 });
 
 export const auth = getAuth(app);

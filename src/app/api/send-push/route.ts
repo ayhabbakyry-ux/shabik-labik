@@ -1,8 +1,8 @@
-
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview محرك إرسال إشعارات FCM المطور - نسخة التوافق العالي للستارة.
+ * @fileOverview محرك إرسال إشعارات FCM المطور - نسخة التوافق العالي V3.
+ * إرسال مزدوج (Notification + Data) لضمان الظهور في ستارة الموبايل.
  */
 
 export async function POST(request: Request) {

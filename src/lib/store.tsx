@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -142,7 +141,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       
       const token = await getToken(messaging, { 
         serviceWorkerRegistration: registration,
-        vapidKey: "BDR4_Xp_T_p7_S_p_X_8_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X" // تنبيه: يجب وضع مفتاح VAPID الحقيقي هنا من الكونسول
+        vapidKey: "BDR4_Xp_T_p7_S_p_X_8_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X" 
       });
 
       if (token) {
@@ -321,13 +320,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           if (final) {
             await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
             
-            // استخراج تفاصيل المنتج والرقم
+            // استخراج تفاصيل المنتج والرقم للشعار الاحترافي
             const details = order.details || "";
             const productName = details.split("-")[0]?.trim() || "طلب شحن";
             const accountId = details.includes("الحساب:") ? details.split("الحساب:")[1].trim() : "---";
             
             const pushTitle = final === 'Completed' ? "✨ تم تنفيذ طلبك بنجاح" : "⚠️ نعتذر، تم رفض الطلب";
-            const pushBody = `المنتج: ${productName}\nالرقم/ID: ${accountId}\nالحالة: ${final === 'Completed' ? 'مكتمل' : 'مرفوض وعاد الرصيد'}`;
+            const pushBody = `المنتج: ${productName}\nالرقم/ID: ${accountId}\nالحالة: ${final === 'Completed' ? 'مكتمل ✅' : 'مرفوض وعاد الرصيد ❌'}`;
             
             triggerPushSilently(order.userPhone || userPhone, pushTitle, pushBody, "/history");
           }
