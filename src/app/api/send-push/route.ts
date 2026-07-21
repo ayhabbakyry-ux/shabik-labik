@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview محرك إرسال إشعارات FCM - النسخة الاحترافية المتوافقة مع ستارة الموبايل.
+ * @fileOverview محرك إرسال إشعارات FCM - النسخة الاحترافية لضمان الظهور في ستارة الموبايل.
  */
 
 export async function POST(request: Request) {
@@ -13,10 +13,9 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: 'Token missing' });
         }
 
+        // مفتاح السيرفر الخاص بفايربيز - يجب التأكد منه في الكونسول
         const SERVER_KEY = process.env.FCM_SERVER_KEY || "AAAA4R9-R0E:APA91bGk_X8G_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X"; 
 
-        // بناء الحمولة لضمان الظهور في الستارة (Notification + Data)
-        // يجب إرسال حقل notification لضمان عرض النظام للإشعار تلقائياً
         const payload = {
             to: token,
             notification: {
@@ -34,7 +33,14 @@ export async function POST(request: Request) {
                 click_action: url || "/history"
             },
             priority: "high",
-            content_available: true
+            content_available: true,
+            android: {
+                priority: "high",
+                notification: {
+                    channel_id: "shabik_labik_high_priority",
+                    sound: "default"
+                }
+            }
         };
 
         const response = await fetch('https://fcm.googleapis.com/fcm/send', {
@@ -47,7 +53,7 @@ export async function POST(request: Request) {
         });
 
         const info = await response.json();
-        console.log("FCM Response:", info);
+        console.log("FCM Direct Response:", info);
 
         return NextResponse.json({ success: true, info });
     } catch (error: any) {

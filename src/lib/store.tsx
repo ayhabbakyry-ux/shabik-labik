@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -103,11 +104,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const token = userData.fcmToken;
         if (!token) return;
 
+        console.log(`[Store] Sending Push to ${phoneClean}...`);
         fetch('/api/send-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, title, body, url })
-        }).catch(() => {});
+        }).catch((e) => console.error("Push Fetch Error:", e));
       } catch (e) {}
     })();
   }, []);
@@ -126,8 +128,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const messaging = await getMessagingSafe();
       if (!messaging) return;
-      const registration = await navigator.serviceWorker.getRegistration();
-      if (!registration) return;
+      
+      // تسجيل عامل الخدمة يدوياً لضمان العمل في الخلفية
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      console.log("[Store] SW Registered:", registration.scope);
       
       const token = await getToken(messaging, { 
         serviceWorkerRegistration: registration,
@@ -135,6 +139,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (token) {
+        console.log("[Store] FCM Token:", token);
         const q = query(collection(db, "users"), where("phone", "==", phone.trim()));
         const snap = await getDocs(q);
         if (!snap.empty) {
@@ -142,7 +147,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           setNotificationsEnabled(true);
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("[Store] FCM Setup Failed:", e);
+    }
   }, []);
 
   const requestNotificationPermission = async () => {
@@ -199,13 +206,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setIsLoggedIn(true);
         setUserPhone(parsed.phone);
         setUserName(parsed.name);
+        setupFCM(parsed.phone); // محاولة التفعيل تلقائياً عند العودة
       }
       if ('Notification' in window) {
         setIsNotificationSupported(true);
         setNotificationsEnabled(Notification.permission === "granted");
       }
     }
-  }, []);
+  }, [setupFCM]);
 
   useEffect(() => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
@@ -258,12 +266,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const data = { phone: phoneClean, name: "المدير العام" };
       setIsLoggedIn(true); setUserPhone(phoneClean); setUserName(data.name);
       localStorage.setItem('shabik_auth', JSON.stringify(data));
+      await setupFCM(phoneClean);
       return { success: true, message: "مرحباً بك يا مدير." };
     }
     const result = await signInAction(phoneClean, password);
     if (result.success && result.user) {
       setIsLoggedIn(true); setUserPhone(result.user.phone); setUserName(result.user.name);
       localStorage.setItem('shabik_auth', JSON.stringify(result.user));
+      await setupFCM(phoneClean);
     }
     return result;
   };
@@ -284,6 +294,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (res.success && tx.userPhone) {
       const title = action === 'approve' ? "✅ تم قبول الإيداع" : "❌ طلب مرفوض";
       const body = action === 'approve' ? `تمت إضافة ${tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ل.س لرصيدك.` : "نعتذر، تم رفض طلب الإيداع.";
+      // إرسال الإشعار للمستخدم
       triggerPushSilently(tx.userPhone, title, body, "/wallet");
     }
   };
@@ -298,8 +309,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const deductBalance = async (amount: number, productDetails: string, initialStatus: 'Pending' | 'Completed' = 'Completed', externalId?: string) => {
     const before = userBalance;
     const newBal = Math.max(0, userBalance - amount);
-    
-    // تحديث الحالة المحلية فوراً لتجربة مستخدم سريعة
     setUserBalance(newBal);
 
     try {
@@ -309,15 +318,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       
       if (!userSnap.empty) {
         const userDocRef = doc(db, "users", userSnap.docs[0].id);
-        // التحديث الفعلي في السيرفر لخصم الرصيد (حجز الرصيد فوراً بنظام الـ increment السالب)
-        // هذا يضمن أن المبلغ يُطرح من قاعدة البيانات حتى لو كان الطلب "Pending"
-        await updateDoc(userDocRef, { 
-          balance: increment(-amount) 
-        });
+        await updateDoc(userDocRef, { balance: increment(-amount) });
       }
 
       const now = new Date().toISOString();
-      // تسجيل المعاملة في السجل لضمان الشفافية
       await addDoc(collection(db, "transactions"), {
         external_order_id: externalId || "",
         type: 'طلب شحن',
@@ -332,10 +336,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         balanceAfter: newBal
       });
       
+      // إرسال إشعار للمدير بطلب شحن جديد
       triggerPushSilently(ADMIN_PHONE, "🚀 طلب شحن جديد", `قام ${userName} بطلب شحن جديد.`, "/admin");
     } catch (e) {
-      console.error("Critical: Failed to persist deduction in Firestore", e);
-      // التراجع عن التحديث المحلي في حال فشل السيرفر لضمان دقة البيانات
       setUserBalance(before);
       throw e;
     }
@@ -354,6 +357,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       details: "طلب إيداع رصيد جديد",
       proofImage
     });
+    // إرسال إشعار للمدير بطلب إيداع جديد
     triggerPushSilently(ADMIN_PHONE, "💳 إيداع جديد وصل!", `قام ${userName} بإرسال ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ل.س.`, "/admin");
   };
 
