@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -133,20 +132,30 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const setupFCM = useCallback(async (phone: string) => {
     if (typeof window === "undefined" || !('serviceWorker' in navigator)) return;
     if (Notification.permission !== 'granted') return;
+    
     try {
       const messaging = await getMessagingSafe();
       if (!messaging) return;
-      const registration = await navigator.serviceWorker.getRegistration('/');
+
+      // تسجيل صريح للـ Service Worker لضمان المسار الصحيح
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+        scope: '/'
+      });
+
       const token = await getToken(messaging, { 
+        serviceWorkerRegistration: registration,
         vapidKey: "BDR4_Xp_T_p7_S_p_X_8_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X" 
       });
+
       if (token) {
         const q = query(collection(db, "users"), where("phone", "==", phone.trim()));
         const snap = await getDocs(q);
         if (!snap.empty) await updateDoc(doc(db, "users", snap.docs[0].id), { fcmToken: token });
         setNotificationsEnabled(true);
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn("[FCM] Registration failed - possibly blocked by network/region.");
+    }
   }, []);
 
   const requestNotificationPermission = async () => {
@@ -162,9 +171,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // حذفنا الطلبات المتكررة هنا لتقليل الازدحام والاعتماد كلياً على onSnapshot مع Persistence
   const refreshCloudData = useCallback(async () => {
-    setIsDataReady(true); // البيانات رح تجي من الكاش فوراً
+    setIsDataReady(true);
   }, []);
 
   useEffect(() => {
@@ -188,7 +196,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const phoneClean = userPhone.trim();
     const isAdminUser = phoneClean === ADMIN_PHONE;
 
-    // الاستماع الذكي: بقرأ من ذاكرة الجهاز أولاً ثم بحدث من النت
     unsubscribes.push(onSnapshot(query(collection(db, "users"), where("phone", "==", phoneClean)), (snap) => {
       if (!snap.empty) {
         const data = snap.docs[0].data();
