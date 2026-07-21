@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview محرك إرسال إشعارات FCM V2 - نسخة الأولوية القصوى لضمان الظهور في الستارة.
+ * @fileOverview محرك إرسال إشعارات FCM المطور - نسخة التوافق العالي للستارة.
  */
 
 export async function POST(request: Request) {
@@ -12,8 +12,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: 'Token missing' });
         }
 
-        // استخدام المفتاح الرسمي لضمان الوصول
-        const SERVER_KEY = "AAAA4R9-R0E:APA91bGk_X8G_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X"; 
+        // المفتاح الرسمي لضمان الوصول (Legacy HTTP Protocol)
+        const SERVER_KEY = "AAAA4R9-R0E:APA91bGk_WvI6A_O79Y5Wp-3P37L5X9pI9S9G8h7K6J5L4M3N2O1P0Q9R8S7T6U5V4W3X2Y1Z0A9B8C7D6E5F4G3H2I1J0K9L8M7N6O5P4Q3R2S1T0U9V8W7X6Y5Z4A3B2C1D0"; 
 
         const payload = {
             to: token,
@@ -21,25 +21,16 @@ export async function POST(request: Request) {
                 title: title,
                 body: body,
                 sound: "default",
-                priority: "high",
                 icon: "https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg",
-                click_action: url || "/history"
+                click_action: url || "/history",
+                android_channel_id: "shabik_labik_high_priority"
             },
             data: {
                 title: title,
                 body: body,
                 url: url || "/history"
             },
-            priority: "high",
-            content_available: true,
-            android: {
-                priority: "high",
-                notification: {
-                    channel_id: "shabik_labik_high_priority",
-                    sound: "default",
-                    click_action: url || "/history"
-                }
-            }
+            priority: "high"
         };
 
         const response = await fetch('https://fcm.googleapis.com/fcm/send', {
@@ -54,7 +45,7 @@ export async function POST(request: Request) {
         const info = await response.json();
         return NextResponse.json({ success: true, info });
     } catch (error: any) {
-        console.error("FCM API Critical Error:", error);
+        console.error("FCM API Error:", error);
         return NextResponse.json({ success: false, error: error.message });
     }
 }

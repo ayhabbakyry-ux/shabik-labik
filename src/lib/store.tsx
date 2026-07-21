@@ -107,7 +107,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, title, body, url })
-        }).catch((e) => console.error("Push Error:", e));
+        }).catch((e) => console.error("Push API Network Error:", e));
       } catch (e) {}
     })();
   }, []);
@@ -147,7 +147,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           setNotificationsEnabled(true);
         }
       }
-    } catch (e) {}
+    } catch (e) {
+        console.error("FCM Setup Error:", e);
+    }
   }, []);
 
   const requestNotificationPermission = async () => {
@@ -266,7 +268,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setIsLoggedIn(true); setUserPhone(phoneClean); setUserName(data.name);
       localStorage.setItem('shabik_auth', JSON.stringify(data));
       if (Notification.permission === 'granted') await setupFCM(phoneClean);
-      return { success: true, message: "مرحباً بك يا مدير." };
+      return { success: true, message: "مرحباً بك يا مدير أيهم." };
     }
     const result = await signInAction(phoneClean, password);
     if (result.success && result.user) {
@@ -292,7 +294,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const res = await processAdminAction(id, action);
     if (res.success && tx.userPhone) {
       const title = action === 'approve' ? "✅ تم قبول الإيداع" : "❌ طلب مرفوض";
-      const body = action === 'approve' ? `تمت إضافة ${tx.amount.toLocaleString()} ل.س لرصيدك.` : "نعتذر، تم رفض طلب الإيداع.";
+      const body = action === 'approve' ? `مبروك! تمت إضافة ${tx.amount.toLocaleString()} ل.س لرصيدك.` : "نعتذر، تم رفض طلب الإيداع.";
       triggerPushSilently(tx.userPhone, title, body, "/wallet");
     }
   };
@@ -300,7 +302,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const updateBalanceAdmin = async (phone: string, amount: number, operation: 'add' | 'subtract') => {
     const res = await updateUserBalanceDirectlyAction(phone, amount, operation);
     if (res.success) {
-      triggerPushSilently(phone, "💰 تحديث رصيد", `تم ${operation === 'add' ? 'إضافة' : 'سحب'} مبلغ من حسابك.`, "/wallet");
+      const title = operation === 'add' ? "💰 تم إضافة رصيد" : "💸 تم سحب رصيد";
+      const body = `قام المدير بـ ${operation === 'add' ? 'إضافة' : 'سحب'} مبلغ ${amount.toLocaleString()} ل.س من حسابك.`;
+      triggerPushSilently(phone, title, body, "/wallet");
     }
   };
 
@@ -334,7 +338,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         balanceAfter: newBal
       });
       
-      triggerPushSilently(ADMIN_PHONE, "🚀 طلب شحن جديد", `قام ${userName} بطلب شحن جديد.`, "/admin");
+      triggerPushSilently(ADMIN_PHONE, "🚀 طلب شحن جديد", `قام ${userName} بطلب شحن جديد بقيمة ${amount.toLocaleString()} ل.س.`, "/admin");
     } catch (e) {
       setUserBalance(before);
       throw e;
@@ -354,7 +358,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       details: "طلب إيداع رصيد جديد",
       proofImage
     });
-    triggerPushSilently(ADMIN_PHONE, "💳 إيداع جديد وصل!", `قام ${userName} بإرسال ${amount.toLocaleString()} ل.س.`, "/admin");
+    triggerPushSilently(ADMIN_PHONE, "💳 إيداع جديد وصل!", `قام ${userName} بإرسال إشعار إيداع بمبلغ ${amount.toLocaleString()} ل.س.`, "/admin");
   };
 
   const checkPendingOrders = async () => {
@@ -371,18 +375,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           const remote = String(data.status).toLowerCase().trim();
           let final: 'Completed' | 'Rejected' | null = null;
           
-          if (['accept', 'موافق', 'success', 'completed', 'مكتمل'].includes(remote)) final = 'Completed';
+          if (['accept', 'موافق', 'success', 'completed', 'مكتمل', 'قبول'].includes(remote)) final = 'Completed';
           else if (['reject', 'failed', 'رفض', 'مرفوض'].includes(remote)) final = 'Rejected';
           
           if (final) {
             await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
             
             const details = order.details || "";
-            const accountPart = details.includes("الحساب:") ? details.split("الحساب:")[1] : "---";
-            const productPart = details.split("-")[0] || order.type;
+            // استخراج اسم المنتج والآي دي من نص التفاصيل
+            const parts = details.split("-");
+            const productName = parts[0] ? parts[0].trim() : "طلب شحن";
+            const accountId = details.includes("الحساب:") ? details.split("الحساب:")[1].trim() : "---";
 
-            const pushTitle = final === 'Completed' ? "✨ تم شحن طلبك بنجاح" : "⚠️ نعتذر، تم رفض الطلب";
-            const pushBody = `المنتج: ${productPart.trim()}\nللحساب: ${accountPart.trim()}`;
+            const pushTitle = final === 'Completed' ? "✨ تم تنفيذ طلبك" : "⚠️ نعتذر، تم رفض الطلب";
+            const pushBody = `المنتج: ${productName}\nالرقم/ID: ${accountId}\nالحالة: ${final === 'Completed' ? 'مكتمل بنجاح' : 'مرفوض من المزود'}`;
 
             triggerPushSilently(order.userPhone || userPhone, pushTitle, pushBody, "/history");
           }

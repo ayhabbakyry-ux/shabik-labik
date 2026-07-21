@@ -1,24 +1,21 @@
 {
-  "name": "شبيك لبيك الرقمي",
+  "name": "شبيك لبيك",
   "short_name": "شبيك لبيك",
-  "description": "المنصة الموثوقة لخدمات الشحن التلقائي والألعاب",
-  "start_url": "/dashboard",
+  "start_url": "/",
   "display": "standalone",
-  "background_color": "#11151d",
+  "background_color": "#ffffff",
   "theme_color": "#6B46C1",
   "icons": [
     {
       "src": "https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     },
     {
       "src": "https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
   ],
-  "gcm_sender_id": "723678552538"
+  "gcm_sender_id": "103953800507"
 }
