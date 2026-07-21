@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -13,7 +14,8 @@ import {
   doc,
   updateDoc,
   addDoc,
-  increment
+  increment,
+  getDoc
 } from 'firebase/firestore';
 import { signInAction, signUpAction, requestPasswordResetAction, signOutAction } from '@/app/actions/auth';
 import { 
@@ -98,7 +100,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       time: new Date().toLocaleTimeString('ar-SY', { hour: '2-digit', minute: '2-digit' }),
       type
     };
-    setLoginNotifications(prev => [newNotif, ...prev].slice(0, 10)); // حفظ آخر 10 تنبيهات
+    setLoginNotifications(prev => [newNotif, ...prev].slice(0, 10)); 
   };
 
   const playNotificationSound = useCallback(() => {
@@ -148,9 +150,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const messaging = await getMessagingSafe();
       if (!messaging) return;
-      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
+      const registration = await navigator.serviceWorker.getRegistration('/');
+      if (!registration) {
+        await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
+      }
+      
       const token = await getToken(messaging, { 
-        serviceWorkerRegistration: registration,
         vapidKey: "BDR4_Xp_T_p7_S_p_X_8_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X"
       });
 
@@ -180,37 +185,47 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // دالة تحديث سحابية فائقة السرعة تستهدف جلب البيانات بلمحة بصر
   const refreshCloudData = useCallback(async () => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     try {
       const phoneClean = userPhone.trim();
       const isAdminUser = phoneClean === ADMIN_PHONE;
+      
+      // ضمان اتصال الشبكة
       await enableNetwork(db).catch(() => {});
 
+      // جلب بيانات المستخدم الحالية (رصيد، صورة)
       const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
-      const results = await getDocs(userQ);
-      if (!results.empty) {
-        const data = results.docs[0].data();
+      const userRes = await getDocs(userQ);
+      if (!userRes.empty) {
+        const data = userRes.docs[0].data();
         setUserBalance(Number(data.balance || 0));
         setProfileImage(data.profileImage || null);
-        if (data.fcmToken) setNotificationsEnabled(true);
       }
 
+      // جلب المعاملات (المستخدم أو الكل للمدير) بطلب موازي سريع
       const txQ = isAdminUser 
         ? query(collection(db, "transactions"))
         : query(collection(db, "transactions"), where("userPhone", "==", phoneClean));
       
-      const txSnap = await getDocs(txQ);
-      const rawTxs = txSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
+      const txRes = await getDocs(txQ);
+      const rawTxs = txRes.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
       setTransactions([...rawTxs].sort((a,b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || "")));
 
+      // في حال كان المدير، نجلب باقي البيانات بلمحة بصر
       if (isAdminUser) {
-        const allUsersSnap = await getDocs(collection(db, "users"));
-        setAllUsers(allUsersSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        const passSnap = await getDocs(collection(db, "password_requests"));
-        setPasswordRequests(passSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const [usersRes, passRes] = await Promise.all([
+          getDocs(collection(db, "users")),
+          getDocs(collection(db, "password_requests"))
+        ]);
+        
+        setAllUsers(usersRes.docs.map(d => ({ id: d.id, ...d.data() })));
+        setPasswordRequests(passRes.docs.map(d => ({ id: d.id, ...d.data() })));
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("Fast Fetch Failed:", e);
+    }
   }, [isLoggedIn, userPhone]);
 
   useEffect(() => {
@@ -230,12 +245,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [setupFCM]);
 
+  // تشغيل المزامنة الحية (Real-time) مع ضمان الأداء العالي
   useEffect(() => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     const unsubscribes: (() => void)[] = [];
     const phoneClean = userPhone.trim();
     const isAdminUser = phoneClean === ADMIN_PHONE;
 
+    // مزامنة المستخدم
     unsubscribes.push(onSnapshot(query(collection(db, "users"), where("phone", "==", phoneClean)), (snap) => {
       if (!snap.empty) {
         const data = snap.docs[0].data();
@@ -244,6 +261,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
     }));
 
+    // مزامنة المعاملات (فوري للمدير وللمستخدم)
     const txQuery = isAdminUser 
       ? query(collection(db, "transactions"))
       : query(collection(db, "transactions"), where("userPhone", "==", phoneClean));
@@ -262,6 +280,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }));
 
     if (isAdminUser) {
+      // مزامنة المستخدمين وطلبات الاستعادة للمدير (حية)
       unsubscribes.push(onSnapshot(collection(db, "users"), (snap) => {
         setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       }));
@@ -269,20 +288,24 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setPasswordRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       }));
     }
+    
+    // تشغيل الجلب الفوري عند أول اتصال لضمان السرعة
+    refreshCloudData();
+
     return () => unsubscribes.forEach(unsub => unsub());
-  }, [isLoggedIn, userPhone, playNotificationSound]);
+  }, [isLoggedIn, userPhone, playNotificationSound, refreshCloudData]);
 
   const login = async (phone: string, password: string) => {
     const phoneClean = phone.trim();
     const fingerprint = getDeviceFingerprint();
 
-    // حالة خاصة للمدير
     if (phoneClean === ADMIN_PHONE && password === ADMIN_PASS) {
       const data = { phone: phoneClean, name: "المدير العام" };
       setIsLoggedIn(true); setUserPhone(phoneClean); setUserName(data.name);
       localStorage.setItem('shabik_auth', JSON.stringify(data));
       addLoginNotification("تم دخول المدير بنجاح ✅");
       if (Notification.permission === 'granted') await setupFCM(phoneClean);
+      await refreshCloudData(); // جلب البيانات فوراً بعد دخول المدير
       return { success: true, message: "مرحباً بك يا مدير أيهم." };
     }
 
@@ -292,6 +315,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('shabik_auth', JSON.stringify(result.user));
       addLoginNotification("تم تسجيل الدخول بنجاح.");
       if (Notification.permission === 'granted') await setupFCM(phoneClean);
+      await refreshCloudData();
     } else if (!result.success) {
       addLoginNotification(`محاولة دخول فاشلة: ${result.message}`, 'warning');
     }
