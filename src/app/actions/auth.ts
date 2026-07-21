@@ -8,11 +8,12 @@ import {
   getDocs, 
   addDoc, 
   updateDoc, 
-  doc
+  doc,
+  increment
 } from 'firebase/firestore';
 
 /**
- * @fileOverview محرك المصادقة - تم إضافة نظام "الجلسة الواحدة" لمنع تعدد الأجهزة.
+ * @fileOverview محرك المصادقة - تم تحديث نظام المكافآت ليدعم كود المدير "ADMIN" بـ 25 ليرة فورية.
  */
 
 const ADMIN_PHONE = "0939549573";
@@ -85,17 +86,23 @@ export async function signUpAction(phone: string, name: string, pass: string, re
     let initialBalance = 0;
     const cleanRefCode = refCode?.trim().toUpperCase();
 
+    // إذا تم استخدام كود المدير "ADMIN"
     if (cleanRefCode === "ADMIN") {
-      const referrerPhone = ADMIN_PHONE;
-      if (referrerPhone !== phoneClean) {
-        const refQ = query(collection(db, "users"), where("phone", "==", referrerPhone));
+      // 1. منح المستخدم الجديد 25 ليرة فوراً
+      initialBalance = 25;
+
+      // 2. محاولة إضافة 25 ليرة لرصيد المدير (إذا كان الحساب موجوداً)
+      try {
+        const refQ = query(collection(db, "users"), where("phone", "==", ADMIN_PHONE));
         const refSnapshot = await getDocs(refQ);
         if (!refSnapshot.empty) {
           const referrerDoc = refSnapshot.docs[0];
-          const currentRefBalance = Number(referrerDoc.data().balance || 0);
-          await updateDoc(doc(db, "users", referrerDoc.id), { balance: currentRefBalance + 25 });
-          initialBalance = 25;
+          await updateDoc(doc(db, "users", referrerDoc.id), { 
+            balance: increment(25) 
+          });
         }
+      } catch (e) {
+        console.warn("Could not update admin bonus balance during signup.");
       }
     }
 
@@ -109,7 +116,12 @@ export async function signUpAction(phone: string, name: string, pass: string, re
     };
 
     await addDoc(collection(db, "users"), newUser);
-    return { success: true, message: "تم إنشاء الحساب بنجاح، يمكنك تسجيل الدخول الآن." };
+    
+    const welcomeMsg = initialBalance > 0 
+      ? `تم إنشاء الحساب بنجاح، مبروك حصلت على ${initialBalance} ل.س هدية ترحيبية!` 
+      : "تم إنشاء الحساب بنجاح، يمكنك تسجيل الدخول الآن.";
+
+    return { success: true, message: welcomeMsg };
   } catch (error) {
     console.error("Register Error:", error);
     return { success: false, message: "حدث خطأ أثناء الاتصال بالسيرفر." };
