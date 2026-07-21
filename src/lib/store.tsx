@@ -25,6 +25,14 @@ import {
 } from '@/app/actions/admin';
 import { changePasswordAction, updateProfileImageAction } from '@/app/actions/profile';
 import { Transaction } from './types';
+import { getDeviceFingerprint } from './utils';
+
+type LoginNotification = {
+  id: string;
+  title: string;
+  time: string;
+  type: 'success' | 'warning';
+};
 
 type UserContextType = {
   isLoggedIn: boolean;
@@ -36,6 +44,7 @@ type UserContextType = {
   transactions: Transaction[];
   allUsers: any[];
   passwordRequests: any[];
+  loginNotifications: LoginNotification[];
   login: (phone: string, password: string) => Promise<{ success: boolean; message: string }>;
   register: (phone: string, name: string, pass: string, refCode?: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
@@ -70,6 +79,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [passwordRequests, setPasswordRequests] = useState<any[]>([]);
+  const [loginNotifications, setLoginNotifications] = useState<LoginNotification[]>([]);
   const [isCheckingOrders, setIsCheckingOrders] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [isNotificationSupported, setIsNotificationSupported] = useState(false);
@@ -80,6 +90,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";
+
+  const addLoginNotification = (title: string, type: 'success' | 'warning' = 'success') => {
+    const newNotif: LoginNotification = {
+      id: Math.random().toString(36).substr(2, 9),
+      title,
+      time: new Date().toLocaleTimeString('ar-SY', { hour: '2-digit', minute: '2-digit' }),
+      type
+    };
+    setLoginNotifications(prev => [newNotif, ...prev].slice(0, 10)); // حفظ آخر 10 تنبيهات
+  };
 
   const playNotificationSound = useCallback(() => {
     if (typeof window === "undefined" || !isAudioUnlocked) return;
@@ -123,17 +143,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const setupFCM = useCallback(async (phone: string) => {
     if (typeof window === "undefined" || !('serviceWorker' in navigator)) return;
-    
     if (Notification.permission !== 'granted') return;
 
     try {
       const messaging = await getMessagingSafe();
       if (!messaging) return;
-      
-      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-        scope: '/'
-      });
-      
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
       const token = await getToken(messaging, { 
         serviceWorkerRegistration: registration,
         vapidKey: "BDR4_Xp_T_p7_S_p_X_8_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X"
@@ -206,9 +221,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setIsLoggedIn(true);
         setUserPhone(parsed.phone);
         setUserName(parsed.name);
-        if (Notification.permission === 'granted') {
-          setupFCM(parsed.phone);
-        }
+        if (Notification.permission === 'granted') setupFCM(parsed.phone);
       }
       if ('Notification' in window) {
         setIsNotificationSupported(true);
@@ -219,7 +232,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
-    
     const unsubscribes: (() => void)[] = [];
     const phoneClean = userPhone.trim();
     const isAdminUser = phoneClean === ADMIN_PHONE;
@@ -257,35 +269,40 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setPasswordRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       }));
     }
-
     return () => unsubscribes.forEach(unsub => unsub());
   }, [isLoggedIn, userPhone, playNotificationSound]);
 
   const login = async (phone: string, password: string) => {
     const phoneClean = phone.trim();
+    const fingerprint = getDeviceFingerprint();
+
+    // حالة خاصة للمدير
     if (phoneClean === ADMIN_PHONE && password === ADMIN_PASS) {
       const data = { phone: phoneClean, name: "المدير العام" };
       setIsLoggedIn(true); setUserPhone(phoneClean); setUserName(data.name);
       localStorage.setItem('shabik_auth', JSON.stringify(data));
+      addLoginNotification("تم دخول المدير بنجاح ✅");
       if (Notification.permission === 'granted') await setupFCM(phoneClean);
       return { success: true, message: "مرحباً بك يا مدير أيهم." };
     }
-    const result = await signInAction(phoneClean, password);
+
+    const result = await signInAction(phoneClean, password, fingerprint);
     if (result.success && result.user) {
       setIsLoggedIn(true); setUserPhone(result.user.phone); setUserName(result.user.name);
       localStorage.setItem('shabik_auth', JSON.stringify(result.user));
+      addLoginNotification("تم تسجيل الدخول بنجاح.");
       if (Notification.permission === 'granted') await setupFCM(phoneClean);
+    } else if (!result.success) {
+      addLoginNotification(`محاولة دخول فاشلة: ${result.message}`, 'warning');
     }
     return result;
   };
 
   const logout = async () => {
-    if (userPhone) {
-      await signOutAction(userPhone);
-    }
-    setIsLoggedIn(false); 
-    setUserPhone("");
+    if (userPhone) await signOutAction(userPhone);
+    setIsLoggedIn(false); setUserPhone("");
     localStorage.removeItem('shabik_auth');
+    setLoginNotifications([]);
   };
 
   const adminAction = async (id: string, action: 'approve' | 'reject') => {
@@ -312,51 +329,34 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const before = userBalance;
     const newBal = Math.max(0, userBalance - amount);
     setUserBalance(newBal);
-
     try {
       const phoneClean = userPhone.trim();
       const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
       const userSnap = await getDocs(userQ);
-      
       if (!userSnap.empty) {
         const userDocRef = doc(db, "users", userSnap.docs[0].id);
         await updateDoc(userDocRef, { balance: increment(-amount) });
       }
-
       const now = new Date().toISOString();
       await addDoc(collection(db, "transactions"), {
         external_order_id: externalId || "",
         type: 'طلب شحن',
-        amount,
-        status: initialStatus,
-        date: now,
-        createdAt: now,
-        userName,
-        userPhone: phoneClean,
-        details: productDetails,
-        balanceBefore: before,
-        balanceAfter: newBal
+        amount, status: initialStatus, date: now, createdAt: now,
+        userName, userPhone: phoneClean, details: productDetails,
+        balanceBefore: before, balanceAfter: newBal
       });
-      
       triggerPushSilently(ADMIN_PHONE, "🚀 طلب شحن جديد", `قام ${userName} بطلب شحن جديد بقيمة ${amount.toLocaleString()} ل.س.`, "/admin");
     } catch (e) {
-      setUserBalance(before);
-      throw e;
+      setUserBalance(before); throw e;
     }
   };
 
   const requestDeposit = async (amount: number, proofImage: string) => {
     const now = new Date().toISOString();
     await addDoc(collection(db, "transactions"), {
-      type: 'إيداع محفظة',
-      amount,
-      status: 'Pending',
-      date: now,
-      createdAt: now,
-      userName,
-      userPhone: userPhone.trim(),
-      details: "طلب إيداع رصيد جديد",
-      proofImage
+      type: 'إيداع محفظة', amount, status: 'Pending',
+      date: now, createdAt: now, userName, userPhone: userPhone.trim(),
+      details: "طلب إيداع رصيد جديد", proofImage
     });
     triggerPushSilently(ADMIN_PHONE, "💳 إيداع جديد وصل!", `قام ${userName} بإرسال إشعار إيداع بمبلغ ${amount.toLocaleString()} ل.س.`, "/admin");
   };
@@ -365,7 +365,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (!isLoggedIn || isCheckingOrders) return;
     const pending = transactions.filter(tx => tx.status === 'Pending' && tx.external_order_id);
     if (pending.length === 0) return;
-    
     setIsCheckingOrders(true);
     for (const order of pending) {
       try {
@@ -374,22 +373,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (data.success && data.status) {
           const remote = String(data.status).toLowerCase().trim();
           let final: 'Completed' | 'Rejected' | null = null;
-          
           if (['accept', 'موافق', 'success', 'completed', 'مكتمل', 'قبول'].includes(remote)) final = 'Completed';
           else if (['reject', 'failed', 'رفض', 'مرفوض'].includes(remote)) final = 'Rejected';
-          
           if (final) {
             await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
-            
             const details = order.details || "";
-            // استخراج اسم المنتج والآي دي من نص التفاصيل
             const parts = details.split("-");
             const productName = parts[0] ? parts[0].trim() : "طلب شحن";
             const accountId = details.includes("الحساب:") ? details.split("الحساب:")[1].trim() : "---";
-
             const pushTitle = final === 'Completed' ? "✨ تم تنفيذ طلبك" : "⚠️ نعتذر، تم رفض الطلب";
             const pushBody = `المنتج: ${productName}\nالرقم/ID: ${accountId}\nالحالة: ${final === 'Completed' ? 'مكتمل بنجاح' : 'مرفوض من المزود'}`;
-
             triggerPushSilently(order.userPhone || userPhone, pushTitle, pushBody, "/history");
           }
         }
@@ -400,7 +393,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <UserContext.Provider value={{ 
-      isLoggedIn, isAdmin: userPhone.trim() === ADMIN_PHONE, userPhone, userName, userBalance, profileImage, transactions, allUsers, passwordRequests,
+      isLoggedIn, isAdmin: userPhone.trim() === ADMIN_PHONE, userPhone, userName, userBalance, profileImage, transactions, allUsers, passwordRequests, loginNotifications,
       login, register: signUpAction, logout, deductBalance, requestDeposit, adminAction, updateBalanceAdmin, deleteUser: deleteUserAction, requestReset: requestPasswordResetAction, adminResetPassword: completePasswordResetAction,
       changePassword: changePasswordAction, updateProfileImage: updateProfileImageAction, currency, checkPendingOrders, notificationsEnabled, isNotificationSupported, requestNotificationPermission, refreshCloudData,
       isAudioUnlocked, unlockAudio, triggerPushSilently

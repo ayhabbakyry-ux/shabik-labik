@@ -7,14 +7,21 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { useUser } from "@/lib/store";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Search, Menu, ShieldAlert, BellRing } from "lucide-react";
+import { Bell, Search, Menu, ShieldAlert, BellRing, Clock, ShieldCheck, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function DashboardPage() {
   const { 
     isLoggedIn, userPhone, isAdmin, notificationsEnabled, 
-    isNotificationSupported, requestNotificationPermission, userName 
+    isNotificationSupported, requestNotificationPermission, userName,
+    loginNotifications
   } = useUser();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -47,12 +54,52 @@ export default function DashboardPage() {
               <p className="text-[10px] text-muted-foreground">الوصول السريع للخدمات الرقمية</p>
             </div>
           </div>
-          <button className="p-2 bg-white rounded-full shadow-sm">
-            <Bell className="h-5 w-5 text-muted-foreground" />
-          </button>
+
+          {/* زر الجرس المطور لتنبيهات تسجيل الدخول */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="p-2 bg-white rounded-full shadow-sm relative active:scale-95 transition-all">
+                <Bell className="h-5 w-5 text-muted-foreground" />
+                {loginNotifications.length > 0 && (
+                  <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0 rounded-[28px] border-none shadow-2xl bg-white/95 backdrop-blur-md" align="start">
+               <div className="p-5 border-b bg-slate-50/50 flex items-center justify-between">
+                  <span className="font-black text-sm text-primary">تنبيهات الأمان</span>
+                  <ShieldCheck className="h-4 w-4 text-green-600" />
+               </div>
+               <ScrollArea className="h-64">
+                  {loginNotifications.length === 0 ? (
+                    <div className="p-10 text-center flex flex-col items-center gap-2">
+                       <Clock className="h-8 w-8 text-slate-200" />
+                       <p className="text-xs text-muted-foreground font-bold">لا توجد تنبيهات دخول حالياً</p>
+                    </div>
+                  ) : (
+                    <div className="p-2 space-y-1">
+                       {loginNotifications.map((notif) => (
+                         <div key={notif.id} className="p-4 rounded-2xl hover:bg-slate-50 transition-colors flex items-start gap-3">
+                            <div className={`p-2 rounded-xl mt-0.5 ${notif.type === 'warning' ? 'bg-amber-100' : 'bg-green-100'}`}>
+                               {notif.type === 'warning' ? <AlertTriangle className="h-3 w-3 text-amber-600" /> : <CheckCircle2 className="h-3 w-3 text-green-600" />}
+                            </div>
+                            <div className="text-right flex-1">
+                               <p className="text-xs font-bold text-slate-800 leading-tight">{notif.title}</p>
+                               <span className="text-[10px] text-slate-400 mt-1 block">{notif.time}</span>
+                            </div>
+                         </div>
+                       ))}
+                    </div>
+                  )}
+               </ScrollArea>
+               <div className="p-3 bg-slate-50/50 text-center">
+                  <p className="text-[9px] font-bold text-slate-400">نظام حماية الأجهزة - شبيك لبيك</p>
+               </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
-        {/* بنر تفعيل الإشعارات - ضروري جداً لتفعيل الصوت */}
+        {/* بنر تفعيل الإشعارات */}
         {isNotificationSupported && !notificationsEnabled && (
           <div className="bg-primary/10 border border-primary/20 p-4 rounded-2xl flex items-center justify-between animate-in slide-in-from-top-4 duration-500">
             <div className="flex items-center gap-3">

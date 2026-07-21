@@ -13,12 +13,12 @@ import {
 } from 'firebase/firestore';
 
 /**
- * @fileOverview محرك المصادقة - تم تحديث نظام المكافآت ليدعم كود المدير "ADMIN" بـ 25 ليرة فورية.
+ * @fileOverview محرك المصادقة المطور - نظام حصر الجهاز الواحد (Hardware Lock).
  */
 
 const ADMIN_PHONE = "0939549573";
 
-export async function signInAction(phone: string, pass: string) {
+export async function signInAction(phone: string, pass: string, deviceFingerprint: string) {
   try {
     const phoneClean = phone.trim();
     const q = query(collection(db, "users"), where("phone", "==", phoneClean), where("password", "==", pass));
@@ -28,12 +28,22 @@ export async function signInAction(phone: string, pass: string) {
       const userDoc = querySnapshot.docs[0];
       const userData = userDoc.data();
 
-      // نظام حصر الجهاز الواحد (باستثناء المدير)
-      if (phoneClean !== ADMIN_PHONE && userData.isOnline === true) {
-        return { 
-          success: false, 
-          message: "هذا الحساب مفتوح حالياً من جهاز آخر. يرجى تسجيل الخروج من الجهاز الأول للمتابعة." 
-        };
+      // نظام حصر الجهاز الواحد الصارم (باستثناء المدير)
+      if (phoneClean !== ADMIN_PHONE) {
+        // إذا كان لدى المستخدم جهاز مسجل مسبقاً والبصمة لا تطابق
+        if (userData.deviceId && userData.deviceId !== deviceFingerprint) {
+          return { 
+            success: false, 
+            message: "عذراً، هذا الحساب مرتبط بجهاز آخر. لا يمكن الدخول من جهاز غريب." 
+          };
+        }
+
+        // إذا لم يكن لديه جهاز مسجل، نقوم بربط هذا الجهاز كجهاز أساسي له
+        if (!userData.deviceId) {
+          await updateDoc(doc(db, "users", userDoc.id), {
+            deviceId: deviceFingerprint
+          });
+        }
       }
 
       // تحديث حالة الاتصال
@@ -86,12 +96,8 @@ export async function signUpAction(phone: string, name: string, pass: string, re
     let initialBalance = 0;
     const cleanRefCode = refCode?.trim().toUpperCase();
 
-    // إذا تم استخدام كود المدير "ADMIN"
     if (cleanRefCode === "ADMIN") {
-      // 1. منح المستخدم الجديد 25 ليرة فوراً
       initialBalance = 25;
-
-      // 2. محاولة إضافة 25 ليرة لرصيد المدير (إذا كان الحساب موجوداً)
       try {
         const refQ = query(collection(db, "users"), where("phone", "==", ADMIN_PHONE));
         const refSnapshot = await getDocs(refQ);
