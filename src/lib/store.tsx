@@ -211,7 +211,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setIsLoggedIn(true);
         setUserPhone(parsed.phone);
         setUserName(parsed.name);
-        // لا نستدعي setupFCM إلا إذا كان المستخدم قد منح الإذن مسبقاً
         if (Notification.permission === 'granted') {
           setupFCM(parsed.phone);
         }
@@ -370,6 +369,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (!isLoggedIn || isCheckingOrders) return;
     const pending = transactions.filter(tx => tx.status === 'Pending' && tx.external_order_id);
     if (pending.length === 0) return;
+    
     setIsCheckingOrders(true);
     for (const order of pending) {
       try {
@@ -378,14 +378,27 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (data.success && data.status) {
           const remote = String(data.status).toLowerCase().trim();
           let final: 'Completed' | 'Rejected' | null = null;
+          
           if (['accept', 'موافق', 'success', 'completed', 'مكتمل'].includes(remote)) final = 'Completed';
           else if (['reject', 'failed', 'رفض', 'مرفوض'].includes(remote)) final = 'Rejected';
+          
           if (final) {
             await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
-            triggerPushSilently(order.userPhone || userPhone, final === 'Completed' ? "✨ شحن مكتمل" : "⚠️ فشل شحن", "يرجى مراجعة سجل الطلبات.", "/history");
+            
+            // استخراج اسم المنتج والمعرف من التفاصيل
+            const details = order.details || "";
+            const accountPart = details.includes("الحساب:") ? details.split("الحساب:")[1] : "---";
+            const productPart = details.split("-")[0] || order.type;
+
+            const pushTitle = final === 'Completed' ? "✨ تم شحن طلبك بنجاح" : "⚠️ نعتذر، تم رفض الطلب";
+            const pushBody = `المنتج: ${productPart.trim()}\nللحساب: ${accountPart.trim()}`;
+
+            triggerPushSilently(order.userPhone || userPhone, pushTitle, pushBody, "/history");
           }
         }
-      } catch (err) {}
+      } catch (err) {
+        console.error("Check Pending Error:", err);
+      }
     }
     setIsCheckingOrders(false);
   };

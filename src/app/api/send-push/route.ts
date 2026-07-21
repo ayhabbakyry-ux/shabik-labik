@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 
 /**
  * @fileOverview محرك إرسال إشعارات FCM - النسخة الاحترافية لضمان الظهور في ستارة الموبايل.
+ * تم تحسين الأولوية والهيكلية لضمان عملها حتى لو كان التطبيق مغلقاً.
  */
 
 export async function POST(request: Request) {
@@ -13,7 +14,6 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: 'Token missing' });
         }
 
-        // مفتاح السيرفر الخاص بفايربيز - يجب التأكد منه في الكونسول
         const SERVER_KEY = process.env.FCM_SERVER_KEY || "AAAA4R9-R0E:APA91bGk_X8G_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X"; 
 
         const payload = {
@@ -38,7 +38,8 @@ export async function POST(request: Request) {
                 priority: "high",
                 notification: {
                     channel_id: "shabik_labik_high_priority",
-                    sound: "default"
+                    sound: "default",
+                    click_action: url || "/history"
                 }
             }
         };
