@@ -125,13 +125,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const setupFCM = useCallback(async (phone: string) => {
     if (typeof window === "undefined" || !('serviceWorker' in navigator)) return;
+    
+    // فحص استباقي لمنع الانهيار في حال حظر الإشعارات
+    if (Notification.permission !== 'granted') {
+      console.log("[Store] Notification permission not granted, skipping FCM token setup.");
+      return;
+    }
+
     try {
       const messaging = await getMessagingSafe();
       if (!messaging) return;
       
-      // تسجيل عامل الخدمة يدوياً لضمان العمل في الخلفية
       const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-      console.log("[Store] SW Registered:", registration.scope);
       
       const token = await getToken(messaging, { 
         serviceWorkerRegistration: registration,
@@ -148,7 +153,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } catch (e) {
-      console.error("[Store] FCM Setup Failed:", e);
+      console.warn("[Store] FCM Setup failed or blocked:", e);
     }
   }, []);
 
@@ -206,7 +211,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setIsLoggedIn(true);
         setUserPhone(parsed.phone);
         setUserName(parsed.name);
-        setupFCM(parsed.phone); // محاولة التفعيل تلقائياً عند العودة
+        // لا نستدعي setupFCM إلا إذا كان المستخدم قد منح الإذن مسبقاً
+        if (Notification.permission === 'granted') {
+          setupFCM(parsed.phone);
+        }
       }
       if ('Notification' in window) {
         setIsNotificationSupported(true);
@@ -266,14 +274,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const data = { phone: phoneClean, name: "المدير العام" };
       setIsLoggedIn(true); setUserPhone(phoneClean); setUserName(data.name);
       localStorage.setItem('shabik_auth', JSON.stringify(data));
-      await setupFCM(phoneClean);
+      if (Notification.permission === 'granted') await setupFCM(phoneClean);
       return { success: true, message: "مرحباً بك يا مدير." };
     }
     const result = await signInAction(phoneClean, password);
     if (result.success && result.user) {
       setIsLoggedIn(true); setUserPhone(result.user.phone); setUserName(result.user.name);
       localStorage.setItem('shabik_auth', JSON.stringify(result.user));
-      await setupFCM(phoneClean);
+      if (Notification.permission === 'granted') await setupFCM(phoneClean);
     }
     return result;
   };
@@ -294,7 +302,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (res.success && tx.userPhone) {
       const title = action === 'approve' ? "✅ تم قبول الإيداع" : "❌ طلب مرفوض";
       const body = action === 'approve' ? `تمت إضافة ${tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ل.س لرصيدك.` : "نعتذر، تم رفض طلب الإيداع.";
-      // إرسال الإشعار للمستخدم
       triggerPushSilently(tx.userPhone, title, body, "/wallet");
     }
   };
@@ -336,7 +343,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         balanceAfter: newBal
       });
       
-      // إرسال إشعار للمدير بطلب شحن جديد
       triggerPushSilently(ADMIN_PHONE, "🚀 طلب شحن جديد", `قام ${userName} بطلب شحن جديد.`, "/admin");
     } catch (e) {
       setUserBalance(before);
@@ -357,7 +363,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       details: "طلب إيداع رصيد جديد",
       proofImage
     });
-    // إرسال إشعار للمدير بطلب إيداع جديد
     triggerPushSilently(ADMIN_PHONE, "💳 إيداع جديد وصل!", `قام ${userName} بإرسال ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ل.س.`, "/admin");
   };
 
