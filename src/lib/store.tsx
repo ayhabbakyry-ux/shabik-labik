@@ -95,16 +95,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const ADMIN_PASS = "872003";
   const NOTIFICATION_SOUND = "/shabik-labik.mp3";
 
-  const addLoginNotification = (title: string, type: 'success' | 'warning' = 'success') => {
-    const newNotif: LoginNotification = {
-      id: Math.random().toString(36).substr(2, 9),
-      title,
-      time: new Date().toLocaleTimeString('ar-SY', { hour: '2-digit', minute: '2-digit' }),
-      type
-    };
-    setLoginNotifications(prev => [newNotif, ...prev].slice(0, 10)); 
-  };
-
   const playNotificationSound = useCallback(() => {
     if (typeof window === "undefined" || !isAudioUnlocked) return;
     try {
@@ -115,23 +105,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const triggerPushSilently = useCallback((targetPhone: string, title: string, body: string, url?: string) => {
     if (typeof window === "undefined") return;
-    
     (async () => {
       try {
         const phoneClean = targetPhone.trim();
         const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
         const snap = await getDocs(userQ);
         if (snap.empty) return;
-        
         const userData = snap.docs[0].data();
         const token = userData.fcmToken;
         if (!token) return;
-
         fetch('/api/send-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, title, body, url })
-        }).catch((e) => console.error("Push API Network Error:", e));
+        }).catch(() => {});
       } catch (e) {}
     })();
   }, []);
@@ -148,30 +135,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const setupFCM = useCallback(async (phone: string) => {
     if (typeof window === "undefined" || !('serviceWorker' in navigator)) return;
     if (Notification.permission !== 'granted') return;
-
     try {
       const messaging = await getMessagingSafe();
       if (!messaging) return;
       const registration = await navigator.serviceWorker.getRegistration('/');
-      if (!registration) {
-        await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
-      }
-      
-      const token = await getToken(messaging, { 
-        vapidKey: "BDR4_Xp_T_p7_S_p_X_8_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X"
-      });
-
+      if (!registration) await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
+      const token = await getToken(messaging, { vapidKey: "BDR4_Xp_T_p7_S_p_X_8_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X" });
       if (token) {
         const q = query(collection(db, "users"), where("phone", "==", phone.trim()));
         const snap = await getDocs(q);
-        if (!snap.empty) {
-          await updateDoc(doc(db, "users", snap.docs[0].id), { fcmToken: token });
-          setNotificationsEnabled(true);
-        }
+        if (!snap.empty) await updateDoc(doc(db, "users", snap.docs[0].id), { fcmToken: token });
+        setNotificationsEnabled(true);
       }
-    } catch (e) {
-        console.error("FCM Setup Error:", e);
-    }
+    } catch (e) {}
   }, []);
 
   const requestNotificationPermission = async () => {
@@ -192,22 +168,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const phoneClean = userPhone.trim();
       const isAdminUser = phoneClean === ADMIN_PHONE;
-      
       await enableNetwork(db).catch(() => {});
 
-      const userQ = query(collection(db, "users"), where("phone", "==", phoneClean));
-      const userRes = await getDocs(userQ);
+      // جلب متوازي فائق السرعة
+      const [userRes, txRes] = await Promise.all([
+        getDocs(query(collection(db, "users"), where("phone", "==", phoneClean))),
+        getDocs(isAdminUser ? query(collection(db, "transactions")) : query(collection(db, "transactions"), where("userPhone", "==", phoneClean)))
+      ]);
+
       if (!userRes.empty) {
         const data = userRes.docs[0].data();
         setUserBalance(Number(data.balance || 0));
         setProfileImage(data.profileImage || null);
       }
 
-      const txQ = isAdminUser 
-        ? query(collection(db, "transactions"))
-        : query(collection(db, "transactions"), where("userPhone", "==", phoneClean));
-      
-      const txRes = await getDocs(txQ);
       const rawTxs = txRes.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
       setTransactions([...rawTxs].sort((a,b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || "")));
 
@@ -216,13 +190,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           getDocs(collection(db, "users")),
           getDocs(collection(db, "password_requests"))
         ]);
-        
         setAllUsers(usersRes.docs.map(d => ({ id: d.id, ...d.data() })));
         setPasswordRequests(passRes.docs.map(d => ({ id: d.id, ...d.data() })));
       }
       setIsDataReady(true);
     } catch (e) {
-      console.error("Fast Fetch Failed:", e);
+      console.error("Critical Fetch Error:", e);
     }
   }, [isLoggedIn, userPhone]);
 
@@ -231,9 +204,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const saved = localStorage.getItem('shabik_auth');
       if (saved) {
         const parsed = JSON.parse(saved);
-        setIsLoggedIn(true);
-        setUserPhone(parsed.phone);
-        setUserName(parsed.name);
+        setIsLoggedIn(true); setUserPhone(parsed.phone); setUserName(parsed.name);
         if (Notification.permission === 'granted') setupFCM(parsed.phone);
       }
       if ('Notification' in window) {
@@ -257,17 +228,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
     }));
 
-    const txQuery = isAdminUser 
-      ? query(collection(db, "transactions"))
-      : query(collection(db, "transactions"), where("userPhone", "==", phoneClean));
-
-    unsubscribes.push(onSnapshot(txQuery, (snap) => {
+    unsubscribes.push(onSnapshot(isAdminUser ? query(collection(db, "transactions")) : query(collection(db, "transactions"), where("userPhone", "==", phoneClean)), (snap) => {
       const rawTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
-      if (!isInitialLoad.current) {
+      if (!isInitialLoad.current && isAdminUser) {
         snap.docChanges().forEach((change) => {
-          if (change.type === "added" && isAdminUser && change.doc.data().status === 'Pending') {
-            playNotificationSound();
-          }
+          if (change.type === "added" && change.doc.data().status === 'Pending') playNotificationSound();
         });
       }
       setTransactions([...rawTxs].sort((a,b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || "")));
@@ -276,42 +241,29 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }));
 
     if (isAdminUser) {
-      unsubscribes.push(onSnapshot(collection(db, "users"), (snap) => {
-        setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      }));
-      unsubscribes.push(onSnapshot(collection(db, "password_requests"), (snap) => {
-        setPasswordRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      }));
+      unsubscribes.push(onSnapshot(collection(db, "users"), (snap) => setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })))));
+      unsubscribes.push(onSnapshot(collection(db, "password_requests"), (snap) => setPasswordRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })))));
     }
     
     refreshCloudData();
-
     return () => unsubscribes.forEach(unsub => unsub());
   }, [isLoggedIn, userPhone, playNotificationSound, refreshCloudData]);
 
   const login = async (phone: string, password: string) => {
     const phoneClean = phone.trim();
     const fingerprint = getDeviceFingerprint();
-
     if (phoneClean === ADMIN_PHONE && password === ADMIN_PASS) {
       const data = { phone: phoneClean, name: "المدير العام" };
       setIsLoggedIn(true); setUserPhone(phoneClean); setUserName(data.name);
       localStorage.setItem('shabik_auth', JSON.stringify(data));
-      addLoginNotification("تم دخول المدير بنجاح ✅");
-      if (Notification.permission === 'granted') await setupFCM(phoneClean);
       await refreshCloudData();
       return { success: true, message: "مرحباً بك يا مدير أيهم." };
     }
-
     const result = await signInAction(phoneClean, password, fingerprint);
     if (result.success && result.user) {
       setIsLoggedIn(true); setUserPhone(result.user.phone); setUserName(result.user.name);
       localStorage.setItem('shabik_auth', JSON.stringify(result.user));
-      addLoginNotification("تم تسجيل الدخول بنجاح.");
-      if (Notification.permission === 'granted') await setupFCM(phoneClean);
       await refreshCloudData();
-    } else if (!result.success) {
-      addLoginNotification(`محاولة دخول فاشلة: ${result.message}`, 'warning');
     }
     return result;
   };

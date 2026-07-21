@@ -33,11 +33,10 @@ export function AdminPanel() {
   const [balanceAdjustments, setBalanceAdjustments] = useState<Record<string, string>>({});
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // إجبار التحديث فور الدخول
   useEffect(() => {
-    if (!isDataReady) {
-      refreshCloudData();
-    }
-  }, [isDataReady, refreshCloudData]);
+    refreshCloudData();
+  }, [refreshCloudData]);
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
@@ -151,7 +150,7 @@ export function AdminPanel() {
           </div>
           <CardContent className="p-8 flex flex-col items-start justify-center relative z-10">
             <p className="text-xs opacity-80 font-black mb-1 tracking-widest">إجمالي المستخدمين</p>
-            {!isDataReady && allUsers.length === 0 ? <Loader2 className="h-8 w-8 animate-spin" /> : <p className="text-5xl font-black">{allUsers.length}</p>}
+            {!isDataReady ? <Loader2 className="h-8 w-8 animate-spin" /> : <p className="text-5xl font-black">{allUsers.length}</p>}
           </CardContent>
         </Card>
 
@@ -161,7 +160,7 @@ export function AdminPanel() {
           </div>
           <CardContent className="p-8 flex flex-col items-start justify-center relative z-10">
             <p className="text-xs opacity-80 font-black mb-1 tracking-widest">إيداعات معلقة</p>
-            {!isDataReady && pendingTxs.length === 0 ? <Loader2 className="h-8 w-8 animate-spin" /> : <p className="text-5xl font-black">{pendingTxs.length}</p>}
+            {!isDataReady ? <Loader2 className="h-8 w-8 animate-spin" /> : <p className="text-5xl font-black">{pendingTxs.length}</p>}
           </CardContent>
         </Card>
 
@@ -171,7 +170,7 @@ export function AdminPanel() {
           </div>
           <CardContent className="p-8 flex flex-col items-start justify-center relative z-10">
             <p className="text-xs opacity-80 font-black mb-1 tracking-widest">طلبات استعادة</p>
-            {!isDataReady && passwordRequests.length === 0 ? <Loader2 className="h-8 w-8 animate-spin" /> : <p className="text-5xl font-black">{passwordRequests.length}</p>}
+            {!isDataReady ? <Loader2 className="h-8 w-8 animate-spin" /> : <p className="text-5xl font-black">{passwordRequests.length}</p>}
           </CardContent>
         </Card>
       </div>
@@ -179,18 +178,20 @@ export function AdminPanel() {
       <Tabs defaultValue="deposits" className="w-full">
         <TabsList className="flex w-full bg-white p-1 rounded-2xl border mb-6 h-auto gap-1 shadow-sm">
           <TabsTrigger value="deposits" className="flex-1 py-4 font-black text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-white rounded-xl transition-all">
-            الطلبات المعلقة ({pendingTxs.length})
+            الطلبات المعلقة ({isDataReady ? pendingTxs.length : '...'})
           </TabsTrigger>
           <TabsTrigger value="users" className="flex-1 py-4 font-black text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-white rounded-xl transition-all">
             إدارة الحسابات
           </TabsTrigger>
           <TabsTrigger value="passwords" className="flex-1 py-4 font-black text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-white rounded-xl transition-all">
-            الاستعادة ({passwordRequests.length})
+            الاستعادة ({isDataReady ? passwordRequests.length : '...'})
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="deposits" className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          {pendingTxs.length === 0 ? (
+          {!isDataReady ? (
+            <div className="py-20 flex justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
+          ) : pendingTxs.length === 0 ? (
             <div className="py-32 text-center bg-white border-2 border-dashed border-slate-100 rounded-[40px] flex flex-col items-center gap-4">
                <div className="bg-slate-50 p-6 rounded-full">
                   <Check className="h-12 w-12 text-slate-200" />
@@ -241,62 +242,68 @@ export function AdminPanel() {
           </div>
           <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
             <ScrollArea className="h-[600px]">
-              <Table>
-                <TableHeader className="bg-slate-50/50">
-                  <TableRow className="border-none">
-                    <TableHead className="text-right py-5 font-black text-slate-500">المستخدم</TableHead>
-                    <TableHead className="text-right font-black text-slate-500">الرصيد الحالي</TableHead>
-                    <TableHead className="text-center font-black text-slate-500">تعديل الرصيد</TableHead>
-                    <TableHead className="text-center font-black text-slate-500">إجراءات</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.map((user) => (
-                    <TableRow key={user.id} className="hover:bg-slate-50/50 border-slate-50 transition-colors">
-                      <TableCell className="text-right font-bold py-5">
-                        <div className="flex items-center gap-3">
-                           <div className="relative">
-                              <div className={`w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-black text-primary text-xs ${user.isOnline ? 'ring-2 ring-emerald-500 ring-offset-2' : ''}`}>
-                                 {user.name?.charAt(0) || 'U'}
-                              </div>
-                              {user.isOnline && <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full animate-pulse"></span>}
-                           </div>
-                           <div>
-                              <p className="font-black text-slate-800">{user.name}</p>
-                              <p className="text-[10px] text-muted-foreground font-mono">{user.phone}</p>
-                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-black text-emerald-600 text-lg">{(user.balance || 0).toLocaleString()} <span className="text-[10px] text-slate-400 font-medium">{currency}</span></TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-2 min-w-[200px] bg-slate-50 p-1.5 rounded-2xl inline-flex">
-                          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl bg-white shadow-sm text-red-600 hover:bg-red-50" onClick={() => handleUpdateBalance(user.phone, 'subtract')}><Minus className="h-4 w-4" /></Button>
-                          <Input type="number" placeholder="المبلغ" className="w-24 h-9 text-center text-xs font-black rounded-xl border-none shadow-inner" value={balanceAdjustments[user.phone] || ""} onChange={(e) => setBalanceAdjustments(prev => ({ ...prev, [user.phone]: e.target.value }))} />
-                          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl bg-white shadow-sm text-emerald-600 hover:bg-emerald-50" onClick={() => handleUpdateBalance(user.phone, 'add')}><Plus className="h-4 w-4" /></Button>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                         <div className="flex items-center justify-center gap-1">
-                            <a 
-                              href={`https://wa.me/${formatWhatsAppNumber(user.phone)}`} 
-                              target="_blank" 
-                              className="p-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100"
-                            >
-                               <MessageCircle className="h-4 w-4" />
-                            </a>
-                            <Button variant="ghost" size="icon" className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl" onClick={() => handleDelete(user.phone)}><Trash2 className="h-4 w-4" /></Button>
-                         </div>
-                      </TableCell>
+              {!isDataReady ? (
+                <div className="py-20 flex justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
+              ) : (
+                <Table>
+                  <TableHeader className="bg-slate-50/50">
+                    <TableRow className="border-none">
+                      <TableHead className="text-right py-5 font-black text-slate-500">المستخدم</TableHead>
+                      <TableHead className="text-right font-black text-slate-500">الرصيد الحالي</TableHead>
+                      <TableHead className="text-center font-black text-slate-500">تعديل الرصيد</TableHead>
+                      <TableHead className="text-center font-black text-slate-500">إجراءات</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsers.map((user) => (
+                      <TableRow key={user.id} className="hover:bg-slate-50/50 border-slate-50 transition-colors">
+                        <TableCell className="text-right font-bold py-5">
+                          <div className="flex items-center gap-3">
+                             <div className="relative">
+                                <div className={`w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-black text-primary text-xs ${user.isOnline ? 'ring-2 ring-emerald-500 ring-offset-2' : ''}`}>
+                                   {user.name?.charAt(0) || 'U'}
+                                </div>
+                                {user.isOnline && <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full animate-pulse"></span>}
+                             </div>
+                             <div>
+                                <p className="font-black text-slate-800">{user.name}</p>
+                                <p className="text-[10px] text-muted-foreground font-mono">{user.phone}</p>
+                             </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-black text-emerald-600 text-lg">{(user.balance || 0).toLocaleString()} <span className="text-[10px] text-slate-400 font-medium">{currency}</span></TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-2 min-w-[200px] bg-slate-50 p-1.5 rounded-2xl inline-flex">
+                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl bg-white shadow-sm text-red-600 hover:bg-red-50" onClick={() => handleUpdateBalance(user.phone, 'subtract')}><Minus className="h-4 w-4" /></Button>
+                            <Input type="number" placeholder="المبلغ" className="w-24 h-9 text-center text-xs font-black rounded-xl border-none shadow-inner" value={balanceAdjustments[user.phone] || ""} onChange={(e) => setBalanceAdjustments(prev => ({ ...prev, [user.phone]: e.target.value }))} />
+                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl bg-white shadow-sm text-emerald-600 hover:bg-emerald-50" onClick={() => handleUpdateBalance(user.phone, 'add')}><Plus className="h-4 w-4" /></Button>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                           <div className="flex items-center justify-center gap-1">
+                              <a 
+                                href={`https://wa.me/${formatWhatsAppNumber(user.phone)}`} 
+                                target="_blank" 
+                                className="p-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100"
+                              >
+                                 <MessageCircle className="h-4 w-4" />
+                              </a>
+                              <Button variant="ghost" size="icon" className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl" onClick={() => handleDelete(user.phone)}><Trash2 className="h-4 w-4" /></Button>
+                           </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </ScrollArea>
           </Card>
         </TabsContent>
 
         <TabsContent value="passwords" className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          {passwordRequests.length === 0 ? (
+          {!isDataReady ? (
+            <div className="py-20 flex justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
+          ) : passwordRequests.length === 0 ? (
             <div className="py-32 text-center bg-white border-2 border-dashed border-slate-100 rounded-[40px] flex flex-col items-center gap-4">
                <div className="bg-slate-50 p-6 rounded-full">
                   <ShieldAlert className="h-12 w-12 text-slate-200" />
