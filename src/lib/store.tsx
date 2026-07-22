@@ -90,7 +90,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const currency = "SYP";
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
-  const NOTIFICATION_SOUND = "/shabik-labik.mp3";
+  const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"; // استخدام رابط مباشر لضمان عمل الصوت
 
   const playNotificationSound = useCallback(() => {
     if (typeof window === "undefined" || !isAudioUnlocked) return;
@@ -125,19 +125,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
       audio.volume = 0;
-      audio.play().then(() => setIsAudioUnlocked(true)).catch(() => {});
+      audio.play().then(() => {
+        setIsAudioUnlocked(true);
+        localStorage.setItem('audio_unlocked', 'true');
+      }).catch(() => {});
     } catch (e) {}
   };
 
   const setupFCM = useCallback(async (phone: string) => {
     if (typeof window === "undefined" || !('serviceWorker' in navigator)) return;
-    if (Notification.permission !== 'granted') return;
     
     try {
       const messaging = await getMessagingSafe();
       if (!messaging) return;
 
-      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+        scope: '/'
+      });
       
       const token = await getToken(messaging, { 
         serviceWorkerRegistration: registration,
@@ -151,7 +155,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setNotificationsEnabled(true);
       }
     } catch (e) {
-      console.warn("[FCM] Registration Error:", e);
+      console.warn("[FCM] Final Attempt Error:", e);
     }
   }, []);
 
@@ -175,6 +179,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('shabik_auth');
+      const audioWasUnlocked = localStorage.getItem('audio_unlocked') === 'true';
+      if (audioWasUnlocked) setIsAudioUnlocked(true);
+
       if (saved) {
         const parsed = JSON.parse(saved);
         setIsLoggedIn(true); setUserPhone(parsed.phone); setUserName(parsed.name);
@@ -235,6 +242,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (result.success && result.user) {
       setIsLoggedIn(true); setUserPhone(result.user.phone); setUserName(result.user.name);
       localStorage.setItem('shabik_auth', JSON.stringify(result.user));
+      if (Notification.permission === 'granted') setupFCM(result.user.phone);
     }
     return result;
   };
@@ -320,15 +328,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           if (final) {
             await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
             
-            // استخراج تفاصيل المنتج والرقم للشعار الاحترافي
+            // استخراج تفاصيل المنتج بدقة للإشعار
             const details = order.details || "";
             const productName = details.split("-")[0]?.trim() || "طلب شحن";
             const accountId = details.includes("الحساب:") ? details.split("الحساب:")[1].trim() : "---";
             
             const pushTitle = final === 'Completed' ? "✨ تم تنفيذ طلبك بنجاح" : "⚠️ نعتذر، تم رفض الطلب";
-            const pushBody = `المنتج: ${productName}\nالرقم/ID: ${accountId}\nالحالة: ${final === 'Completed' ? 'مكتمل ✅' : 'مرفوض وعاد الرصيد ❌'}`;
+            const pushBody = `المنتج: ${productName}\nالرقم: ${accountId}\nالحالة: ${final === 'Completed' ? 'مكتمل ✅' : 'مرفوض وعاد الرصيد ❌'}`;
             
             triggerPushSilently(order.userPhone || userPhone, pushTitle, pushBody, "/history");
+            if (final === 'Completed') playNotificationSound();
           }
         }
       } catch (err) {}

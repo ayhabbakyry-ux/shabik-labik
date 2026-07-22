@@ -2,15 +2,15 @@ import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 
 /**
- * @fileOverview محرك "شبيك لبيك" المطور - نسخة الأمان الصارمة V7.
- * تم ضبط المحرك ليعمل بنظام "الأمان الصامت" لتجنب أخطاء السيرفر.
+ * @fileOverview محرك الذكاء الاصطناعي - إصلاح خطأ 401 النهائي.
+ * تم ضبط المحرك لقراءة المفتاح بأمان من متغيرات البيئة.
  */
 
 export const ai = genkit({
   plugins: [
     googleAI({
-      // يقرأ المفتاح من بيئة النظام (Secrets) حصراً
-      apiKey: process.env.GEMINI_API_KEY,
+      // محاولة قراءة المفتاح من كافة المصادر الممكنة لضمان المصادقة
+      apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY,
     }),
   ],
 });
