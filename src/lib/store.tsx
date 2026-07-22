@@ -214,6 +214,37 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [setupFCM]);
 
+  // نظام التواجد الحي (النقطة الخضراء)
+  useEffect(() => {
+    if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
+
+    const phoneClean = userPhone.trim();
+    const updatePresence = async (status: boolean) => {
+      try {
+        const q = query(collection(db, "users"), where("phone", "==", phoneClean));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          await updateDoc(doc(db, "users", snap.docs[0].id), { isOnline: status });
+        }
+      } catch (e) {}
+    };
+
+    updatePresence(true);
+
+    const handleVisibilityChange = () => {
+      updatePresence(document.visibilityState === 'visible');
+    };
+
+    window.addEventListener('beforeunload', () => updatePresence(false));
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', () => updatePresence(false));
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      updatePresence(false);
+    };
+  }, [isLoggedIn, userPhone]);
+
   useEffect(() => {
     if (!isLoggedIn || !userPhone || typeof window === "undefined") return;
     const unsubscribes: (() => void)[] = [];

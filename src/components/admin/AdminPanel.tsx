@@ -260,10 +260,12 @@ export function AdminPanel() {
                         <TableCell className="text-right font-bold py-5">
                           <div className="flex items-center gap-3">
                              <div className="relative">
-                                <div className={`w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-black text-primary text-xs ${user.isOnline ? 'ring-2 ring-emerald-500 ring-offset-2' : ''}`}>
+                                <div className={`w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center font-black text-primary text-sm ${user.isOnline ? 'ring-2 ring-emerald-500 ring-offset-2' : ''}`}>
                                    {user.name?.charAt(0) || 'U'}
                                 </div>
-                                {user.isOnline && <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full animate-pulse"></span>}
+                                {user.isOnline && (
+                                  <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full shadow-sm animate-pulse z-10"></span>
+                                )}
                              </div>
                              <div>
                                 <p className="font-black text-slate-800">{user.name}</p>
