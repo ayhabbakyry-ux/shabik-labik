@@ -92,7 +92,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const currency = "SYP";
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
-  const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
+  const NOTIFICATION_SOUND = "https://raw.githubusercontent.com/ayhabbakyry-ux/shabik-labik/main/public/notification.mp3"; 
   
   const { toast } = useToast();
 
@@ -100,9 +100,21 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined" || !isAudioUnlocked) return;
     try {
       const audio = new Audio(NOTIFICATION_SOUND);
-      audio.play().catch(() => {});
+      audio.volume = 1.0;
+      audio.play().catch(e => console.warn("Audio play blocked", e));
     } catch (e) {}
   }, [isAudioUnlocked]);
+
+  const showLocalNotification = (title: string, body: string) => {
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+      new Notification(title, {
+        body,
+        icon: "https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg"
+      });
+      playNotificationSound();
+    }
+    toast({ title, description: body });
+  };
 
   const triggerPushSilently = useCallback((targetPhone: string, title: string, body: string, url?: string) => {
     if (typeof window === "undefined") return;
@@ -156,12 +168,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (!snap.empty) await updateDoc(doc(db, "users", snap.docs[0].id), { fcmToken: token });
         setNotificationsEnabled(true);
         
-        // استماع للإشعارات بينما التطبيق مفتوح (Foreground)
         onMessage(messaging, (payload) => {
-           console.log('Foreground Message received: ', payload);
            if (payload.notification) {
-             toast({ title: payload.notification.title, description: payload.notification.body });
-             playNotificationSound();
+             showLocalNotification(payload.notification.title || "تنبيه", payload.notification.body || "");
            }
         });
       }
@@ -222,11 +231,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     unsubscribes.push(onSnapshot(isAdminUser ? query(collection(db, "transactions")) : query(collection(db, "transactions"), where("userPhone", "==", phoneClean)), (snap) => {
       const rawTxs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Transaction[];
+      
       if (!isInitialLoad.current && isAdminUser) {
         snap.docChanges().forEach((change) => {
-          if (change.type === "added" && change.doc.data().status === 'Pending') playNotificationSound();
+          if (change.type === "added" && change.doc.data().status === 'Pending') {
+            showLocalNotification("💳 إيداع جديد وصل!", `قام ${change.doc.data().userName} بإرسال إشعار بمبلغ ${Number(change.doc.data().amount).toLocaleString()} ل.س.`);
+          }
         });
       }
+      
       setTransactions([...rawTxs].sort((a,b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || "")));
       isInitialLoad.current = false;
       setIsDataReady(true);
@@ -238,7 +251,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
     
     return () => unsubscribes.forEach(unsub => unsub());
-  }, [isLoggedIn, userPhone, playNotificationSound]);
+  }, [isLoggedIn, userPhone]);
 
   const login = async (phone: string, password: string) => {
     const phoneClean = phone.trim();
@@ -346,8 +359,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             const pushTitle = final === 'Completed' ? "✨ تم تنفيذ طلبك بنجاح" : "⚠️ نعتذر، تم رفض الطلب";
             const pushBody = `المنتج: ${productName}\nالرقم: ${accountId}\nالحالة: ${final === 'Completed' ? 'مكتمل ✅' : 'مرفوض وعاد الرصيد ❌'}`;
             
+            showLocalNotification(pushTitle, pushBody);
             triggerPushSilently(order.userPhone || userPhone, pushTitle, pushBody, "/history");
-            if (final === 'Completed') playNotificationSound();
           }
         }
       } catch (err) {}

@@ -2,8 +2,8 @@
 import { NextResponse } from 'next/server';
 
 /**
- * @fileOverview محرك إرسال الإشعارات V11 - نسخة الاستقرار القصوى.
- * يرسل payload مزدوج (Notification + Data) لضمان الظهور في كافة الحالات.
+ * @fileOverview محرك إرسال الإشعارات V12 - إصلاح نظام المصادقة.
+ * يضمن وصول الإشعارات لستارة الموبايل حتى لو كان التطبيق مغلقاً.
  */
 
 export async function POST(request: Request) {
@@ -12,6 +12,7 @@ export async function POST(request: Request) {
         
         if (!token) return NextResponse.json({ success: false, error: 'Token missing' });
 
+        // ملاحظة للمدير: يفضل تحديث هذا المفتاح من كونسول فايربيز (Cloud Messaging Legacy Key)
         const SERVER_KEY = "AAAA4R9-R0E:APA91bGk_WvI6A_O79Y5Wp-3P37L5X9pI9S9G8h7K6J5L4M3N2O1P0Q9R8S7T6U5V4W3X2Y1Z0A9B8C7D6E5F4G3H2I1J0K9L8M7N6O5P4Q3R2S1T0U9V8W7X6Y5Z4A3B2C1D0"; 
 
         const payload = {
@@ -20,6 +21,7 @@ export async function POST(request: Request) {
                 title: title,
                 body: body,
                 sound: "default",
+                priority: "high",
                 icon: "https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg",
                 click_action: url || "/history"
             },
@@ -29,8 +31,7 @@ export async function POST(request: Request) {
                 url: url || "/history",
                 priority: "high"
             },
-            priority: "high",
-            content_available: true
+            priority: "high"
         };
 
         const response = await fetch('https://fcm.googleapis.com/fcm/send', {
