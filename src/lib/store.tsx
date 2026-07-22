@@ -1,8 +1,9 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db, getMessagingSafe } from './firebase-config';
-import { getToken } from 'firebase/messaging';
+import { getToken, onMessage } from 'firebase/messaging';
 import { 
   collection, 
   query, 
@@ -25,6 +26,7 @@ import {
 import { changePasswordAction, updateProfileImageAction } from '@/app/actions/profile';
 import { Transaction } from './types';
 import { getDeviceFingerprint } from './utils';
+import { useToast } from '@/hooks/use-toast';
 
 type LoginNotification = {
   id: string;
@@ -90,7 +92,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const currency = "SYP";
   const ADMIN_PHONE = "0939549573";
   const ADMIN_PASS = "872003";
-  const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"; // استخدام رابط مباشر لضمان عمل الصوت
+  const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
+  
+  const { toast } = useToast();
 
   const playNotificationSound = useCallback(() => {
     if (typeof window === "undefined" || !isAudioUnlocked) return;
@@ -139,9 +143,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const messaging = await getMessagingSafe();
       if (!messaging) return;
 
-      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-        scope: '/'
-      });
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
       
       const token = await getToken(messaging, { 
         serviceWorkerRegistration: registration,
@@ -153,11 +155,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const snap = await getDocs(q);
         if (!snap.empty) await updateDoc(doc(db, "users", snap.docs[0].id), { fcmToken: token });
         setNotificationsEnabled(true);
+        
+        // استماع للإشعارات بينما التطبيق مفتوح (Foreground)
+        onMessage(messaging, (payload) => {
+           console.log('Foreground Message received: ', payload);
+           if (payload.notification) {
+             toast({ title: payload.notification.title, description: payload.notification.body });
+             playNotificationSound();
+           }
+        });
       }
     } catch (e) {
-      console.warn("[FCM] Final Attempt Error:", e);
+      console.warn("[FCM] Setup Error:", e);
     }
-  }, []);
+  }, [playNotificationSound, toast]);
 
   const requestNotificationPermission = async () => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -328,7 +339,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           if (final) {
             await updateTransactionStatusServer(order.id, final, order.amount, order.userPhone || userPhone);
             
-            // استخراج تفاصيل المنتج بدقة للإشعار
             const details = order.details || "";
             const productName = details.split("-")[0]?.trim() || "طلب شحن";
             const accountId = details.includes("الحساب:") ? details.split("الحساب:")[1].trim() : "---";
