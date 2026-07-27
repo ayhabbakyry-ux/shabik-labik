@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useUser } from "@/lib/store";
@@ -9,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useEffect, useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { formatWhatsAppNumber } from "@/lib/utils";
@@ -200,7 +199,7 @@ export function AdminPanel() {
             </div>
           ) : (
             pendingTxs.map((tx) => (
-              <Card key={tx.id} className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white hover:shadow-xl transition-all border-r-8 border-r-orange-500">
+              <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white hover:shadow-xl transition-all border-r-8 border-r-orange-500">
                 <CardContent className="p-8 flex flex-col md:flex-row items-center justify-between gap-6">
                   <div className="text-right w-full md:w-auto space-y-1">
                     <p className="text-2xl font-black text-slate-800">{tx.userName || "مستخدم مجهول"}</p>
@@ -242,11 +241,11 @@ export function AdminPanel() {
           </div>
           <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
             <ScrollArea className="h-[600px] w-full" dir="rtl">
-              <div className="w-full overflow-x-auto">
-                {!isDataReady ? (
-                  <div className="py-20 flex justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
-                ) : (
-                  <Table className="min-w-[1000px]">
+              {!isDataReady ? (
+                <div className="py-20 flex justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
+              ) : (
+                <div className="min-w-[1200px]">
+                  <Table>
                     <TableHeader className="bg-slate-50/50">
                       <TableRow className="border-none">
                         <TableHead className="text-right py-5 font-black text-slate-500">المستخدم</TableHead>
@@ -298,8 +297,9 @@ export function AdminPanel() {
                       ))}
                     </TableBody>
                   </Table>
-                )}
-              </div>
+                </div>
+              )}
+              <ScrollBar orientation="horizontal" />
             </ScrollArea>
           </Card>
         </TabsContent>
@@ -316,7 +316,7 @@ export function AdminPanel() {
             </div>
           ) : (
             passwordRequests.map((req) => (
-              <Card key={req.id} className="border-none shadow-sm rounded-[32px] bg-white overflow-hidden border-r-8 border-r-emerald-500">
+              <Card className="border-none shadow-sm rounded-[32px] bg-white overflow-hidden border-r-8 border-r-emerald-500">
                 <CardContent className="p-8 flex flex-col md:flex-row items-center justify-between gap-6">
                   <div className="text-right space-y-1">
                       <p className="font-black text-2xl text-slate-800">{req.userName}</p>
