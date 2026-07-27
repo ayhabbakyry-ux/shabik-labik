@@ -59,10 +59,10 @@ export function ProductSheet({
   const calculateProductPrice = useCallback((product: ProductItem) => {
     const originalPrice = Number(product.price);
     if (isTelecom) {
-      // إضافة عمولة 3% حصراً على السعر الأساسي للراغب
+      // إضافة عمولة 3% حصراً على السعر الأساسي للراغب بطلب من أيهم
       return originalPrice * 1.03;
     }
-    return originalPrice + 2;
+    return originalPrice;
   }, [isTelecom]);
 
   const isShamValid = useMemo(() => {
@@ -176,45 +176,17 @@ export function ProductSheet({
         }
 
         if (searchKey === "tiktok") {
-            const matchesTikTok = 
-              prodName.includes("tik tok") || 
-              prodName.includes("tiktok") || 
-              prodName.includes("تيك توك") ||
-              catName.includes("tik tok") || 
-              catName.includes("tiktok") || 
-              catName.includes("تيك توك");
-            return matchesTikTok;
+            return prodName.includes("tik tok") || prodName.includes("tiktok") || prodName.includes("تيك توك") || catName.includes("tik tok") || catName.includes("tiktok") || catName.includes("تيك توك");
         }
 
         if (searchKey === "clash") {
-            const matchesClash = 
-              prodName.includes("clash") || 
-              prodName.includes("clah") || 
-              prodName.includes("كلاش") || 
-              catName.includes("clash") || 
-              catName.includes("clah") || 
-              catName.includes("كلاش");
-            
-            const matchesRoyale = 
-              prodName.includes("royale") || 
-              prodName.includes("royail") || 
-              prodName.includes("رويال") || 
-              catName.includes("royale") || 
-              catName.includes("royail") || 
-              catName.includes("رويال");
-
+            const matchesClash = prodName.includes("clash") || prodName.includes("clah") || prodName.includes("كلاش") || catName.includes("clash") || catName.includes("clah") || catName.includes("كلاش");
+            const matchesRoyale = prodName.includes("royale") || prodName.includes("royail") || prodName.includes("رويال") || catName.includes("royale") || catName.includes("royail") || catName.includes("رويال");
             return matchesClash && !matchesRoyale;
         }
 
         if (searchKey === "royale") {
-            return (
-              prodName.includes("royale") || 
-              prodName.includes("royail") || 
-              prodName.includes("رويال") || 
-              catName.includes("royale") || 
-              catName.includes("royail") || 
-              catName.includes("رويال")
-            );
+            return prodName.includes("royale") || prodName.includes("royail") || prodName.includes("رويال") || catName.includes("royale") || catName.includes("royail") || catName.includes("رويال");
         }
 
         if (searchKey === "pool coins") {
@@ -336,7 +308,7 @@ export function ProductSheet({
                                   <ShoppingCart className="h-4 w-4" />
                                 </div>
                                 <div className="text-right">
-                                  <h4 className="font-bold text-foreground text-[12px] leading-tight">{product.name} ({product.id})</h4>
+                                  <h4 className="font-bold text-foreground text-[12px] leading-tight">{product.name}</h4>
                                   <p className="text-primary font-black text-sm mt-1">
                                     {finalPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} 
                                     <span className="text-[9px] font-medium mr-1">{currency}</span>
