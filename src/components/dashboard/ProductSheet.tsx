@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo, useState, useCallback } from 'react';
@@ -56,10 +55,13 @@ export function ProductSheet({
     return filter.includes('mtn') || filter.includes('syriatel');
   }, [filterValue]);
 
+  // فحص صحة الرقم لقسم الوحدات فقط (09 وأرقام إنكليزية)
+  const isUnitPhoneError = isTelecom && globalTargetId.length > 0 && !globalTargetId.startsWith("09");
+
   const calculateProductPrice = useCallback((product: ProductItem) => {
     const originalPrice = Number(product.price);
     if (isTelecom) {
-      // إضافة عمولة 3% حصراً على السعر الأساسي للراغب بطلب من أيهم
+      // تطبيق عمولة 3% حصراً لقسم الوحدات بطلب من أيهم
       return originalPrice * 1.03;
     }
     return originalPrice;
@@ -102,6 +104,11 @@ export function ProductSheet({
     let serviceId = 0;
     let link = globalTargetId;
     let quantity = 1;
+
+    if (isTelecom && !link.startsWith("09")) {
+      toast({ title: "خطأ في الرقم", description: "يجب أن يبدأ الرقم بـ 09 حصراً.", variant: "destructive" });
+      return;
+    }
 
     if (isShamCash) {
       if (!isShamValid) return;
@@ -242,12 +249,15 @@ export function ProductSheet({
                        <User className="absolute right-3 top-3 h-4 w-4 text-primary opacity-50" />
                        <Input 
                          type="text"
-                         placeholder="أدخل رقم الحساب أو الـ ID" 
-                         className="text-right h-11 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-primary font-bold" 
+                         placeholder={isTelecom ? "09xxxxxxxx" : "أدخل رقم الحساب أو الـ ID"} 
+                         className={`text-right h-11 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-primary font-bold ${isUnitPhoneError ? 'border-destructive ring-1 ring-destructive' : ''}`} 
                          value={globalTargetId} 
-                         onChange={(e) => setGlobalTargetId(e.target.value)} 
+                         onChange={(e) => setGlobalTargetId(e.target.value.replace(/[^0-9]/g, ""))} 
                        />
                     </div>
+                    {isUnitPhoneError && (
+                      <p className="text-destructive text-[9px] font-bold pr-1 animate-in fade-in slide-in-from-top-1">عذراً، يجب أن يبدأ الرقم بـ 09 حصراً وبأرقام إنكليزية.</p>
+                    )}
                  </div>
 
                  {isShamCash && (
@@ -273,7 +283,7 @@ export function ProductSheet({
                         {ordering !== null ? <Loader2 className="h-5 w-5 animate-spin" /> : "إرسال طلب الشحن"}
                       </Button>
                       
-                      <div className="flex items-center gap-2 justify-center mt-2 bg-amber-50 border border-amber-100 p-3 rounded-xl animate-pulse">
+                      <div className="flex items-center gap-2 justify-center mt-2 bg-amber-50 border border-amber-100 p-3 rounded-xl">
                         <AlertCircle className="h-4 w-4 text-amber-600" />
                         <p className="text-[11px] font-bold text-amber-700">تنبيه: هذا المنتج يعمل بشكل يدوي</p>
                       </div>
@@ -317,7 +327,7 @@ export function ProductSheet({
                               </div>
                               <Button 
                                 onClick={() => handleOrder(product)} 
-                                disabled={ordering === String(product.id)}
+                                disabled={ordering === String(product.id) || isUnitPhoneError || globalTargetId.length === 0}
                                 className="rounded-xl font-bold px-6 h-10 text-xs bg-primary"
                               >
                                 {ordering === String(product.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : "شحن"}

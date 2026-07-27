@@ -34,10 +34,18 @@ export default function AuthPage() {
     }
   }, [isLoggedIn, router]);
 
+  // فحص صحة الرقم (09 وأرقام إنكليزية فقط)
+  const isPhoneError = phone.length > 0 && !phone.startsWith("09");
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone || !password) {
       toast({ variant: "destructive", title: "تنبيه", description: "يرجى تعبئة كافة البيانات المطلوبة." });
+      return;
+    }
+
+    if (isPhoneError) {
+      toast({ variant: "destructive", title: "خطأ في الرقم", description: "يجب أن يبدأ الرقم بـ 09 حصراً." });
       return;
     }
 
@@ -103,7 +111,7 @@ export default function AuthPage() {
                     placeholder="09xxxxxxxx" 
                     className="pr-10 h-12 text-right rounded-xl border-muted bg-muted/20" 
                     value={resetPhone} 
-                    onChange={(e) => setResetPhone(e.target.value)} 
+                    onChange={(e) => setResetPhone(e.target.value.replace(/[^0-9]/g, ""))} 
                   />
                 </div>
              </div>
@@ -178,8 +186,16 @@ export default function AuthPage() {
                 <Label className="text-right block font-bold text-xs pr-1">رقم الهاتف</Label>
                 <div className="relative">
                   <Phone className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="09xxxxxxxx" className="pr-10 h-12 text-right rounded-xl border-muted bg-muted/20" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                  <Input 
+                    placeholder="09xxxxxxxx" 
+                    className={`pr-10 h-12 text-right rounded-xl border-muted bg-muted/20 ${isPhoneError ? 'border-destructive ring-1 ring-destructive' : ''}`} 
+                    value={phone} 
+                    onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ""))} 
+                  />
                 </div>
+                {isPhoneError && (
+                  <p className="text-destructive text-[10px] font-bold pr-1 animate-in fade-in slide-in-from-top-1">عذراً، يجب أن يبدأ الرقم بـ 09 حصراً وبأرقام إنكليزية.</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label className="text-right block font-bold text-xs pr-1">كلمة المرور</Label>
@@ -213,7 +229,7 @@ export default function AuthPage() {
               {isLogin && (
                 <button type="button" onClick={() => setIsForgotPassword(true)} className="text-[10px] text-primary font-bold hover:underline block w-full text-right pr-1">نسيت كلمة المرور؟</button>
               )}
-              <Button type="submit" disabled={isLoading} className="w-full h-14 text-base font-bold mt-2 shadow-xl shadow-primary/20 rounded-2xl">
+              <Button type="submit" disabled={isLoading || isPhoneError} className="w-full h-14 text-base font-bold mt-2 shadow-xl shadow-primary/20 rounded-2xl">
                 {isLoading ? "جاري المعالجة..." : isLogin ? "دخول" : "تسجيل"} <ArrowRight className="mr-2 h-4 w-4 rotate-180" />
               </Button>
             </form>
