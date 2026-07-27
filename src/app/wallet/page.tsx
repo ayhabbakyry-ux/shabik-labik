@@ -29,18 +29,18 @@ export default function WalletPage() {
     }
   }, [isLoggedIn, router]);
 
-  // حساب إجمالي المشتريات: مجموع كافة العمليات من نوع "طلب شحن" التي لم يتم رفضها
+  // حساب إجمالي المشتريات التراكمي: مجموع كافة العمليات من نوع "طلب شحن" التي لم يتم رفضها منذ إنشاء الحساب
   const totalPurchases = useMemo(() => {
     return transactions
       .filter(tx => tx.type === 'طلب شحن' && tx.status !== 'Rejected')
-      .reduce((acc, tx) => acc + tx.amount, 0);
+      .reduce((acc, tx) => acc + (Number(tx.amount) || 0), 0);
   }, [transactions]);
 
-  // حساب الوارد: مجموع كافة الإيداعات التي تمت الموافقة عليها (Completed)
+  // حساب الوارد التراكمي: مجموع كافة الإيداعات التي تمت الموافقة عليها منذ إنشاء الحساب
   const totalIncoming = useMemo(() => {
     return transactions
       .filter(tx => (tx.type === 'إيداع محفظة' || tx.type === 'طلب إيداع') && tx.status === 'Completed')
-      .reduce((acc, tx) => acc + tx.amount, 0);
+      .reduce((acc, tx) => acc + (Number(tx.amount) || 0), 0);
   }, [transactions]);
 
   if (!isLoggedIn) return null;
@@ -80,19 +80,19 @@ export default function WalletPage() {
         <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 snap-x snap-mandatory">
           <div className="min-w-[85%] sm:min-w-[300px] flex flex-col items-center justify-center bg-green-500 p-6 rounded-2xl snap-center shadow-xl transition-transform active:scale-95 group">
             <img 
-              src={logoImage?.imageUrl} 
+              src={logoImage?.imageUrl || "https://i.postimg.cc/C1bjq1Wh/Screenshot-20260710-202636.jpg"} 
               alt="رصيد" 
               className="w-16 h-16 mb-2 object-contain group-hover:scale-110 transition-transform" 
-              data-ai-hint={logoImage?.imageHint}
+              data-ai-hint="magic lamp"
             />
             <span className="text-white font-bold text-lg font-headline">رصيدك الحالي</span>
             <span className="text-white font-black text-2xl mt-1">
-              SYP {userBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {currency} {(userBalance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
 
           <div className="min-w-[85%] sm:min-w-[300px] bg-[#ff5252] p-6 rounded-2xl flex flex-col justify-between h-40 snap-center shadow-xl relative overflow-hidden group">
-            <span className="text-[10px] font-bold self-start bg-black/20 px-2 py-0.5 rounded backdrop-blur-sm z-10">SYP</span>
+            <span className="text-[10px] font-bold self-start bg-black/20 px-2 py-0.5 rounded backdrop-blur-sm z-10">{currency}</span>
             <div className="text-right z-10">
               <h3 className="text-3xl font-black tracking-wide font-mono">
                 {totalPurchases.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -103,7 +103,7 @@ export default function WalletPage() {
           </div>
 
           <div className="min-w-[85%] sm:min-w-[300px] bg-[#7c4dff] p-6 rounded-2xl flex flex-col justify-between h-40 snap-center shadow-xl relative overflow-hidden group">
-            <span className="text-[10px] font-bold self-start bg-black/20 px-2 py-0.5 rounded backdrop-blur-sm z-10">SYP</span>
+            <span className="text-[10px] font-bold self-start bg-black/20 px-2 py-0.5 rounded backdrop-blur-sm z-10">{currency}</span>
             <div className="text-right z-10">
               <h3 className="text-3xl font-black tracking-wide font-mono">
                 {totalIncoming.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
