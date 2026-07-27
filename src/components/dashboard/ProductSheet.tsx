@@ -26,6 +26,7 @@ interface ProductItem {
   category_name?: string;
   category_id?: string | number;
   image?: string;
+  available?: boolean;
 }
 
 export function ProductSheet({ 
@@ -55,7 +56,6 @@ export function ProductSheet({
     return filter.includes('mtn') || filter.includes('syriatel');
   }, [filterValue]);
 
-  // فحص صحة الرقم لقسم الوحدات فقط (09 وأرقام إنكليزية)
   const isUnitPhoneError = isTelecom && globalTargetId.length > 0 && !globalTargetId.startsWith("09");
 
   const calculateProductPrice = useCallback((product: ProductItem) => {
@@ -64,8 +64,12 @@ export function ProductSheet({
       // تطبيق عمولة 3% حصراً لقسم الوحدات بطلب من أيهم
       return originalPrice * 1.03;
     }
+    if (!isShamCash) {
+       // الألعاب وتطبيقات الدردشة فقط 3 ل.س ثابته على كل فئة بطلب صارم من أيهم
+       return originalPrice + 3;
+    }
     return originalPrice;
-  }, [isTelecom]);
+  }, [isTelecom, isShamCash]);
 
   const isShamValid = useMemo(() => {
     const hasAccount = globalTargetId && globalTargetId.trim().length > 0;
@@ -166,6 +170,12 @@ export function ProductSheet({
         const catName = (p.category_name || "").toLowerCase();
         
         if (Number(p.price) < 10) return false;
+
+        // فقاعة الفري فاير - إصلاح شامل بطلب من أيهم
+        if (searchKey === "free fire") {
+            const ffKeywords = ["free fire", "freefire", "free fier", "freefier", "fier", "fire", "فري فاير", "مجوهرات", "عضويات", "جواهر", "gems"];
+            return ffKeywords.some(key => prodName.includes(key) || catName.includes(key));
+        }
 
         if (searchKey === "pubg") {
             const isPubg = prodName.includes("pubg") || catName.includes("pubg") || prodName.includes("ببجي") || catName.includes("ببجي");
@@ -310,8 +320,18 @@ export function ProductSheet({
                     {filteredProductsList.length > 0 ? (
                       filteredProductsList.map((product) => {
                         const finalPrice = calculateProductPrice(product);
+                        const isAvailable = product.available !== false;
                         return (
-                          <Card key={product.id} className="border-none shadow-sm bg-white group hover:shadow-md transition-all">
+                          <Card key={product.id} className={cn("border-none shadow-sm bg-white group hover:shadow-md transition-all relative overflow-hidden", !isAvailable && "opacity-60")}>
+                            {/* الشريط الأحمر بالورب للفئات غير المتوفرة */}
+                            {!isAvailable && (
+                              <div className="absolute top-0 right-0 overflow-hidden w-20 h-20 pointer-events-none z-10">
+                                <div className="bg-red-600 text-white text-[8px] font-bold py-1 px-10 transform rotate-45 translate-x-4 translate-y-2 shadow-lg text-center">
+                                  غير متوفر
+                                </div>
+                              </div>
+                            )}
+
                             <CardContent className="p-4 flex items-center justify-between gap-4">
                               <div className="flex items-center gap-3 flex-1">
                                 <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
@@ -327,8 +347,8 @@ export function ProductSheet({
                               </div>
                               <Button 
                                 onClick={() => handleOrder(product)} 
-                                disabled={ordering === String(product.id) || isUnitPhoneError || globalTargetId.length === 0}
-                                className="rounded-xl font-bold px-6 h-10 text-xs bg-primary"
+                                disabled={ordering === String(product.id) || isUnitPhoneError || globalTargetId.length === 0 || !isAvailable}
+                                className={cn("rounded-xl font-bold px-6 h-10 text-xs", isAvailable ? "bg-primary" : "bg-gray-400")}
                               >
                                 {ordering === String(product.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : "شحن"}
                               </Button>

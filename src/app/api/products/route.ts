@@ -4,8 +4,8 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * @fileOverview محرك "رادار شبيك لبيك" V31 - النسخة الصارمة لتنظيف الفئات الوهمية.
- * يقوم بمسح ذري شامل ويستبعد أي فئة سعرها أقل من 10 ليرات لضمان جودة البيانات.
+ * @fileOverview محرك "رادار شبيك لبيك" المطور - النسخة الشاملة للاختراق العميقة.
+ * يقوم بمسح ذري شامل ويستخرج حالة التوفر (Status) وكامل مسار الفئات لضمان جودة البيانات.
  */
 export async function GET() {
     const API_TOKEN = process.env.ALRAGHEB_TOKEN;
@@ -34,7 +34,7 @@ export async function GET() {
         let allExtractedItems: any[] = [];
 
         /**
-         * دالة التنقيب الذري: تغوص في أي كائن JSON وتبحث عن المنتجات والخيارات
+         * دالة التنقيب الذري: تغوص في أي كائن JSON وتبحث عن المنتجات والخيارات مع حفظ مسار الفئة وحالة التوفر
          */
         function deepScan(obj: any, parentName = '', catInfo = { name: '', id: '' }) {
             if (!obj || typeof obj !== 'object') return;
@@ -44,16 +44,21 @@ export async function GET() {
             const price = obj.السعر || obj.price || obj.cost || obj.amount || obj.rate || 0;
             const id = obj.id || obj.product_id || obj.service_id || obj.item_id;
 
-            // تحديث معلومات الفئة إذا مررنا بها
+            // كشف حالة التوفر (Status) بدقة
+            const rawStatus = obj.status !== undefined ? obj.status : (obj.active !== undefined ? obj.active : (obj.available !== undefined ? obj.available : 1));
+            const isAvailable = (rawStatus === 1 || rawStatus === true || String(rawStatus).toLowerCase() === 'active' || String(rawStatus).toLowerCase() === 'available' || String(rawStatus) === '1');
+
+            // تحديث معلومات الفئة بشكل تراكمي
             let currentCatName = catInfo.name;
             let currentCatId = catInfo.id;
             
             if (obj.category_name || obj.category?.name || obj.section?.name) {
-                currentCatName = obj.category_name || obj.category?.name || obj.section?.name;
+                const newCatName = obj.category_name || obj.category?.name || obj.section?.name;
+                currentCatName = currentCatName ? `${currentCatName} > ${newCatName}` : newCatName;
                 currentCatId = obj.category_id || obj.category?.id || obj.section_id;
             }
 
-            // نظام الفلترة الصارم V31: استبعاد المنتجات الوهمية (أقل من 10 ليرات)
+            // نظام الفلترة الصارم: استبعاد المنتجات الوهمية (أقل من 10 ليرات)
             if (id && Number(price) >= 10 && name) {
                 const fullName = parentName && !name.includes(parentName) ? `${parentName} - ${name}` : name;
                 allExtractedItems.push({
@@ -62,12 +67,13 @@ export async function GET() {
                     price: Number(price),
                     category_name: String(currentCatName || parentName || ''),
                     category_id: currentCatId,
-                    image: obj.image || obj.img || obj.thumbnail || ''
+                    image: obj.image || obj.img || obj.thumbnail || '',
+                    available: isAvailable
                 });
             }
 
             // البحث عن مصفوفات فرعية (خيارات منسدلة أو فئات فرعية) والغوص داخلها لفكها
-            const keysToScan = ['variants', 'options', 'prices', 'sub_services', 'items', 'products', 'data', 'services', 'children', 'quantities'];
+            const keysToScan = ['variants', 'options', 'prices', 'sub_services', 'items', 'products', 'data', 'services', 'children', 'quantities', 'sub_categories'];
             
             if (Array.isArray(obj)) {
                 obj.forEach(item => deepScan(item, parentName, { name: currentCatName, id: currentCatId }));
@@ -77,7 +83,7 @@ export async function GET() {
                     if (keysToScan.includes(key) && Array.isArray(value)) {
                         const newParentName = (id && name) ? name : parentName;
                         value.forEach(item => deepScan(item, newParentName, { name: currentCatName, id: currentCatId }));
-                    } else if (typeof value === 'object') {
+                    } else if (typeof value === 'object' && value !== null) {
                         deepScan(value, parentName, { name: currentCatName, id: currentCatId });
                     }
                 });
@@ -88,8 +94,6 @@ export async function GET() {
 
         // تنظيف البيانات: إزالة التكرار وضمان الجودة
         const uniqueProducts = Array.from(new Map(allExtractedItems.map(item => [String(item.id) + String(item.price), item])).values());
-
-        console.log(`API_DEBUG -> Atomic Scan V31: Extracted ${uniqueProducts.length} unique real products.`);
 
         return NextResponse.json(uniqueProducts);
 
