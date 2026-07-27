@@ -241,12 +241,12 @@ export function AdminPanel() {
             <Input placeholder="ابحث عن مستخدم بالاسم أو الرقم..." className="pr-12 h-14 bg-white rounded-2xl border-none shadow-sm text-right font-bold focus:ring-primary" value={userSearch} onChange={(e) => setUserSearch(e.target.value)} />
           </div>
           <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
-            <ScrollArea className="h-[600px] w-full">
-              <div className="min-w-full overflow-x-auto">
+            <ScrollArea className="h-[600px] w-full" dir="rtl">
+              <div className="w-full overflow-x-auto">
                 {!isDataReady ? (
                   <div className="py-20 flex justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
                 ) : (
-                  <Table className="min-w-[800px]">
+                  <Table className="min-w-[1000px]">
                     <TableHeader className="bg-slate-50/50">
                       <TableRow className="border-none">
                         <TableHead className="text-right py-5 font-black text-slate-500">المستخدم</TableHead>
