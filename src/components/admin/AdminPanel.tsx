@@ -241,63 +241,65 @@ export function AdminPanel() {
             <Input placeholder="ابحث عن مستخدم بالاسم أو الرقم..." className="pr-12 h-14 bg-white rounded-2xl border-none shadow-sm text-right font-bold focus:ring-primary" value={userSearch} onChange={(e) => setUserSearch(e.target.value)} />
           </div>
           <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
-            <ScrollArea className="h-[600px]">
-              {!isDataReady ? (
-                <div className="py-20 flex justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
-              ) : (
-                <Table>
-                  <TableHeader className="bg-slate-50/50">
-                    <TableRow className="border-none">
-                      <TableHead className="text-right py-5 font-black text-slate-500">المستخدم</TableHead>
-                      <TableHead className="text-right font-black text-slate-500">الرصيد الحالي</TableHead>
-                      <TableHead className="text-center font-black text-slate-500">تعديل الرصيد</TableHead>
-                      <TableHead className="text-center font-black text-slate-500">إجراءات</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredUsers.map((user) => (
-                      <TableRow key={user.id} className="hover:bg-slate-50/50 border-slate-50 transition-colors">
-                        <TableCell className="text-right font-bold py-5">
-                          <div className="flex items-center gap-3">
-                             <div className="relative">
-                                <div className={`w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center font-black text-primary text-sm ${user.isOnline ? 'ring-2 ring-emerald-500 ring-offset-2' : ''}`}>
-                                   {user.name?.charAt(0) || 'U'}
-                                </div>
-                                {user.isOnline && (
-                                  <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full shadow-sm animate-pulse z-10"></span>
-                                )}
-                             </div>
-                             <div>
-                                <p className="font-black text-slate-800">{user.name}</p>
-                                <p className="text-[10px] text-muted-foreground font-mono">{user.phone}</p>
-                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-black text-emerald-600 text-lg">{(user.balance || 0).toLocaleString()} <span className="text-[10px] text-slate-400 font-medium">{currency}</span></TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex items-center justify-center gap-2 min-w-[200px] bg-slate-50 p-1.5 rounded-2xl inline-flex">
-                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl bg-white shadow-sm text-red-600 hover:bg-red-50" onClick={() => handleUpdateBalance(user.phone, 'subtract')}><Minus className="h-4 w-4" /></Button>
-                            <Input type="number" placeholder="المبلغ" className="w-24 h-9 text-center text-xs font-black rounded-xl border-none shadow-inner" value={balanceAdjustments[user.phone] || ""} onChange={(e) => setBalanceAdjustments(prev => ({ ...prev, [user.phone]: e.target.value }))} />
-                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl bg-white shadow-sm text-emerald-600 hover:bg-emerald-50" onClick={() => handleUpdateBalance(user.phone, 'add')}><Plus className="h-4 w-4" /></Button>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                           <div className="flex items-center justify-center gap-1">
-                              <a 
-                                href={`https://wa.me/${formatWhatsAppNumber(user.phone)}`} 
-                                target="_blank" 
-                                className="p-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100"
-                              >
-                                 <MessageCircle className="h-4 w-4" />
-                              </a>
-                              <Button variant="ghost" size="icon" className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl" onClick={() => handleDelete(user.phone)}><Trash2 className="h-4 w-4" /></Button>
-                           </div>
-                        </TableCell>
+            <ScrollArea className="h-[600px] w-full">
+              <div className="min-w-full overflow-x-auto">
+                {!isDataReady ? (
+                  <div className="py-20 flex justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
+                ) : (
+                  <Table className="min-w-[800px]">
+                    <TableHeader className="bg-slate-50/50">
+                      <TableRow className="border-none">
+                        <TableHead className="text-right py-5 font-black text-slate-500">المستخدم</TableHead>
+                        <TableHead className="text-right font-black text-slate-500">الرصيد الحالي</TableHead>
+                        <TableHead className="text-center font-black text-slate-500">تعديل الرصيد</TableHead>
+                        <TableHead className="text-center font-black text-slate-500">إجراءات</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
+                    </TableHeader>
+                    <TableBody>
+                      {filteredUsers.map((user) => (
+                        <TableRow key={user.id} className="hover:bg-slate-50/50 border-slate-50 transition-colors">
+                          <TableCell className="text-right font-bold py-5">
+                            <div className="flex items-center gap-3">
+                               <div className="relative">
+                                  <div className={`w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center font-black text-primary text-sm ${user.isOnline ? 'ring-2 ring-emerald-500 ring-offset-2' : ''}`}>
+                                     {user.name?.charAt(0) || 'U'}
+                                  </div>
+                                  {user.isOnline && (
+                                    <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full shadow-sm animate-pulse z-10"></span>
+                                  )}
+                               </div>
+                               <div>
+                                  <p className="font-black text-slate-800">{user.name}</p>
+                                  <p className="text-[10px] text-muted-foreground font-mono">{user.phone}</p>
+                               </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-black text-emerald-600 text-lg">{(user.balance || 0).toLocaleString()} <span className="text-[10px] text-slate-400 font-medium">{currency}</span></TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex items-center justify-center gap-2 min-w-[200px] bg-slate-50 p-1.5 rounded-2xl inline-flex">
+                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl bg-white shadow-sm text-red-600 hover:bg-red-50" onClick={() => handleUpdateBalance(user.phone, 'subtract')}><Minus className="h-4 w-4" /></Button>
+                              <Input type="number" placeholder="المبلغ" className="w-24 h-9 text-center text-xs font-black rounded-xl border-none shadow-inner" value={balanceAdjustments[user.phone] || ""} onChange={(e) => setBalanceAdjustments(prev => ({ ...prev, [user.phone]: e.target.value }))} />
+                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl bg-white shadow-sm text-emerald-600 hover:bg-emerald-50" onClick={() => handleUpdateBalance(user.phone, 'add')}><Plus className="h-4 w-4" /></Button>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                             <div className="flex items-center justify-center gap-1">
+                                <a 
+                                  href={`https://wa.me/${formatWhatsAppNumber(user.phone)}`} 
+                                  target="_blank" 
+                                  className="p-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100"
+                                >
+                                   <MessageCircle className="h-4 w-4" />
+                                </a>
+                                <Button variant="ghost" size="icon" className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl" onClick={() => handleDelete(user.phone)}><Trash2 className="h-4 w-4" /></Button>
+                             </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
             </ScrollArea>
           </Card>
         </TabsContent>
@@ -318,7 +320,7 @@ export function AdminPanel() {
                 <CardContent className="p-8 flex flex-col md:flex-row items-center justify-between gap-6">
                   <div className="text-right space-y-1">
                       <p className="font-black text-2xl text-slate-800">{req.userName}</p>
-                      <p className="font-mono text-sm text-muted-foreground bg-slate-50 inline-block px-3 py-1 rounded-lg">{req.phone}</p>
+                      <p className="font-mono text-sm text-muted-foreground bg-slate-50 px-3 py-1 rounded-lg">{req.phone}</p>
                       <p className="text-xl font-black text-emerald-600 mt-2">الرصيد المحفوظ: {(req.balance || 0).toLocaleString()} {currency}</p>
                   </div>
                   <Button onClick={() => handleResetPassword(req.phone, req.id)} className="bg-primary hover:bg-primary/90 text-white font-black h-14 px-10 rounded-2xl shadow-xl shadow-primary/20 transition-all active:scale-95">
