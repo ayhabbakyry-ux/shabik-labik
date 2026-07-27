@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@/lib/store';
 import { Navbar } from '@/components/layout/Navbar';
@@ -17,7 +18,7 @@ import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 export default function WalletPage() {
   const router = useRouter();
-  const { userBalance, isLoggedIn, currency } = useUser();
+  const { userBalance, isLoggedIn, currency, transactions } = useUser();
   const [fromDate, setFromDate] = useState('2026-06-24');
   const [toDate, setToDate] = useState('2026-06-24');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -27,6 +28,20 @@ export default function WalletPage() {
       router.push("/");
     }
   }, [isLoggedIn, router]);
+
+  // حساب إجمالي المشتريات: مجموع كافة العمليات من نوع "طلب شحن" التي لم يتم رفضها
+  const totalPurchases = useMemo(() => {
+    return transactions
+      .filter(tx => tx.type === 'طلب شحن' && tx.status !== 'Rejected')
+      .reduce((acc, tx) => acc + tx.amount, 0);
+  }, [transactions]);
+
+  // حساب الوارد: مجموع كافة الإيداعات التي تمت الموافقة عليها (Completed)
+  const totalIncoming = useMemo(() => {
+    return transactions
+      .filter(tx => (tx.type === 'إيداع محفظة' || tx.type === 'طلب إيداع') && tx.status === 'Completed')
+      .reduce((acc, tx) => acc + tx.amount, 0);
+  }, [transactions]);
 
   if (!isLoggedIn) return null;
 
@@ -79,7 +94,9 @@ export default function WalletPage() {
           <div className="min-w-[85%] sm:min-w-[300px] bg-[#ff5252] p-6 rounded-2xl flex flex-col justify-between h-40 snap-center shadow-xl relative overflow-hidden group">
             <span className="text-[10px] font-bold self-start bg-black/20 px-2 py-0.5 rounded backdrop-blur-sm z-10">SYP</span>
             <div className="text-right z-10">
-              <h3 className="text-3xl font-black tracking-wide font-mono">0.00</h3>
+              <h3 className="text-3xl font-black tracking-wide font-mono">
+                {totalPurchases.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </h3>
               <p className="text-sm opacity-90 font-medium mt-2">إجمالي مشتريات</p>
             </div>
             <ShoppingBag className="absolute left-[-10px] bottom-[-10px] h-24 w-24 opacity-10 -rotate-12 group-hover:scale-110 transition-transform" />
@@ -88,7 +105,9 @@ export default function WalletPage() {
           <div className="min-w-[85%] sm:min-w-[300px] bg-[#7c4dff] p-6 rounded-2xl flex flex-col justify-between h-40 snap-center shadow-xl relative overflow-hidden group">
             <span className="text-[10px] font-bold self-start bg-black/20 px-2 py-0.5 rounded backdrop-blur-sm z-10">SYP</span>
             <div className="text-right z-10">
-              <h3 className="text-3xl font-black tracking-wide font-mono">0.00</h3>
+              <h3 className="text-3xl font-black tracking-wide font-mono">
+                {totalIncoming.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </h3>
               <p className="text-sm opacity-90 font-medium mt-2">الوارد</p>
             </div>
             <ArrowRight className="absolute left-[-10px] bottom-[-10px] h-24 w-24 opacity-10 rotate-[135deg] group-hover:scale-110 transition-transform" />
