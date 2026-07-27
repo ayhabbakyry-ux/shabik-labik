@@ -59,10 +59,8 @@ export function ProductSheet({
   const calculateProductPrice = useCallback((product: ProductItem) => {
     const originalPrice = Number(product.price);
     if (isTelecom) {
-      const matches = product.name.match(/\d+/);
-      const nominalCredit = matches ? Number(matches[0]) : (originalPrice > 10 ? Math.round(originalPrice / 1.05) : originalPrice);
-      const markup = nominalCredit * 0.02;
-      return originalPrice + markup;
+      // إضافة عمولة 3% حصراً على السعر الأساسي للراغب
+      return originalPrice * 1.03;
     }
     return originalPrice + 2;
   }, [isTelecom]);
@@ -141,7 +139,6 @@ export function ProductSheet({
           toast({ title: "تم إرسال الطلب", description: "جاري المعالجة من قبل المزود." });
           if (isShamCash) { setGlobalTargetId(""); setDynamicAmount(""); }
       } else {
-          // عرض رسالة الخطأ القادمة من السيرفر (مثل تنبيه رصيد المزود)
           toast({ 
             title: "فشل الطلب", 
             description: result.message || "رفض المزود تنفيذ العملية.", 
@@ -339,7 +336,7 @@ export function ProductSheet({
                                   <ShoppingCart className="h-4 w-4" />
                                 </div>
                                 <div className="text-right">
-                                  <h4 className="font-bold text-foreground text-[12px] leading-tight">{product.name}</h4>
+                                  <h4 className="font-bold text-foreground text-[12px] leading-tight">{product.name} ({product.id})</h4>
                                   <p className="text-primary font-black text-sm mt-1">
                                     {finalPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} 
                                     <span className="text-[9px] font-medium mr-1">{currency}</span>
