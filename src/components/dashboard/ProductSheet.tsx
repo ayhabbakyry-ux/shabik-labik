@@ -174,6 +174,7 @@ export function ProductSheet({
             const isDiamond = prodName.includes("diamond") || prodName.includes("دياموند") || prodName.includes("جواهر") || prodName.includes("gems");
             const isFFIdentity = prodName.includes("fire") || prodName.includes("fier") || catName.includes("fire") || catName.includes("fier") || prodName.includes("فري فاير") || catName.includes("فري فاير");
 
+            // عرض الفئات الستة المطلوبة حصراً التي تحمل هوية اللعبة
             return isFFIdentity && isDiamond && hasNum;
         }
 
