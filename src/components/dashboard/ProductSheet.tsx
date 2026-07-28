@@ -171,7 +171,7 @@ export function ProductSheet({
         
         if (Number(p.price) < 10) return false;
 
-        // فقاعة الفري فاير - إصلاح شامل بطلب من أيهم (FREE FIER)
+        // فقاعة الفري فاير - رادار فائق الاختراق بطلب من أيهم (يسحب الجواهر والعضويات والمجوهرات)
         if (searchKey === "free fire") {
             const ffKeywords = [
               "free fire", "freefire", "free fier", "freefier", 
