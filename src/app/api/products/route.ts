@@ -48,14 +48,14 @@ export async function GET() {
             const rawStatus = obj.status !== undefined ? obj.status : (obj.active !== undefined ? obj.active : (obj.available !== undefined ? obj.available : 1));
             const isAvailable = (rawStatus === 1 || rawStatus === true || String(rawStatus).toLowerCase() === 'active' || String(rawStatus).toLowerCase() === 'available' || String(rawStatus) === '1');
 
-            // تحديث معلومات الفئة بشكل تراكمي
+            // تحديث معلومات الفئة بشكل تراكمي لضمان عدم ضياع السياق (مثل الفري فاير)
             let currentCatName = catInfo.name;
             let currentCatId = catInfo.id;
             
-            if (obj.category_name || obj.category?.name || obj.section?.name) {
-                const newCatName = obj.category_name || obj.category?.name || obj.section?.name;
-                currentCatName = currentCatName ? `${currentCatName} > ${newCatName}` : newCatName;
-                currentCatId = obj.category_id || obj.category?.id || obj.section_id;
+            const detectedCatName = obj.category_name || obj.category?.name || obj.section?.name || (id && name && !price ? name : "");
+            if (detectedCatName) {
+                currentCatName = currentCatName ? `${currentCatName} > ${detectedCatName}` : detectedCatName;
+                currentCatId = obj.category_id || obj.category?.id || obj.section_id || currentCatId;
             }
 
             // نظام الفلترة الصارم: استبعاد المنتجات الوهمية (أقل من 10 ليرات)
@@ -73,7 +73,7 @@ export async function GET() {
             }
 
             // البحث عن مصفوفات فرعية (خيارات منسدلة أو فئات فرعية) والغوص داخلها لفكها
-            const keysToScan = ['variants', 'options', 'prices', 'sub_services', 'items', 'products', 'data', 'services', 'children', 'quantities', 'sub_categories'];
+            const keysToScan = ['variants', 'options', 'prices', 'sub_services', 'items', 'products', 'data', 'services', 'children', 'quantities', 'sub_categories', 'sections'];
             
             if (Array.isArray(obj)) {
                 obj.forEach(item => deepScan(item, parentName, { name: currentCatName, id: currentCatId }));
