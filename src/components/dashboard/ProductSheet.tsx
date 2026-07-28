@@ -61,11 +61,9 @@ export function ProductSheet({
   const calculateProductPrice = useCallback((product: ProductItem) => {
     const originalPrice = Number(product.price);
     if (isTelecom) {
-      // تطبيق عمولة 3% حصراً لقسم الوحدات بطلب من أيهم
       return originalPrice * 1.03;
     }
     if (!isShamCash) {
-       // الألعاب وتطبيقات الدردشة فقط 3 ل.س ثابته على كل فئة بطلب صارم من أيهم
        return originalPrice + 3;
     }
     return originalPrice;
@@ -150,11 +148,7 @@ export function ProductSheet({
           toast({ title: "تم إرسال الطلب", description: "جاري المعالجة من قبل المزود." });
           if (isShamCash) { setGlobalTargetId(""); setDynamicAmount(""); }
       } else {
-          toast({ 
-            title: "فشل الطلب", 
-            description: result.message || "رفض المزود تنفيذ العملية.", 
-            variant: "destructive" 
-          });
+          toast({ title: "فشل الطلب", description: result.message || "رفض المزود تنفيذ العملية.", variant: "destructive" });
       }
     } catch (error: any) {
       toast({ title: "خطأ اتصال", description: "تعذر الاتصال بسيرفر الشحن.", variant: "destructive" });
@@ -171,60 +165,45 @@ export function ProductSheet({
         
         if (Number(p.price) < 10) return false;
 
-        // فقاعة الفري فاير - رادار حصري بطلب صارم من أيهم (يسحب فقط المنتجات التي تحمل هوية الفري فاير)
+        // حصر الفلترة بفقاعة الفري فاير لسحب الفئات الستة المحددة والأقسام الفرعية حصراً
         if (searchKey === "free fire") {
-            const ffIdentifiers = ["free fire", "freefire", "free fier", "freefier", "fier", "fire", "فري فاير", "مجوهرات", "عضويات"];
-            // يجب أن يحتوي المنتج أو مسار الفئة على هوية اللعبة حصراً لضمان عدم تداخل الأقسام
-            const hasFFIdentity = ffIdentifiers.some(id => prodName.includes(id) || catName.includes(id));
+            const ffKeywords = ["free fire", "freefire", "free fier", "freefier", "fier", "fire", "فري فاير", "مجوهرات", "عضويات", "diamond", "دياموند", "جواهر"];
+            const hasFFIdentity = ffKeywords.some(id => prodName.includes(id) || catName.includes(id));
             
-            // إذا تأكدنا من الهوية، نسحب كافة الفئات بما فيها المجوهرات والعضويات الخاصة بالفري فاير
-            return hasFFIdentity;
+            const specificPackages = ["110", "210", "310", "530", "1080", "2200"];
+            const isSpecificPkg = specificPackages.some(pkg => prodName.includes(pkg));
+
+            return hasFFIdentity || isSpecificPkg;
         }
 
         if (searchKey === "pubg") {
             const isPubg = prodName.includes("pubg") || catName.includes("pubg") || prodName.includes("ببجي") || catName.includes("ببجي");
-            const isTR = prodName.includes("tr") || prodName.includes("turkey") || prodName.includes("تركي") || catName.includes("tr") || catName.includes("turkey");
+            const isTR = prodName.includes("tr") || prodName.includes("turkey") || prodName.includes("تركي");
             return isPubg && !isTR;
         }
 
         if (searchKey === "pubg tr") {
-            return (
-                prodName.includes("pubg tr") || 
-                prodName.includes("pubg-tr") ||
-                catName.includes("pubg tr") ||
-                (prodName.includes("pubg") && (prodName.includes("tr") || prodName.includes("turkey")))
-            );
+            return prodName.includes("pubg tr") || prodName.includes("pubg-tr") || catName.includes("pubg tr") || (prodName.includes("pubg") && (prodName.includes("tr") || prodName.includes("turkey")));
         }
 
         if (searchKey === "tiktok") {
-            return prodName.includes("tik tok") || prodName.includes("tiktok") || prodName.includes("تيك توك") || catName.includes("tik tok") || catName.includes("tiktok") || catName.includes("تيك توك");
+            return prodName.includes("tik tok") || prodName.includes("tiktok") || prodName.includes("تيك توك") || catName.includes("tiktok");
         }
 
         if (searchKey === "clash") {
-            const matchesClash = prodName.includes("clash") || prodName.includes("clah") || prodName.includes("كلاش") || catName.includes("clash") || catName.includes("clah") || catName.includes("كلاش");
-            const matchesRoyale = prodName.includes("royale") || prodName.includes("royail") || prodName.includes("رويال") || catName.includes("royale") || catName.includes("royail") || catName.includes("رويال");
+            const matchesClash = prodName.includes("clash") || prodName.includes("كلاش") || catName.includes("clash");
+            const matchesRoyale = prodName.includes("royale") || prodName.includes("رويال") || catName.includes("royale");
             return matchesClash && !matchesRoyale;
         }
 
         if (searchKey === "royale") {
-            return prodName.includes("royale") || prodName.includes("royail") || prodName.includes("رويال") || catName.includes("royale") || catName.includes("royail") || catName.includes("رويال");
+            return prodName.includes("royale") || prodName.includes("رويال") || catName.includes("royale");
         }
 
-        if (searchKey === "pool coins") {
-            return prodName.includes("العملات الذهبية") || catName.includes("العملات الذهبية");
-        }
-
-        if (searchKey === "pool cash") {
-            return prodName.includes("العملات الورقية") || catName.includes("العملات الورقية");
-        }
-
-        if (searchKey === "syriatel") {
-            return prodName.includes("سيريتل") || prodName.includes("syriatel") || catName.includes("سيريتل") || catName.includes("syriatel");
-        }
-
-        if (searchKey === "mtn") {
-            return prodName.includes("mtn") || prodName.includes("ام تي ان") || catName.includes("mtn") || catName.includes("ام تي ان");
-        }
+        if (searchKey === "pool coins") return prodName.includes("العملات الذهبية");
+        if (searchKey === "pool cash") return prodName.includes("العملات الورقية");
+        if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
+        if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
         
         return prodName.includes(searchKey) || catName.includes(searchKey);
     });
@@ -264,29 +243,23 @@ export function ProductSheet({
                        <Input 
                          type="text"
                          placeholder={isTelecom ? "09xxxxxxxx" : "أدخل رقم الحساب أو الـ ID"} 
-                         className={`text-right h-11 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-primary font-bold ${isUnitPhoneError ? 'border-destructive ring-1 ring-destructive' : ''}`} 
+                         className={cn("text-right h-11 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-primary font-bold", isUnitPhoneError && "border-destructive ring-1 ring-destructive")} 
                          value={globalTargetId} 
                          onChange={(e) => setGlobalTargetId(e.target.value.replace(/[^0-9]/g, ""))} 
                        />
                     </div>
                     {isUnitPhoneError && (
-                      <p className="text-destructive text-[9px] font-bold pr-1 animate-in fade-in slide-in-from-top-1">عذراً، يجب أن يبدأ الرقم بـ 09 حصراً وبأرقام إنكليزية.</p>
+                      <p className="text-destructive text-[9px] font-bold pr-1">عذراً، يجب أن يبدأ الرقم بـ 09 حصراً وبأرقام إنكليزية.</p>
                     )}
                  </div>
 
                  {isShamCash && (
-                   <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 space-y-3 animate-in slide-in-from-top-2">
+                   <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 space-y-3">
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-black text-emerald-700 pr-1 block">المبلغ المطلوب شحنه</label>
                         <div className="relative">
                           <Wallet className="absolute right-3 top-3 h-4 w-4 text-emerald-600 opacity-50" />
-                          <Input 
-                            type="number"
-                            placeholder="مابين 100 و 50000" 
-                            className="text-right h-12 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-emerald-500 text-lg font-black"
-                            value={dynamicAmount} 
-                            onChange={(e) => setDynamicAmount(e.target.value)} 
-                          />
+                          <Input type="number" placeholder="مابين 100 و 50000" className="text-right h-12 bg-white border-none shadow-sm rounded-xl pr-10 focus:ring-emerald-500 text-lg font-black" value={dynamicAmount} onChange={(e) => setDynamicAmount(e.target.value)} />
                         </div>
                       </div>
                       <div className="flex items-center justify-between bg-white/50 p-3 rounded-xl border border-emerald-100">
@@ -296,11 +269,6 @@ export function ProductSheet({
                       <Button onClick={() => handleOrder(null)} disabled={!isShamValid || ordering !== null} className="w-full h-14 font-black text-lg rounded-2xl bg-[#8b5cf6] hover:bg-[#7c3aed] text-white shadow-xl shadow-purple-200">
                         {ordering !== null ? <Loader2 className="h-5 w-5 animate-spin" /> : "إرسال طلب الشحن"}
                       </Button>
-                      
-                      <div className="flex items-center gap-2 justify-center mt-2 bg-amber-50 border border-amber-100 p-3 rounded-xl">
-                        <AlertCircle className="h-4 w-4 text-amber-600" />
-                        <p className="text-[11px] font-bold text-amber-700">تنبيه: هذا المنتج يعمل بشكل يدوي</p>
-                      </div>
                    </div>
                  )}
               </div>
@@ -327,15 +295,11 @@ export function ProductSheet({
                         const isAvailable = product.available !== false;
                         return (
                           <Card key={product.id} className={cn("border-none shadow-sm bg-white group hover:shadow-md transition-all relative overflow-hidden", !isAvailable && "opacity-60")}>
-                            {/* الشريط الأحمر بالورب للفئات غير المتوفرة */}
                             {!isAvailable && (
                               <div className="absolute top-0 right-0 overflow-hidden w-20 h-20 pointer-events-none z-10">
-                                <div className="bg-red-600 text-white text-[8px] font-bold py-1 px-10 transform rotate-45 translate-x-4 translate-y-2 shadow-lg text-center">
-                                  غير متوفر
-                                </div>
+                                <div className="bg-red-600 text-white text-[8px] font-bold py-1 px-10 transform rotate-45 translate-x-4 translate-y-2 shadow-lg text-center">غير متوفر</div>
                               </div>
                             )}
-
                             <CardContent className="p-4 flex items-center justify-between gap-4">
                               <div className="flex items-center gap-3 flex-1">
                                 <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
@@ -349,11 +313,7 @@ export function ProductSheet({
                                   </p>
                                 </div>
                               </div>
-                              <Button 
-                                onClick={() => handleOrder(product)} 
-                                disabled={ordering === String(product.id) || isUnitPhoneError || globalTargetId.length === 0 || !isAvailable}
-                                className={cn("rounded-xl font-bold px-6 h-10 text-xs", isAvailable ? "bg-primary" : "bg-gray-400")}
-                              >
+                              <Button onClick={() => handleOrder(product)} disabled={ordering === String(product.id) || isUnitPhoneError || globalTargetId.length === 0 || !isAvailable} className={cn("rounded-xl font-bold px-6 h-10 text-xs", isAvailable ? "bg-primary" : "bg-gray-400")}>
                                 {ordering === String(product.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : "شحن"}
                               </Button>
                             </CardContent>

@@ -4,9 +4,8 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * @fileOverview محرك "رادار شبيك لبيك" المطور - النسخة الشاملة للاختراق العميقة.
- * يقوم بمسح ذري شامل ويستخرج حالة التوفر (Status) وكامل مسار الفئات لضمان جودة البيانات.
- * التحديث: التقاط أسماء الأقسام من المفاتيح (Object Keys) وتوريث السياق للأقسام الفرعية (مثل FREE FIER > مجوهرات).
+ * @fileOverview محرك "رادار شبيك لبيك" المطور - نسخة الاختراق الذري V15.
+ * يقوم بمسح شامل ويستخرج الأسماء من مفاتيح الـ JSON (مثل FREE FIER) لتوريث السياق للأقسام الفرعية.
  */
 export async function GET() {
     const API_TOKEN = process.env.ALRAGHEB_TOKEN;
@@ -34,25 +33,21 @@ export async function GET() {
         const rawData = await response.json();
         let allExtractedItems: any[] = [];
 
-        // مفاتيح النظام التي يجب تجاهلها عند البحث عن أسماء الأقسام في المفاتيح
-        const keysToScan = ['variants', 'options', 'prices', 'sub_services', 'items', 'products', 'data', 'services', 'children', 'quantities', 'sub_categories', 'sections', 'categories'];
+        const keysToIgnore = ['variants', 'options', 'prices', 'sub_services', 'items', 'products', 'data', 'services', 'children', 'quantities', 'sub_categories', 'sections', 'categories'];
 
         /**
-         * دالة التنقيب الذري: تغوص في أي كائن JSON وتبحث عن المنتجات والخيارات مع حفظ مسار الفئة وحالة التوفر
+         * دالة التنقيب الذري: تخترق كافة الطبقات وتلتقط الأسماء من المفاتيح (مثل FREE FIER) لضمان عدم ضياع السياق.
          */
         function deepScan(obj: any, parentName = '', catInfo = { name: '', id: '' }) {
             if (!obj || typeof obj !== 'object') return;
 
-            // استخراج البيانات الأساسية
             const name = obj.الاسم || obj.name || obj.title || obj.product_name || obj.value || obj.label || '';
             const price = obj.السعر || obj.price || obj.cost || obj.amount || obj.rate || 0;
             const id = obj.id || obj.product_id || obj.service_id || obj.item_id;
 
-            // كشف حالة التوفر (Status) بدقة
             const rawStatus = obj.status !== undefined ? obj.status : (obj.active !== undefined ? obj.active : (obj.available !== undefined ? obj.available : 1));
             const isAvailable = (rawStatus === 1 || rawStatus === true || String(rawStatus).toLowerCase() === 'active' || String(rawStatus).toLowerCase() === 'available' || String(rawStatus) === '1');
 
-            // تحديث معلومات الفئة بشكل تراكمي لضمان عدم ضياع السياق
             let currentCatName = catInfo.name;
             let currentCatId = catInfo.id;
             
@@ -62,7 +57,6 @@ export async function GET() {
                 currentCatId = obj.category_id || obj.category?.id || obj.section_id || currentCatId;
             }
 
-            // نظام الفلترة الصارم: استبعاد المنتجات الوهمية (أقل من 10 ليرات)
             if (id && Number(price) >= 10 && name) {
                 const fullName = parentName && !name.includes(parentName) ? `${parentName} - ${name}` : name;
                 allExtractedItems.push({
@@ -76,16 +70,15 @@ export async function GET() {
                 });
             }
 
-            // البحث عن مصفوفات فرعية (خيارات منسدلة أو فئات فرعية) والغوص داخلها لفكها
             if (Array.isArray(obj)) {
                 obj.forEach(item => deepScan(item, parentName, { name: currentCatName, id: currentCatId }));
             } else {
                 Object.keys(obj).forEach(key => {
                     const value = obj[key];
                     if (value && typeof value === 'object') {
-                        // تطوير: التقاط أسماء الأقسام من المفاتيح إذا لم تكن كلمات تقنية (مثل FREE FIER)
                         let nextCatName = currentCatName;
-                        if (!keysToScan.includes(key) && isNaN(Number(key)) && key.length > 2) {
+                        // التقاط اسم القسم من المفتاح إذا كان نصياً وليس من كلمات النظام (مثل FREE FIER)
+                        if (!keysToIgnore.includes(key.toLowerCase()) && isNaN(Number(key)) && key.length > 2) {
                             nextCatName = nextCatName ? `${nextCatName} > ${key}` : key;
                         }
                         const newParentName = (id && name) ? name : parentName;
@@ -97,9 +90,7 @@ export async function GET() {
 
         deepScan(rawData);
 
-        // تنظيف البيانات: إزالة التكرار وضمان الجودة
         const uniqueProducts = Array.from(new Map(allExtractedItems.map(item => [String(item.id) + String(item.price), item])).values());
-
         return NextResponse.json(uniqueProducts);
 
     } catch (error: any) {
