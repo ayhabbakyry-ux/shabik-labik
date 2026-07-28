@@ -168,14 +168,17 @@ export function ProductSheet({
         // حصر فقاعة الفري فاير لجلب الفئات الستة المطلوبة حصراً بالاسم والعدد
         if (searchKey === "free fire") {
             const specificNumbers = ["110", "210", "310", "530", "1080", "2200"];
-            const prodNameClean = prodName.replace(/\s+/g, '');
-            const hasNum = specificNumbers.some(num => prodNameClean.includes(num));
             
-            const isDiamond = prodName.includes("diamond") || prodName.includes("دياموند") || prodName.includes("جواهر") || prodName.includes("gems");
-            const isFFIdentity = prodName.includes("fire") || prodName.includes("fier") || catName.includes("fire") || catName.includes("fier") || prodName.includes("فري فاير") || catName.includes("فري فاير");
+            // تنظيف الاسم من المسافات للبحث عن العدد بدقة
+            const prodNameClean = prodName.replace(/\s+/g, '');
+            const hasCorrectNum = specificNumbers.some(num => prodNameClean.includes(num));
+            
+            // التحقق من هوية الفري فاير والجواهر
+            const isFFBrand = prodName.includes("fire") || prodName.includes("fier") || catName.includes("FIRE") || catName.includes("FIER") || prodName.includes("فري فاير") || catName.includes("فري فاير");
+            const isDiamond = prodName.includes("diamond") || prodName.includes("جواهر") || prodName.includes("دياموند") || prodName.includes("gems");
 
-            // عرض الفئات الستة المطلوبة حصراً التي تحمل هوية اللعبة
-            return isFFIdentity && isDiamond && hasNum;
+            // العرض حصراً للفئات الستة التي تحمل هوية اللعبة
+            return isFFBrand && isDiamond && hasCorrectNum;
         }
 
         if (searchKey === "pubg") {

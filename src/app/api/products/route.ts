@@ -79,12 +79,12 @@ export async function GET() {
                         let nextCatName = currentCatName;
                         const lowerKey = key.toLowerCase();
                         
-                        // التقاط اسم القسم من المفتاح (مثل FREE FIER)
+                        // التقاط اسم القسم من المفتاح (مثل FREE FIER) وتمريره كـ Context
                         if (!keysToIgnore.includes(lowerKey) && isNaN(Number(key)) && key.length > 2) {
-                            nextCatName = nextCatName ? `${nextCatName} > ${key}` : key;
+                            nextCatName = nextCatName ? `${nextCatName} > ${key.toUpperCase()}` : key.toUpperCase();
                         }
                         
-                        // حقن سياق الفري فاير الصارم إذا وجد في المفاتيح
+                        // حقن سياق الفري فاير الصارم إذا وجد في المفاتيح لضمان عدم ضياع الهوية
                         if (lowerKey.includes('fire') || lowerKey.includes('fier') || lowerKey.includes('فري') || lowerKey.includes('فاير')) {
                             nextCatName = nextCatName.includes('FREE FIRE') ? nextCatName : (nextCatName ? `${nextCatName} > FREE FIRE` : 'FREE FIRE');
                         }
