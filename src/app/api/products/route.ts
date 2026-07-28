@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * @fileOverview محرك "رادار شبيك لبيك" المطور - نسخة الاختراق الذري V15.
+ * @fileOverview محرك "رادار شبيك لبيك" المطور - نسخة الاختراق الذري V16.
  * يقوم بمسح شامل ويستخرج الأسماء من مفاتيح الـ JSON (مثل FREE FIER) لتوريث السياق للأقسام الفرعية.
  */
 export async function GET() {
@@ -33,7 +33,7 @@ export async function GET() {
         const rawData = await response.json();
         let allExtractedItems: any[] = [];
 
-        const keysToIgnore = ['variants', 'options', 'prices', 'sub_services', 'items', 'products', 'data', 'services', 'children', 'quantities', 'sub_categories', 'sections', 'categories'];
+        const keysToIgnore = ['variants', 'options', 'prices', 'sub_services', 'items', 'products', 'data', 'services', 'children', 'quantities', 'sub_categories', 'sections', 'categories', 'id', 'status', 'available', 'price', 'name', 'img', 'image'];
 
         /**
          * دالة التنقيب الذري: تخترق كافة الطبقات وتلتقط الأسماء من المفاتيح (مثل FREE FIER) لضمان عدم ضياع السياق.
@@ -46,7 +46,7 @@ export async function GET() {
             const id = obj.id || obj.product_id || obj.service_id || obj.item_id;
 
             const rawStatus = obj.status !== undefined ? obj.status : (obj.active !== undefined ? obj.active : (obj.available !== undefined ? obj.available : 1));
-            const isAvailable = (rawStatus === 1 || rawStatus === true || String(rawStatus).toLowerCase() === 'active' || String(rawStatus).toLowerCase() === 'available' || String(rawStatus) === '1');
+            const isAvailable = (rawStatus === 1 || rawStatus === true || String(rawStatus).toLowerCase() === 'active' || String(rawStatus).toLowerCase() === 'available' || String(rawStatus) === '1' || String(rawStatus) === 'مكتمل');
 
             let currentCatName = catInfo.name;
             let currentCatId = catInfo.id;

@@ -170,7 +170,7 @@ export function ProductSheet({
             const specificNumbers = ["110", "210", "310", "530", "1080", "2200"];
             const hasNum = specificNumbers.some(num => prodName.includes(num));
             const isDiamond = prodName.includes("diamond") || prodName.includes("دياموند") || prodName.includes("جواهر");
-            const isFF = prodName.includes("fire") || prodName.includes("fier") || catName.includes("fire") || catName.includes("fier") || prodName.includes("فري فاير") || catName.includes("فري فاير");
+            const isFF = prodName.includes("fire") || prodName.includes("fier") || catName.includes("fire") || catName.includes("fier") || prodName.includes("فري فاير") || catName.includes("فري فاير") || catName.includes("مجوهرات") || catName.includes("عضويات");
 
             // عرض الفئات الستة المطلوبة حصراً وفقط إذا كانت تنتمي للفري فاير
             return isFF && isDiamond && hasNum;
