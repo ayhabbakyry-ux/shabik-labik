@@ -173,7 +173,7 @@ export function ProductSheet({
 
         // فقاعة الفري فاير - رادار حصري بطلب صارم من أيهم (يسحب فقط المنتجات التي تحمل هوية الفري فاير)
         if (searchKey === "free fire") {
-            const ffIdentifiers = ["free fire", "freefire", "free fier", "freefier", "fier", "fire", "فري فاير"];
+            const ffIdentifiers = ["free fire", "freefire", "free fier", "freefier", "fier", "fire", "فري فاير", "مجوهرات", "عضويات"];
             // يجب أن يحتوي المنتج أو مسار الفئة على هوية اللعبة حصراً لضمان عدم تداخل الأقسام
             const hasFFIdentity = ffIdentifiers.some(id => prodName.includes(id) || catName.includes(id));
             

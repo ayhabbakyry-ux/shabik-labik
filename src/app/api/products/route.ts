@@ -6,7 +6,7 @@ export const revalidate = 0;
 /**
  * @fileOverview محرك "رادار شبيك لبيك" المطور - النسخة الشاملة للاختراق العميقة.
  * يقوم بمسح ذري شامل ويستخرج حالة التوفر (Status) وكامل مسار الفئات لضمان جودة البيانات.
- * التحديث: التقاط أسماء الأقسام من المفاتيح (Object Keys) لضمان عدم ضياع فئات مثل FREE FIER.
+ * التحديث: التقاط أسماء الأقسام من المفاتيح (Object Keys) وتوريث السياق للأقسام الفرعية (مثل FREE FIER > مجوهرات).
  */
 export async function GET() {
     const API_TOKEN = process.env.ALRAGHEB_TOKEN;
