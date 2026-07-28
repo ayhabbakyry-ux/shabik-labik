@@ -165,15 +165,15 @@ export function ProductSheet({
         
         if (Number(p.price) < 10) return false;
 
-        // حصر الفلترة بفقاعة الفري فاير لسحب الفئات الستة المحددة والأقسام الفرعية حصراً
+        // حصر الفلترة بفقاعة الفري فاير لسحب الفئات الستة المحددة حصراً Diamond 110, 210, 310, 530, 1080, 2200
         if (searchKey === "free fire") {
-            const ffKeywords = ["free fire", "freefire", "free fier", "freefier", "fier", "fire", "فري فاير", "مجوهرات", "عضويات", "diamond", "دياموند", "جواهر"];
-            const hasFFIdentity = ffKeywords.some(id => prodName.includes(id) || catName.includes(id));
-            
-            const specificPackages = ["110", "210", "310", "530", "1080", "2200"];
-            const isSpecificPkg = specificPackages.some(pkg => prodName.includes(pkg));
+            const specificNumbers = ["110", "210", "310", "530", "1080", "2200"];
+            const hasNum = specificNumbers.some(num => prodName.includes(num));
+            const isDiamond = prodName.includes("diamond") || prodName.includes("دياموند") || prodName.includes("جواهر");
+            const isFF = prodName.includes("fire") || prodName.includes("fier") || catName.includes("fire") || catName.includes("fier") || prodName.includes("فري فاير") || catName.includes("فري فاير");
 
-            return hasFFIdentity || isSpecificPkg;
+            // عرض الفئات الستة المطلوبة حصراً وفقط إذا كانت تنتمي للفري فاير
+            return isFF && isDiamond && hasNum;
         }
 
         if (searchKey === "pubg") {
