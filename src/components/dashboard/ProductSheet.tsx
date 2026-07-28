@@ -171,9 +171,13 @@ export function ProductSheet({
         
         if (Number(p.price) < 10) return false;
 
-        // فقاعة الفري فاير - إصلاح شامل بطلب من أيهم
+        // فقاعة الفري فاير - إصلاح شامل بطلب من أيهم (FREE FIER)
         if (searchKey === "free fire") {
-            const ffKeywords = ["free fire", "freefire", "free fier", "freefier", "fier", "fire", "فري فاير", "مجوهرات", "عضويات", "جواهر", "gems"];
+            const ffKeywords = [
+              "free fire", "freefire", "free fier", "freefier", 
+              "fier", "fire", "فري فاير", "مجوهرات", "عضويات", 
+              "جواهر", "gems", "diamonds", "diamond", "membership"
+            ];
             return ffKeywords.some(key => prodName.includes(key) || catName.includes(key));
         }
 

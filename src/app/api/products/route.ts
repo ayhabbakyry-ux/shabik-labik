@@ -48,7 +48,7 @@ export async function GET() {
             const rawStatus = obj.status !== undefined ? obj.status : (obj.active !== undefined ? obj.active : (obj.available !== undefined ? obj.available : 1));
             const isAvailable = (rawStatus === 1 || rawStatus === true || String(rawStatus).toLowerCase() === 'active' || String(rawStatus).toLowerCase() === 'available' || String(rawStatus) === '1');
 
-            // تحديث معلومات الفئة بشكل تراكمي لضمان عدم ضياع السياق (مثل الفري فاير)
+            // تحديث معلومات الفئة بشكل تراكمي لضمان عدم ضياع السياق
             let currentCatName = catInfo.name;
             let currentCatId = catInfo.id;
             
@@ -73,18 +73,16 @@ export async function GET() {
             }
 
             // البحث عن مصفوفات فرعية (خيارات منسدلة أو فئات فرعية) والغوص داخلها لفكها
-            const keysToScan = ['variants', 'options', 'prices', 'sub_services', 'items', 'products', 'data', 'services', 'children', 'quantities', 'sub_categories', 'sections'];
+            const keysToScan = ['variants', 'options', 'prices', 'sub_services', 'items', 'products', 'data', 'services', 'children', 'quantities', 'sub_categories', 'sections', 'categories'];
             
             if (Array.isArray(obj)) {
                 obj.forEach(item => deepScan(item, parentName, { name: currentCatName, id: currentCatId }));
             } else {
                 Object.keys(obj).forEach(key => {
                     const value = obj[key];
-                    if (keysToScan.includes(key) && Array.isArray(value)) {
+                    if ((keysToScan.includes(key) || typeof value === 'object') && value !== null) {
                         const newParentName = (id && name) ? name : parentName;
-                        value.forEach(item => deepScan(item, newParentName, { name: currentCatName, id: currentCatId }));
-                    } else if (typeof value === 'object' && value !== null) {
-                        deepScan(value, parentName, { name: currentCatName, id: currentCatId });
+                        deepScan(value, newParentName, { name: currentCatName, id: currentCatId });
                     }
                 });
             }
