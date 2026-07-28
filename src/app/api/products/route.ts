@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * @fileOverview محرك "رادار شبيك لبيك" المطور - نسخة الاختراق الذري V17.
+ * @fileOverview محرك "رادار شبيك لبيك" المطور - نسخة الاختراق الذري V18.
  * يقوم بمسح شامل ويستخرج الأسماء من مفاتيح الـ JSON (مثل FREE FIER) لتوريث السياق للأقسام الفرعية.
  */
 export async function GET() {
@@ -46,7 +46,7 @@ export async function GET() {
             const id = obj.id || obj.product_id || obj.service_id || obj.item_id;
 
             const rawStatus = obj.status !== undefined ? obj.status : (obj.active !== undefined ? obj.active : (obj.available !== undefined ? obj.available : 1));
-            const isAvailable = (rawStatus === 1 || rawStatus === true || String(rawStatus).toLowerCase() === 'active' || String(rawStatus).toLowerCase() === 'available' || String(rawStatus) === '1' || String(rawStatus) === 'مكتمل');
+            const isAvailable = (rawStatus === 1 || rawStatus === true || String(rawStatus).toLowerCase() === 'active' || String(rawStatus).toLowerCase() === 'available' || String(rawStatus) === '1' || String(rawStatus) === 'موافق' || String(rawStatus) === 'مكتمل' || String(rawStatus) === 'قبول');
 
             let currentCatName = catInfo.name;
             let currentCatId = catInfo.id;
@@ -77,10 +77,18 @@ export async function GET() {
                     const value = obj[key];
                     if (value && typeof value === 'object') {
                         let nextCatName = currentCatName;
+                        const lowerKey = key.toLowerCase();
+                        
                         // التقاط اسم القسم من المفتاح إذا كان نصياً وليس من كلمات النظام (مثل FREE FIER)
-                        if (!keysToIgnore.includes(key.toLowerCase()) && isNaN(Number(key)) && key.length > 2) {
+                        if (!keysToIgnore.includes(lowerKey) && isNaN(Number(key)) && key.length > 2) {
                             nextCatName = nextCatName ? `${nextCatName} > ${key}` : key;
                         }
+                        
+                        // حقن سياق الفري فاير الصارم إذا وجد في المفاتيح
+                        if (lowerKey.includes('fire') || lowerKey.includes('fier') || lowerKey.includes('فري') || lowerKey.includes('فاير')) {
+                            nextCatName = nextCatName.includes('FREE FIRE') ? nextCatName : (nextCatName ? `${nextCatName} > FREE FIRE` : 'FREE FIRE');
+                        }
+
                         const newParentName = (id && name) ? name : parentName;
                         deepScan(value, newParentName, { name: nextCatName, id: currentCatId });
                     }
