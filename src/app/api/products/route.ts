@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * @fileOverview محرك "رادار شبيك لبيك" المطور - نسخة الاختراق الذري V16.
+ * @fileOverview محرك "رادار شبيك لبيك" المطور - نسخة الاختراق الذري V17.
  * يقوم بمسح شامل ويستخرج الأسماء من مفاتيح الـ JSON (مثل FREE FIER) لتوريث السياق للأقسام الفرعية.
  */
 export async function GET() {

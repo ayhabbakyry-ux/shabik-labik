@@ -63,6 +63,7 @@ export function ProductSheet({
     if (isTelecom) {
       return originalPrice * 1.03;
     }
+    // الحفاظ على عمولة الـ 3 ليرات للألعاب وتطبيقات الدردشة
     if (!isShamCash) {
        return originalPrice + 3;
     }
@@ -165,14 +166,14 @@ export function ProductSheet({
         
         if (Number(p.price) < 10) return false;
 
-        // حصر الفلترة بفقاعة الفري فاير لسحب الفئات الستة المحددة حصراً Diamond 110, 210, 310, 530, 1080, 2200
+        // حصر فقاعة الفري فاير لجلب الفئات الستة المطلوبة حصراً من داخل FREE FIER والأقسام الفرعية
         if (searchKey === "free fire") {
             const specificNumbers = ["110", "210", "310", "530", "1080", "2200"];
             const hasNum = specificNumbers.some(num => prodName.includes(num));
             const isDiamond = prodName.includes("diamond") || prodName.includes("دياموند") || prodName.includes("جواهر");
             const isFF = prodName.includes("fire") || prodName.includes("fier") || catName.includes("fire") || catName.includes("fier") || prodName.includes("فري فاير") || catName.includes("فري فاير") || catName.includes("مجوهرات") || catName.includes("عضويات");
 
-            // عرض الفئات الستة المطلوبة حصراً وفقط إذا كانت تنتمي للفري فاير
+            // جلب الفئات الستة المطلوبة حصراً طالما أنها تنتمي لهوية الفري فاير
             return isFF && isDiamond && hasNum;
         }
 
