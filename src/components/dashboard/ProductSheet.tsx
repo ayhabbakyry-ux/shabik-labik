@@ -177,11 +177,8 @@ export function ProductSheet({
             // يجب أن يحتوي المنتج أو مسار الفئة على هوية اللعبة حصراً لضمان عدم تداخل الأقسام
             const hasFFIdentity = ffIdentifiers.some(id => prodName.includes(id) || catName.includes(id));
             
-            if (!hasFFIdentity) return false;
-
-            // إذا تأكدنا من الهوية، نسحب كافة الفئات بما فيها المجوهرات والعضويات
-            const ffSubKeywords = ["مجوهرات", "عضويات", "جواهر", "gems", "diamonds", "membership"];
-            return hasFFIdentity || ffSubKeywords.some(key => prodName.includes(key) || catName.includes(key));
+            // إذا تأكدنا من الهوية، نسحب كافة الفئات بما فيها المجوهرات والعضويات الخاصة بالفري فاير
+            return hasFFIdentity;
         }
 
         if (searchKey === "pubg") {

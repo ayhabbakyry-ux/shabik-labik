@@ -6,6 +6,7 @@ export const revalidate = 0;
 /**
  * @fileOverview محرك "رادار شبيك لبيك" المطور - النسخة الشاملة للاختراق العميقة.
  * يقوم بمسح ذري شامل ويستخرج حالة التوفر (Status) وكامل مسار الفئات لضمان جودة البيانات.
+ * التحديث: التقاط أسماء الأقسام من المفاتيح (Object Keys) لضمان عدم ضياع فئات مثل FREE FIER.
  */
 export async function GET() {
     const API_TOKEN = process.env.ALRAGHEB_TOKEN;
@@ -32,6 +33,9 @@ export async function GET() {
 
         const rawData = await response.json();
         let allExtractedItems: any[] = [];
+
+        // مفاتيح النظام التي يجب تجاهلها عند البحث عن أسماء الأقسام في المفاتيح
+        const keysToScan = ['variants', 'options', 'prices', 'sub_services', 'items', 'products', 'data', 'services', 'children', 'quantities', 'sub_categories', 'sections', 'categories'];
 
         /**
          * دالة التنقيب الذري: تغوص في أي كائن JSON وتبحث عن المنتجات والخيارات مع حفظ مسار الفئة وحالة التوفر
@@ -73,16 +77,19 @@ export async function GET() {
             }
 
             // البحث عن مصفوفات فرعية (خيارات منسدلة أو فئات فرعية) والغوص داخلها لفكها
-            const keysToScan = ['variants', 'options', 'prices', 'sub_services', 'items', 'products', 'data', 'services', 'children', 'quantities', 'sub_categories', 'sections', 'categories'];
-            
             if (Array.isArray(obj)) {
                 obj.forEach(item => deepScan(item, parentName, { name: currentCatName, id: currentCatId }));
             } else {
                 Object.keys(obj).forEach(key => {
                     const value = obj[key];
-                    if ((keysToScan.includes(key) || typeof value === 'object') && value !== null) {
+                    if (value && typeof value === 'object') {
+                        // تطوير: التقاط أسماء الأقسام من المفاتيح إذا لم تكن كلمات تقنية (مثل FREE FIER)
+                        let nextCatName = currentCatName;
+                        if (!keysToScan.includes(key) && isNaN(Number(key)) && key.length > 2) {
+                            nextCatName = nextCatName ? `${nextCatName} > ${key}` : key;
+                        }
                         const newParentName = (id && name) ? name : parentName;
-                        deepScan(value, newParentName, { name: currentCatName, id: currentCatId });
+                        deepScan(value, newParentName, { name: nextCatName, id: currentCatId });
                     }
                 });
             }
