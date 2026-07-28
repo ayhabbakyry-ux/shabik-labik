@@ -171,14 +171,17 @@ export function ProductSheet({
         
         if (Number(p.price) < 10) return false;
 
-        // فقاعة الفري فاير - رادار فائق الاختراق بطلب من أيهم (يسحب الجواهر والعضويات والمجوهرات)
+        // فقاعة الفري فاير - رادار حصري بطلب صارم من أيهم (يسحب فقط المنتجات التي تحمل هوية الفري فاير)
         if (searchKey === "free fire") {
-            const ffKeywords = [
-              "free fire", "freefire", "free fier", "freefier", 
-              "fier", "fire", "فري فاير", "مجوهرات", "عضويات", 
-              "جواهر", "gems", "diamonds", "diamond", "membership"
-            ];
-            return ffKeywords.some(key => prodName.includes(key) || catName.includes(key));
+            const ffIdentifiers = ["free fire", "freefire", "free fier", "freefier", "fier", "fire", "فري فاير"];
+            // يجب أن يحتوي المنتج أو مسار الفئة على هوية اللعبة حصراً لضمان عدم تداخل الأقسام
+            const hasFFIdentity = ffIdentifiers.some(id => prodName.includes(id) || catName.includes(id));
+            
+            if (!hasFFIdentity) return false;
+
+            // إذا تأكدنا من الهوية، نسحب كافة الفئات بما فيها المجوهرات والعضويات
+            const ffSubKeywords = ["مجوهرات", "عضويات", "جواهر", "gems", "diamonds", "membership"];
+            return hasFFIdentity || ffSubKeywords.some(key => prodName.includes(key) || catName.includes(key));
         }
 
         if (searchKey === "pubg") {
