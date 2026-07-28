@@ -4,8 +4,8 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * @fileOverview محرك "رادار شبيك لبيك" المطور - نسخة الاختراق الذري V18.
- * يقوم بمسح شامل ويستخرج الأسماء من مفاتيح الـ JSON (مثل FREE FIER) لتوريث السياق للأقسام الفرعية.
+ * @fileOverview محرك "رادار شبيك لبيك" المطور - نسخة الاختراق الذري V20.
+ * يقوم بمسح شامل ويستخرج الأسماء من مفاتيح الـ JSON (مثل FREE FIER) لضمان توريث السياق للأقسام العميقة.
  */
 export async function GET() {
     const API_TOKEN = process.env.ALRAGHEB_TOKEN;
@@ -36,7 +36,7 @@ export async function GET() {
         const keysToIgnore = ['variants', 'options', 'prices', 'sub_services', 'items', 'products', 'data', 'services', 'children', 'quantities', 'sub_categories', 'sections', 'categories', 'id', 'status', 'available', 'price', 'name', 'img', 'image'];
 
         /**
-         * دالة التنقيب الذري: تخترق كافة الطبقات وتلتقط الأسماء من المفاتيح (مثل FREE FIER) لضمان عدم ضياع السياق.
+         * دالة التنقيب الذري: تخترق كافة الطبقات وتلتقط الأسماء من المفاتيح لضمان عدم ضياع السياق.
          */
         function deepScan(obj: any, parentName = '', catInfo = { name: '', id: '' }) {
             if (!obj || typeof obj !== 'object') return;
@@ -79,7 +79,7 @@ export async function GET() {
                         let nextCatName = currentCatName;
                         const lowerKey = key.toLowerCase();
                         
-                        // التقاط اسم القسم من المفتاح إذا كان نصياً وليس من كلمات النظام (مثل FREE FIER)
+                        // التقاط اسم القسم من المفتاح (مثل FREE FIER)
                         if (!keysToIgnore.includes(lowerKey) && isNaN(Number(key)) && key.length > 2) {
                             nextCatName = nextCatName ? `${nextCatName} > ${key}` : key;
                         }

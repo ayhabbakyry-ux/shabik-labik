@@ -63,7 +63,6 @@ export function ProductSheet({
     if (isTelecom) {
       return originalPrice * 1.03;
     }
-    // الحفاظ على عمولة الـ 3 ليرات للألعاب وتطبيقات الدردشة
     if (!isShamCash) {
        return originalPrice + 3;
     }
@@ -166,17 +165,15 @@ export function ProductSheet({
         
         if (Number(p.price) < 10) return false;
 
-        // حصر فقاعة الفري فاير لجلب الفئات الستة المطلوبة حصراً Diamond 110, 210, 310, 530, 1080, 2200
+        // حصر فقاعة الفري فاير لجلب الفئات الستة المطلوبة حصراً بالاسم والعدد
         if (searchKey === "free fire") {
             const specificNumbers = ["110", "210", "310", "530", "1080", "2200"];
-            // تنظيف الاسم من المسافات لضمان التقاط الرقم بدقة
             const prodNameClean = prodName.replace(/\s+/g, '');
             const hasNum = specificNumbers.some(num => prodNameClean.includes(num));
             
             const isDiamond = prodName.includes("diamond") || prodName.includes("دياموند") || prodName.includes("جواهر") || prodName.includes("gems");
             const isFFIdentity = prodName.includes("fire") || prodName.includes("fier") || catName.includes("fire") || catName.includes("fier") || prodName.includes("فري فاير") || catName.includes("فري فاير");
 
-            // عرض حصري للفئات الستة المطلوبة التي تحمل هوية الفري فاير
             return isFFIdentity && isDiamond && hasNum;
         }
 
