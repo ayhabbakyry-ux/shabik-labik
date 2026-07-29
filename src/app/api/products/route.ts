@@ -84,7 +84,7 @@ export async function GET() {
                         const lowerKey = key.toLowerCase();
                         
                         // التقاط اسم القسم من مفاتيح الـ JSON (مثل FREE FIER)
-                        const isGameKey = gameKeywords.some(kw => lowerKey.includes(isFinite(Number(kw)) ? "" : kw));
+                        const isGameKey = gameKeywords.some(kw => lowerKey.includes(kw));
                         if (isGameKey && isNaN(Number(key))) {
                             nextCatName = nextCatName ? `${nextCatName} > ${key.toUpperCase()}` : key.toUpperCase();
                         }

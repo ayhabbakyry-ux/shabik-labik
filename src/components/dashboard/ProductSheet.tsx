@@ -165,15 +165,16 @@ export function ProductSheet({
         
         if (Number(p.price) < 10) return false;
 
-        // حصر فقاعة الفري فاير لجلب الفئات الستة المطلوبة حصراً بالاسم والعدد
+        // فحص صارم لفقاعة الفري فاير لجلب الفئات الستة المطلوبة حصراً بالاسم والعدد
         if (searchKey === "free fire") {
             const specificNumbers = ["110", "210", "310", "530", "1080", "2200"];
             
-            // التحقق من هوية الفري فاير
+            // التحقق من هوية الفري فاير (نقبل الاختلافات الإملائية القادمة من الباك إند)
             const isFFBrand = prodName.includes("fire") || prodName.includes("fier") || catName.includes("FIRE") || catName.includes("FIER") || prodName.includes("فري فاير") || catName.includes("فري فاير");
             
-            // التحقق من وجود أحد الأعداد الستة في الاسم
-            const hasCorrectNum = specificNumbers.some(num => prodName.replace(/\s+/g, '').includes(num));
+            // التحقق من وجود أحد الأعداد الستة في الاسم (بإلغاء المسافات للفحص الدقيق)
+            const cleanName = prodName.replace(/\s+/g, '');
+            const hasCorrectNum = specificNumbers.some(num => cleanName.includes(num));
 
             // العرض حصراً للفئات الستة التي تحمل هوية اللعبة
             return isFFBrand && hasCorrectNum;
