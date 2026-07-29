@@ -4,8 +4,8 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * @fileOverview محرك "رادار شبيك لبيك" المطور - نسخة الاختراق الذري V22.
- * يقوم بمسح شامل ويستخرج الأسماء من مفاتيح الـ JSON (مثل FREE FIER) لضمان توريث السياق للأقسام العميقة.
+ * @fileOverview محرك "رادار شبيك لبيك" المطور - نسخة الاختراق الذري V23.
+ * يقوم بمسح شامل ويستخرج الأسماء من كافة المفاتيح لضمان التقاط فئات الفري فاير المختبئة.
  */
 export async function GET() {
     const API_TOKEN = process.env.ALRAGHEB_TOKEN;
@@ -33,10 +33,11 @@ export async function GET() {
         const rawData = await response.json();
         let allExtractedItems: any[] = [];
 
-        const keysToIgnore = ['variants', 'options', 'prices', 'sub_services', 'items', 'products', 'data', 'services', 'children', 'quantities', 'sub_categories', 'sections', 'categories', 'id', 'status', 'available', 'price', 'name', 'img', 'image'];
+        // المفاتيح التي نعتبرها أسماء أقسام إذا احتوت على كلمات دلالية
+        const gameKeywords = ['fire', 'fier', 'pubg', 'tiktok', 'bigo', 'likee', 'clash', 'royale', 'pool', 'units', 'سيريتل', 'mtn'];
 
         /**
-         * دالة التنقيب الذري: تخترق كافة الطبقات وتلتقط الأسماء من المفاتيح لضمان عدم ضياع السياق.
+         * دالة التنقيب الذري: تخترق كافة الطبقات وتلتقط الهوية من المفاتيح والأسماء.
          */
         function deepScan(obj: any, parentName = '', catInfo = { name: '', id: '' }) {
             if (!obj || typeof obj !== 'object') return;
@@ -51,12 +52,14 @@ export async function GET() {
             let currentCatName = catInfo.name;
             let currentCatId = catInfo.id;
             
+            // تحديث اسم القسم إذا وجد
             const detectedCatName = obj.category_name || obj.category?.name || obj.section?.name || (id && name && !price ? name : "");
             if (detectedCatName) {
                 currentCatName = currentCatName ? `${currentCatName} > ${detectedCatName}` : detectedCatName;
                 currentCatId = obj.category_id || obj.category?.id || obj.section_id || currentCatId;
             }
 
+            // إذا وجدنا منتجاً حقيقياً (ID وسعر)
             if (id && Number(price) >= 10 && name) {
                 const fullName = parentName && !name.includes(parentName) ? `${parentName} - ${name}` : name;
                 allExtractedItems.push({
@@ -70,6 +73,7 @@ export async function GET() {
                 });
             }
 
+            // التنقيب في العمق
             if (Array.isArray(obj)) {
                 obj.forEach(item => deepScan(item, parentName, { name: currentCatName, id: currentCatId }));
             } else {
@@ -79,14 +83,10 @@ export async function GET() {
                         let nextCatName = currentCatName;
                         const lowerKey = key.toLowerCase();
                         
-                        // التقاط اسم القسم من المفتاح (مثل FREE FIER) وتمريره كـ Context
-                        if (!keysToIgnore.includes(lowerKey) && isNaN(Number(key)) && key.length > 2) {
+                        // التقاط اسم القسم من مفاتيح الـ JSON (مثل FREE FIER)
+                        const isGameKey = gameKeywords.some(kw => lowerKey.includes(isFinite(Number(kw)) ? "" : kw));
+                        if (isGameKey && isNaN(Number(key))) {
                             nextCatName = nextCatName ? `${nextCatName} > ${key.toUpperCase()}` : key.toUpperCase();
-                        }
-                        
-                        // حقن سياق الفري فاير الصارم إذا وجد في المفاتيح لضمان عدم ضياع الهوية
-                        if (lowerKey.includes('fire') || lowerKey.includes('fier') || lowerKey.includes('فري') || lowerKey.includes('فاير')) {
-                            nextCatName = nextCatName.includes('FREE FIRE') ? nextCatName : (nextCatName ? `${nextCatName} > FREE FIRE` : 'FREE FIRE');
                         }
 
                         const newParentName = (id && name) ? name : parentName;
@@ -98,6 +98,7 @@ export async function GET() {
 
         deepScan(rawData);
 
+        // إزالة التكرار
         const uniqueProducts = Array.from(new Map(allExtractedItems.map(item => [String(item.id) + String(item.price), item])).values());
         return NextResponse.json(uniqueProducts);
 

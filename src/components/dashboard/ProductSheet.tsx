@@ -64,7 +64,7 @@ export function ProductSheet({
       return originalPrice * 1.03;
     }
     if (!isShamCash) {
-       return originalPrice + 3;
+       return originalPrice + 3; // عمولة الـ 3 ليرات ثابتة للألعاب
     }
     return originalPrice;
   }, [isTelecom, isShamCash]);
@@ -169,16 +169,14 @@ export function ProductSheet({
         if (searchKey === "free fire") {
             const specificNumbers = ["110", "210", "310", "530", "1080", "2200"];
             
-            // تنظيف الاسم من المسافات للبحث عن العدد بدقة
-            const prodNameClean = prodName.replace(/\s+/g, '');
-            const hasCorrectNum = specificNumbers.some(num => prodNameClean.includes(num));
-            
-            // التحقق من هوية الفري فاير والجواهر
+            // التحقق من هوية الفري فاير
             const isFFBrand = prodName.includes("fire") || prodName.includes("fier") || catName.includes("FIRE") || catName.includes("FIER") || prodName.includes("فري فاير") || catName.includes("فري فاير");
-            const isDiamond = prodName.includes("diamond") || prodName.includes("جواهر") || prodName.includes("دياموند") || prodName.includes("gems");
+            
+            // التحقق من وجود أحد الأعداد الستة في الاسم
+            const hasCorrectNum = specificNumbers.some(num => prodName.replace(/\s+/g, '').includes(num));
 
             // العرض حصراً للفئات الستة التي تحمل هوية اللعبة
-            return isFFBrand && isDiamond && hasCorrectNum;
+            return isFFBrand && hasCorrectNum;
         }
 
         if (searchKey === "pubg") {
@@ -195,18 +193,6 @@ export function ProductSheet({
             return prodName.includes("tik tok") || prodName.includes("tiktok") || prodName.includes("تيك توك") || catName.includes("tiktok");
         }
 
-        if (searchKey === "clash") {
-            const matchesClash = prodName.includes("clash") || prodName.includes("كلاش") || catName.includes("clash");
-            const matchesRoyale = prodName.includes("royale") || prodName.includes("رويال") || catName.includes("royale");
-            return matchesClash && !matchesRoyale;
-        }
-
-        if (searchKey === "royale") {
-            return prodName.includes("royale") || prodName.includes("رويال") || catName.includes("royale");
-        }
-
-        if (searchKey === "pool coins") return prodName.includes("العملات الذهبية");
-        if (searchKey === "pool cash") return prodName.includes("العملات الورقية");
         if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
         if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
         
