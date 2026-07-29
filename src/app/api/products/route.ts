@@ -4,8 +4,8 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * @fileOverview محرك "رادار شبيك لبيك" المطور - نسخة الاختراق الذري V23.
- * يقوم بمسح شامل ويستخرج الأسماء من كافة المفاتيح لضمان التقاط فئات الفري فاير المختبئة.
+ * @fileOverview محرك "رادار شبيك لبيك" المطور - نسخة الاختراق الذري V24.
+ * يقوم بمسح شامل ويستخرج الأسماء من كافة المفاتيح لضمان التقاط فئات الفري فاير المختبئة وتوريث الهوية.
  */
 export async function GET() {
     const API_TOKEN = process.env.ALRAGHEB_TOKEN;
@@ -33,64 +33,70 @@ export async function GET() {
         const rawData = await response.json();
         let allExtractedItems: any[] = [];
 
-        // المفاتيح التي نعتبرها أسماء أقسام إذا احتوت على كلمات دلالية
-        const gameKeywords = ['fire', 'fier', 'pubg', 'tiktok', 'bigo', 'likee', 'clash', 'royale', 'pool', 'units', 'سيريتل', 'mtn'];
+        // الكلمات المفتاحية للهوية
+        const gameKeywords = ['fire', 'fier', 'pubg', 'tiktok', 'bigo', 'likee', 'clash', 'royale', 'pool', 'units', 'سيريتل', 'mtn', 'diamond', 'جواهر'];
 
         /**
          * دالة التنقيب الذري: تخترق كافة الطبقات وتلتقط الهوية من المفاتيح والأسماء.
          */
-        function deepScan(obj: any, parentName = '', catInfo = { name: '', id: '' }) {
+        function deepScan(obj: any, inheritedContext = '', parentName = '') {
             if (!obj || typeof obj !== 'object') return;
 
+            // استخراج البيانات الأساسية
             const name = obj.الاسم || obj.name || obj.title || obj.product_name || obj.value || obj.label || '';
             const price = obj.السعر || obj.price || obj.cost || obj.amount || obj.rate || 0;
             const id = obj.id || obj.product_id || obj.service_id || obj.item_id;
 
+            // تحديد الحالة
             const rawStatus = obj.status !== undefined ? obj.status : (obj.active !== undefined ? obj.active : (obj.available !== undefined ? obj.available : 1));
             const isAvailable = (rawStatus === 1 || rawStatus === true || String(rawStatus).toLowerCase() === 'active' || String(rawStatus).toLowerCase() === 'available' || String(rawStatus) === '1' || String(rawStatus) === 'موافق' || String(rawStatus) === 'مكتمل' || String(rawStatus) === 'قبول');
 
-            let currentCatName = catInfo.name;
-            let currentCatId = catInfo.id;
-            
-            // تحديث اسم القسم إذا وجد
+            // التقاط الهوية من المفتاح أو الاسم
+            let currentContext = inheritedContext;
             const detectedCatName = obj.category_name || obj.category?.name || obj.section?.name || (id && name && !price ? name : "");
             if (detectedCatName) {
-                currentCatName = currentCatName ? `${currentCatName} > ${detectedCatName}` : detectedCatName;
-                currentCatId = obj.category_id || obj.category?.id || obj.section_id || currentCatId;
+                const lowerCat = detectedCatName.toLowerCase();
+                if (lowerCat.includes('fire') || lowerCat.includes('fier') || lowerCat.includes('فري فاير')) {
+                    currentContext = 'FREE FIRE';
+                } else if (lowerCat.includes('pubg') || lowerCat.includes('ببجي')) {
+                    currentContext = 'PUBG';
+                }
             }
 
-            // إذا وجدنا منتجاً حقيقياً (ID وسعر)
+            // إذا وجدنا منتجاً حقيقياً (ID وسعر واسم)
             if (id && Number(price) >= 10 && name) {
-                const fullName = parentName && !name.includes(parentName) ? `${parentName} - ${name}` : name;
+                // توريث اسم اللعبة إذا كان المنتج بداخلها
+                const finalCategory = currentContext || detectedCatName || parentName || '';
+                
                 allExtractedItems.push({
                     id: id,
-                    name: String(fullName),
+                    name: String(name),
                     price: Number(price),
-                    category_name: String(currentCatName || parentName || ''),
-                    category_id: currentCatId,
+                    category_name: String(finalCategory),
+                    category_id: obj.category_id || obj.category?.id || '',
                     image: obj.image || obj.img || obj.thumbnail || '',
                     available: isAvailable
                 });
             }
 
-            // التنقيب في العمق
+            // التنقيب في العمق مع توريث السياق
             if (Array.isArray(obj)) {
-                obj.forEach(item => deepScan(item, parentName, { name: currentCatName, id: currentCatId }));
+                obj.forEach(item => deepScan(item, currentContext, name || parentName));
             } else {
                 Object.keys(obj).forEach(key => {
                     const value = obj[key];
                     if (value && typeof value === 'object') {
-                        let nextCatName = currentCatName;
+                        let nextContext = currentContext;
                         const lowerKey = key.toLowerCase();
                         
-                        // التقاط اسم القسم من مفاتيح الـ JSON (مثل FREE FIER)
-                        const isGameKey = gameKeywords.some(kw => lowerKey.includes(kw));
-                        if (isGameKey && isNaN(Number(key))) {
-                            nextCatName = nextCatName ? `${nextCatName} > ${key.toUpperCase()}` : key.toUpperCase();
+                        // التقاط الهوية من مفاتيح الـ JSON
+                        if (lowerKey.includes('fire') || lowerKey.includes('fier')) {
+                            nextContext = 'FREE FIRE';
+                        } else if (lowerKey.includes('pubg')) {
+                            nextContext = 'PUBG';
                         }
 
-                        const newParentName = (id && name) ? name : parentName;
-                        deepScan(value, newParentName, { name: nextCatName, id: currentCatId });
+                        deepScan(value, nextContext, (id && name) ? name : parentName);
                     }
                 });
             }
@@ -98,7 +104,7 @@ export async function GET() {
 
         deepScan(rawData);
 
-        // إزالة التكرار
+        // إزالة التكرار (ID + السعر)
         const uniqueProducts = Array.from(new Map(allExtractedItems.map(item => [String(item.id) + String(item.price), item])).values());
         return NextResponse.json(uniqueProducts);
 

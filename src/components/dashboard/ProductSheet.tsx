@@ -64,7 +64,7 @@ export function ProductSheet({
       return originalPrice * 1.03;
     }
     if (!isShamCash) {
-       return originalPrice + 3; // عمولة الـ 3 ليرات ثابتة للألعاب
+       return originalPrice + 3; // عمولة الـ 3 ليرات ثابتة للألعاب والتطبيقات
     }
     return originalPrice;
   }, [isTelecom, isShamCash]);
@@ -165,38 +165,42 @@ export function ProductSheet({
         
         if (Number(p.price) < 10) return false;
 
-        // فحص صارم لفقاعة الفري فاير لجلب الفئات الستة المطلوبة حصراً بالاسم والعدد
+        // حصر فقاعة الفري فاير بالفئات الستة المطلوبة حصراً (Diamond 110, 210, 310, 530, 1080, 2200)
         if (searchKey === "free fire") {
-            const specificNumbers = ["110", "210", "310", "530", "1080", "2200"];
+            const allowedNumbers = ["110", "210", "310", "530", "1080", "2200"];
             
-            // التحقق من هوية الفري فاير (نقبل الاختلافات الإملائية القادمة من الباك إند)
-            const isFFBrand = prodName.includes("fire") || prodName.includes("fier") || catName.includes("FIRE") || catName.includes("FIER") || prodName.includes("فري فاير") || catName.includes("فري فاير");
+            // التحقق من هوية اللعبة أو الجواهر في الاسم أو الفئة
+            const hasFFIdentity = prodName.includes("fire") || prodName.includes("fier") || catName.includes("FIRE") || catName.includes("FIER") || prodName.includes("diamond") || prodName.includes("جواهر");
             
-            // التحقق من وجود أحد الأعداد الستة في الاسم (بإلغاء المسافات للفحص الدقيق)
+            // تنظيف الاسم للتحقق من الأرقام بدقة
             const cleanName = prodName.replace(/\s+/g, '');
-            const hasCorrectNum = specificNumbers.some(num => cleanName.includes(num));
+            const hasCorrectNum = allowedNumbers.some(num => cleanName.includes(num));
 
-            // العرض حصراً للفئات الستة التي تحمل هوية اللعبة
-            return isFFBrand && hasCorrectNum;
+            return hasFFIdentity && hasCorrectNum;
         }
 
+        // ببجي عالمي (استثناء التركي)
         if (searchKey === "pubg") {
-            const isPubg = prodName.includes("pubg") || catName.includes("pubg") || prodName.includes("ببجي") || catName.includes("ببجي");
+            const isPubg = prodName.includes("pubg") || catName.includes("pubg") || prodName.includes("ببجي");
             const isTR = prodName.includes("tr") || prodName.includes("turkey") || prodName.includes("تركي");
             return isPubg && !isTR;
         }
 
+        // ببجي تركي
         if (searchKey === "pubg tr") {
             return prodName.includes("pubg tr") || prodName.includes("pubg-tr") || catName.includes("pubg tr") || (prodName.includes("pubg") && (prodName.includes("tr") || prodName.includes("turkey")));
         }
 
+        // تيك توك
         if (searchKey === "tiktok") {
             return prodName.includes("tik tok") || prodName.includes("tiktok") || prodName.includes("تيك توك") || catName.includes("tiktok");
         }
 
+        // اتصالات
         if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
         if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
         
+        // عام
         return prodName.includes(searchKey) || catName.includes(searchKey);
     });
   }, [allProducts, filterValue]);
