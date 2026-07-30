@@ -56,7 +56,30 @@ export function ProductSheet({
     return filter.includes('mtn') || filter.includes('syriatel');
   }, [filterValue]);
 
-  const isUnitPhoneError = isTelecom && globalTargetId.length > 0 && !globalTargetId.startsWith("09");
+  const isUnitPhoneError = useMemo(() => {
+    if (!isTelecom || globalTargetId.length === 0) return false;
+    const lowerFilter = filterValue.toLowerCase();
+    if (lowerFilter.includes('mtn')) {
+      return !(globalTargetId.startsWith("095") || globalTargetId.startsWith("096") || globalTargetId.startsWith("094"));
+    }
+    if (lowerFilter.includes('syriatel')) {
+      return !(globalTargetId.startsWith("098") || globalTargetId.startsWith("093") || globalTargetId.startsWith("099"));
+    }
+    return !globalTargetId.startsWith("09");
+  }, [isTelecom, globalTargetId, filterValue]);
+
+  const phoneErrorMessage = useMemo(() => {
+    if (!isUnitPhoneError) return null;
+    const lowerFilter = filterValue.toLowerCase();
+    if (lowerFilter.includes('mtn')) {
+      return "عذراً، أرقام MTN يجب أن تبدأ بـ 095 أو 096 أو 094.";
+    }
+    if (lowerFilter.includes('syriatel')) {
+      return "عذراً، أرقام Syriatel يجب أن تبدأ بـ 098 أو 093 أو 099.";
+    }
+    return "عذراً، يجب أن يبدأ الرقم بـ 09 حصراً.";
+  }, [isUnitPhoneError, filterValue]);
+
 
   const calculateProductPrice = useCallback((product: ProductItem) => {
     const originalPrice = Number(product.price);
@@ -64,7 +87,7 @@ export function ProductSheet({
       return originalPrice * 1.03;
     }
     if (!isShamCash) {
-       return originalPrice + 3; // عمولة الـ 3 ليرات ثابتة للألعاب والتطبيقات
+       return originalPrice + 3; 
     }
     return originalPrice;
   }, [isTelecom, isShamCash]);
@@ -107,8 +130,8 @@ export function ProductSheet({
     let link = globalTargetId;
     let quantity = 1;
 
-    if (isTelecom && !link.startsWith("09")) {
-      toast({ title: "خطأ في الرقم", description: "يجب أن يبدأ الرقم بـ 09 حصراً.", variant: "destructive" });
+    if (isUnitPhoneError) {
+      toast({ title: "خطأ في الرقم", description: phoneErrorMessage, variant: "destructive" });
       return;
     }
 
@@ -165,42 +188,34 @@ export function ProductSheet({
         
         if (Number(p.price) < 10) return false;
 
-        // حصر فقاعة الفري فاير بالفئات الستة المطلوبة حصراً (Diamond 110, 210, 310, 530, 1080, 2200)
         if (searchKey === "free fire") {
+            if (prodName.includes("royal") || prodName.includes("رويال")) return false;
+            
             const allowedNumbers = ["110", "210", "310", "530", "1080", "2200"];
+            const isDiamond = prodName.includes("diamond") || prodName.includes("جواهر");
+            const hasCorrectNum = allowedNumbers.some(num => prodName.includes(num));
             
-            // التحقق من هوية اللعبة أو الجواهر في الاسم أو الفئة
-            const hasFFIdentity = prodName.includes("fire") || prodName.includes("fier") || catName.includes("FIRE") || catName.includes("FIER") || prodName.includes("diamond") || prodName.includes("جواهر");
+            const isMembership = prodName.includes("weekly") || prodName.includes("monthly") || prodName.includes("عضوية") || prodName.includes("اسبوعية") || prodName.includes("شهرية");
+            const isBooyah = prodName.includes("booyah") || prodName.includes("pass") || prodName.includes("بوياه") || prodName.includes("تصريح");
+            const isLevelUp = (prodName.includes("level up") || prodName.includes("ترقية") || prodName.includes("مستوى")) && (prodName.includes("6") || prodName.includes("10") || prodName.includes("15"));
             
-            // تنظيف الاسم للتحقق من الأرقام بدقة
-            const cleanName = prodName.replace(/\s+/g, '');
-            const hasCorrectNum = allowedNumbers.some(num => cleanName.includes(num));
-
-            return hasFFIdentity && hasCorrectNum;
+            const hasFFIdentity = prodName.includes("fire") || prodName.includes("fier") || catName.includes("fire") || catName.includes("fier");
+            
+            return (isDiamond && hasCorrectNum) || isMembership || isBooyah || isLevelUp || (hasFFIdentity && (hasCorrectNum || isMembership || isBooyah || isLevelUp));
         }
 
-        // ببجي عالمي (استثناء التركي)
+        if (searchKey === "clash of clans") {
+            const hasClashIdentity = prodName.includes("clash") || prodName.includes("clah") || prodName.includes("كلاش") || prodName.includes("رويال");
+            const hasCategoryIdentity = catName.includes("clash");
+            return hasClashIdentity || hasCategoryIdentity;
+        }
+
         if (searchKey === "pubg") {
             const isPubg = prodName.includes("pubg") || catName.includes("pubg") || prodName.includes("ببجي");
             const isTR = prodName.includes("tr") || prodName.includes("turkey") || prodName.includes("تركي");
             return isPubg && !isTR;
         }
 
-        // ببجي تركي
-        if (searchKey === "pubg tr") {
-            return prodName.includes("pubg tr") || prodName.includes("pubg-tr") || catName.includes("pubg tr") || (prodName.includes("pubg") && (prodName.includes("tr") || prodName.includes("turkey")));
-        }
-
-        // تيك توك
-        if (searchKey === "tiktok") {
-            return prodName.includes("tik tok") || prodName.includes("tiktok") || prodName.includes("تيك توك") || catName.includes("tiktok");
-        }
-
-        // اتصالات
-        if (searchKey === "syriatel") return prodName.includes("سيريتل") || prodName.includes("syriatel");
-        if (searchKey === "mtn") return prodName.includes("mtn") || prodName.includes("ام تي ان");
-        
-        // عام
         return prodName.includes(searchKey) || catName.includes(searchKey);
     });
   }, [allProducts, filterValue]);
@@ -244,8 +259,8 @@ export function ProductSheet({
                          onChange={(e) => setGlobalTargetId(e.target.value.replace(/[^0-9]/g, ""))} 
                        />
                     </div>
-                    {isUnitPhoneError && (
-                      <p className="text-destructive text-[9px] font-bold pr-1">عذراً، يجب أن يبدأ الرقم بـ 09 حصراً وبأرقام إنكليزية.</p>
+                    {phoneErrorMessage && (
+                      <p className="text-destructive text-[9px] font-bold pr-1">{phoneErrorMessage}</p>
                     )}
                  </div>
 
