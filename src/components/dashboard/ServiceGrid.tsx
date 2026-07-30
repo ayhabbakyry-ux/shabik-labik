@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo } from "react";
@@ -138,7 +137,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
         { 
           id: "freefire", 
           name: "فري فاير", 
-          filter: "Free Fire", 
+          filter: "FREE FIRE", 
           icon: Zap, 
           color: "text-orange-600", 
           bg: "bg-orange-50",
@@ -157,7 +156,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
         { 
           id: "coc", 
           name: "كلاش اوف كلانس", 
-          filter: "Clash", 
+          filter: "CLASH OF CLANS", 
           icon: Castle, 
           color: "text-blue-600", 
           bg: "bg-blue-50",
@@ -166,7 +165,7 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
         { 
           id: "clash_royale", 
           name: "كلاش رويال", 
-          filter: "Royale", 
+          filter: "CLASH_ROYALE", 
           icon: Swords, 
           color: "text-red-600", 
           bg: "bg-red-50",
@@ -298,7 +297,6 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
             
             <SheetContent side="bottom" className="h-full bg-background border-none shadow-none p-0 overflow-hidden" dir="rtl">
                <div className="h-full flex flex-col">
-                  {/* Header with Intelligent Back Button */}
                   <div className="p-6 border-b bg-white/80 backdrop-blur-md sticky top-0 z-20 flex items-center justify-between">
                      <div className="flex items-center gap-4">
                         {activeSubGroup === 'pool' ? (
@@ -323,7 +321,6 @@ export function ServiceGrid({ isAdmin, searchQuery = "" }: { isAdmin?: boolean, 
                         )}
                      </div>
                      
-                     {/* Intelligent Back/Close logic */}
                      {activeSubGroup ? (
                         <Button 
                           variant="ghost" 

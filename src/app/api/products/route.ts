@@ -3,10 +3,6 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-/**
- * @fileOverview محرك "رادار شبيك لبيك" المطور - نسخة الاختراق الذري V24.
- * يقوم بمسح شامل ويستخرج الأسماء من كافة المفاتيح لضمان التقاط فئات الفري فاير المختبئة وتوريث الهوية.
- */
 export async function GET() {
     const API_TOKEN = process.env.ALRAGHEB_TOKEN;
     const ENDPOINT = 'https://api.alragheb-store.com/client/api/products?limit=500';
@@ -33,53 +29,47 @@ export async function GET() {
         const rawData = await response.json();
         let allExtractedItems: any[] = [];
 
-        // الكلمات المفتاحية للهوية
-        const gameKeywords = ['fire', 'fier', 'pubg', 'tiktok', 'bigo', 'likee', 'clash', 'royale', 'pool', 'units', 'سيريتل', 'mtn', 'diamond', 'جواهر'];
-
-        /**
-         * دالة التنقيب الذري: تخترق كافة الطبقات وتلتقط الهوية من المفاتيح والأسماء.
-         */
         function deepScan(obj: any, inheritedContext = '', parentName = '') {
             if (!obj || typeof obj !== 'object') return;
 
-            // استخراج البيانات الأساسية
             const name = obj.الاسم || obj.name || obj.title || obj.product_name || obj.value || obj.label || '';
             const price = obj.السعر || obj.price || obj.cost || obj.amount || obj.rate || 0;
             const id = obj.id || obj.product_id || obj.service_id || obj.item_id;
 
-            // تحديد الحالة
             const rawStatus = obj.status !== undefined ? obj.status : (obj.active !== undefined ? obj.active : (obj.available !== undefined ? obj.available : 1));
             const isAvailable = (rawStatus === 1 || rawStatus === true || String(rawStatus).toLowerCase() === 'active' || String(rawStatus).toLowerCase() === 'available' || String(rawStatus) === '1' || String(rawStatus) === 'موافق' || String(rawStatus) === 'مكتمل' || String(rawStatus) === 'قبول');
 
-            // التقاط الهوية من المفتاح أو الاسم
             let currentContext = inheritedContext;
             const detectedCatName = obj.category_name || obj.category?.name || obj.section?.name || (id && name && !price ? name : "");
-            if (detectedCatName) {
-                const lowerCat = detectedCatName.toLowerCase();
-                if (lowerCat.includes('fire') || lowerCat.includes('fier') || lowerCat.includes('فري فاير')) {
-                    currentContext = 'FREE FIRE';
-                } else if (lowerCat.includes('pubg') || lowerCat.includes('ببجي')) {
-                    currentContext = 'PUBG';
-                }
-            }
-
-            // إذا وجدنا منتجاً حقيقياً (ID وسعر واسم)
-            if (id && Number(price) >= 10 && name) {
-                // توريث اسم اللعبة إذا كان المنتج بداخلها
-                const finalCategory = currentContext || detectedCatName || parentName || '';
+            
+            const findIdentity = (text: string) => {
+                const low = text.toLowerCase();
+                if (low.includes('fire') || low.includes('fier') || low.includes('فري فاير') || low.includes('booyah')) return 'FREE FIRE';
                 
+                // --- فقاعة كلاش رويال الحصرية ---
+                if (low.includes('royale') || low.includes('رويال')) return 'CLASH_ROYALE';
+                // --- نهاية الفقاعة ---
+
+                if (low.includes('clash of clans') || low.includes('clah of clans') || low.includes('clash') || low.includes('clah') || low.includes('كلاش') || low.includes('clans') || low.includes('كلانز')) return 'CLASH OF CLANS';
+                if (low.includes('pubg') || low.includes('ببجي')) return 'PUBG';
+                return null;
+            };
+
+            const identity = findIdentity(name) || findIdentity(detectedCatName) || findIdentity(parentName);
+            if (identity) currentContext = identity;
+
+            if (id && Number(price) >= 10 && name) {
                 allExtractedItems.push({
                     id: id,
                     name: String(name),
                     price: Number(price),
-                    category_name: String(finalCategory),
+                    category_name: currentContext,
                     category_id: obj.category_id || obj.category?.id || '',
                     image: obj.image || obj.img || obj.thumbnail || '',
                     available: isAvailable
                 });
             }
 
-            // التنقيب في العمق مع توريث السياق
             if (Array.isArray(obj)) {
                 obj.forEach(item => deepScan(item, currentContext, name || parentName));
             } else {
@@ -87,15 +77,8 @@ export async function GET() {
                     const value = obj[key];
                     if (value && typeof value === 'object') {
                         let nextContext = currentContext;
-                        const lowerKey = key.toLowerCase();
-                        
-                        // التقاط الهوية من مفاتيح الـ JSON
-                        if (lowerKey.includes('fire') || lowerKey.includes('fier')) {
-                            nextContext = 'FREE FIRE';
-                        } else if (lowerKey.includes('pubg')) {
-                            nextContext = 'PUBG';
-                        }
-
+                        const keyIdentity = findIdentity(key);
+                        if (keyIdentity) nextContext = keyIdentity;
                         deepScan(value, nextContext, (id && name) ? name : parentName);
                     }
                 });
@@ -104,7 +87,6 @@ export async function GET() {
 
         deepScan(rawData);
 
-        // إزالة التكرار (ID + السعر)
         const uniqueProducts = Array.from(new Map(allExtractedItems.map(item => [String(item.id) + String(item.price), item])).values());
         return NextResponse.json(uniqueProducts);
 

@@ -205,9 +205,16 @@ export function ProductSheet({
         }
 
         if (searchKey === "clash of clans") {
-            const hasClashIdentity = prodName.includes("clash") || prodName.includes("clah") || prodName.includes("كلاش") || prodName.includes("رويال");
+            const hasClashIdentity = prodName.includes("clash") || prodName.includes("clah") || prodName.includes("كلاش");
             const hasCategoryIdentity = catName.includes("clash");
-            return hasClashIdentity || hasCategoryIdentity;
+            const isNotRoyale = !prodName.includes("royal");
+            return (hasClashIdentity || hasCategoryIdentity) && isNotRoyale;
+        }
+
+        if (searchKey === "clash_royale") {
+            const hasRoyaleIdentity = prodName.includes("royale") || prodName.includes("رويال");
+            const hasCategoryIdentity = catName.includes("royale");
+            return hasRoyaleIdentity || hasCategoryIdentity;
         }
 
         if (searchKey === "pubg") {
